@@ -32,6 +32,7 @@
             paraview
             vtk
             cmake-format
+            llvm.openmp
           ];
         };
       }
