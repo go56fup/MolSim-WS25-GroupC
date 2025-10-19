@@ -8,7 +8,9 @@
 #include "outputWriter/XYZWriter.h"
 
 #include <iomanip>
+#include <span>
 #include <sstream>
+#include <string_view>
 
 namespace outputWriter {
 
@@ -16,7 +18,7 @@ XYZWriter::XYZWriter() = default;
 
 XYZWriter::~XYZWriter() = default;
 
-void XYZWriter::plotParticles(std::list<Particle> particles, const std::string& filename, int iteration) {
+void XYZWriter::plotParticles(std::span<const Particle> particles, std::string_view filename, int iteration) {
 	std::ofstream file;
 	std::stringstream strstr;
 	strstr << filename << "_" << std::setfill('0') << std::setw(4) << iteration << ".xyz";
@@ -28,7 +30,7 @@ void XYZWriter::plotParticles(std::list<Particle> particles, const std::string& 
 		 << std::endl;
 
 	for (auto& p : particles) {
-		std::array<double, 3> x = p.getX();
+		auto x = p.getX();
 		file << "Ar ";
 		file.setf(std::ios_base::showpoint);
 

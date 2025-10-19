@@ -6,7 +6,7 @@
  */
 #ifdef ENABLE_VTK_OUTPUT
 
-#include "VTKWriter.h"
+#include "outputWriter/VTKWriter.h"
 
 #include <vtkCellArray.h>
 #include <vtkDoubleArray.h>
@@ -16,11 +16,13 @@
 #include <vtkXMLUnstructuredGridWriter.h>
 
 #include <iomanip>
+#include <span>
 #include <sstream>
+#include <string_view>
 
 namespace outputWriter {
 
-void VTKWriter::plotParticles(std::list<Particle> particles, const std::string& filename, int iteration) {
+void VTKWriter::plotParticles(std::span<const Particle> particles, std::string_view filename, int iteration) {
 	// Initialize points
 	auto points = vtkSmartPointer<vtkPoints>::New();
 
@@ -71,6 +73,7 @@ void VTKWriter::plotParticles(std::list<Particle> particles, const std::string& 
 
 	// Write the file
 	writer->Write();
+	// TODO: deallocate correctly, leaks.
 }
 }  // namespace outputWriter
 #endif

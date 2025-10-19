@@ -10,27 +10,29 @@
 #include <array>
 #include <string>
 
+#include "Vector.h"
+
 class Particle {
 private:
 	/**
 	 * Position of the particle
 	 */
-	std::array<double, 3> x;
+	vec x;
 
 	/**
 	 * Velocity of the particle
 	 */
-	std::array<double, 3> v;
+	vec v;
 
 	/**
 	 * Force effective on this particle
 	 */
-	std::array<double, 3> f;
+	vec f{};
 
 	/**
 	 * Force which was effective on this particle
 	 */
-	std::array<double, 3> old_f;
+	vec old_f{};
 
 	/**
 	 * Mass of this particle
@@ -51,24 +53,32 @@ public:
 	Particle(
 		// for visualization, we need always 3 coordinates
 	    // -> in case of 2d, we use only the first and the second
-		std::array<double, 3> x_arg, std::array<double, 3> v_arg, double m_arg, int type = 0
+		vec x_arg, vec v_arg, double m_arg, int type = 0
 	);
 
 	virtual ~Particle();
 
-	const std::array<double, 3>& getX() const;
+	const vec& getX() const;
 
-	const std::array<double, 3>& getV() const;
+	void setX(const vec&) noexcept;
 
-	const std::array<double, 3>& getF() const;
+	const vec& getV() const;
 
-	const std::array<double, 3>& getOldF() const;
+	void setV(const vec&) noexcept;
+
+	const vec& getF() const;
+
+	void setF(const vec&) noexcept;
+
+	const vec& getOldF() const;
+
+	void setOldF(const vec&) noexcept;
 
 	double getM() const;
 
 	int getType() const;
 
-	bool operator==(Particle& other);
+	constexpr bool operator==(const Particle& other) const = default;
 
 	std::string toString() const;
 };

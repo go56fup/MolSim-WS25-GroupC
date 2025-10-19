@@ -16,10 +16,10 @@ FileReader::FileReader() = default;
 
 FileReader::~FileReader() = default;
 
-void FileReader::readFile(std::list<Particle>& particles, char* filename) {
-	std::array<double, 3> x;
-	std::array<double, 3> v;
-	double m;
+void FileReader::readFile(std::vector<Particle>& particles, char* filename) {
+	vec x{};
+	vec v{};
+	double m{};
 	int num_particles = 0;
 
 	std::ifstream input_file(filename);

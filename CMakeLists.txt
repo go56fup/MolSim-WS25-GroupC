@@ -48,7 +48,16 @@ target_compile_options(
 			# disable some spam warnings for icpc...
 			$<$<CXX_COMPILER_ID:Intel>:-w3
 			-wd383,981,1418,1572,2259>
-)
+		)
+
+if(ENABLE_SANITIZERS)
+	target_compile_options(MolSim PRIVATE "-fsanitize=undefined,address")
+	target_link_options(MolSim PRIVATE "-fsanitize=undefined,address")
+endif()
+
+if(ENABLE_VTK_OUTPUT)
+	target_compile_definitions(MolSim PRIVATE "ENABLE_VTK_OUTPUT")
+endif()
 
 # add additional modules
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/modules)
