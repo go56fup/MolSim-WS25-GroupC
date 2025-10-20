@@ -73,13 +73,26 @@ constexpr void update_values(std::span<Particle> ps) noexcept {
 }
 
 constexpr double get_double_from_argv(std::string_view str) {
-	double ret_val = 0;
-	const auto [ptr, ec] = std::from_chars(str.data(), str.data() + str.length(), ret_val);
-	if (*ptr != '\0' || ec == std::errc::invalid_argument || ec == std::errc::result_out_of_range) {
+	auto invalid_input = []{
 		std::cout << "Given decimal number is invalid.\n";
 		die();
+	};
+	double result = 0;
+#if __cpp_lib_to_chars == 201611L
+	const auto [ptr, ec] = std::from_chars(str.data(), str.data() + str.length(), result);
+	if (*ptr != '\0' || ec == std::errc::invalid_argument || ec == std::errc::result_out_of_range) {
+		invalid_input();
 	}
-	return ret_val;
+#else
+	std::size_t pos = 0;
+	try {
+		result = std::stod(str.data(), &pos);
+	} catch (std::exception&) {
+		invalid_input();
+	}
+	if (pos != str.length()) invalid_input();
+#endif
+	return result;
 }
 
 struct get_parameters_args {

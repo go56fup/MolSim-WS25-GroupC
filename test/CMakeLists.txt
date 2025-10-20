@@ -18,6 +18,8 @@ set(
 FetchContent_MakeAvailable(googletest)
 
 add_executable(MolSim_Test Test.cpp)
+get_target_property(gtest_underlying GTest::gtest_main ALIASED_TARGET)
+set_property(TARGET "${gtest_underlying}" PROPERTY COMPILE_WARNING_AS_ERROR OFF)
 target_link_libraries(MolSim_Test PRIVATE GTest::gtest_main)
 
 include(GoogleTest)
