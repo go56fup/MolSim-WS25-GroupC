@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.10)
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 project(
@@ -48,7 +48,7 @@ target_compile_options(
 			# disable some spam warnings for icpc...
 			$<$<CXX_COMPILER_ID:Intel>:-w3
 			-wd383,981,1418,1572,2259>
-		)
+)
 
 if(ENABLE_SANITIZERS)
 	target_compile_options(MolSim PRIVATE "-fsanitize=undefined,address")

@@ -1,7 +1,10 @@
 MolSim
 ===
-GroupC
+_Group C_
 
-build instructions: 
+#### Build instructions
+```
 cmake --workflow release
+```
+
 The Molecular Dynamics teaching code.
