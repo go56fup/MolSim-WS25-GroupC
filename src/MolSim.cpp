@@ -15,6 +15,12 @@
 #include "utils/ArrayUtils.h"
 #include "Vector.h"
 
+
+/*
+ *	@param p1 represents the particle with coordinates xi
+ 	@param p2 represents the particle with coordinates xj
+	This function calculates the force acting on i from j
+ */
 constexpr vec calculate_component(const Particle& p1, const Particle& p2) noexcept {
 	const auto xi = p1.getX();
 	const auto xj = p2.getX();
@@ -23,6 +29,8 @@ constexpr vec calculate_component(const Particle& p1, const Particle& p2) noexce
 	return scaling_factor * (xj - xi);
 }
 
+
+/// This function sums over all the component forces acting on each particle.
 constexpr void calculateF(std::span<Particle> particles) noexcept {
 	for (std::size_t i = 0; i < particles.size(); ++i) {
 		auto& p1 = particles[i];
@@ -37,6 +45,7 @@ constexpr void calculateF(std::span<Particle> particles) noexcept {
 	}
 }
 
+/// This function updates the coordinate of each particle
 constexpr void calculateX(std::span<Particle> particles, double delta_t) noexcept {
 	for (auto& p : particles) {
 		const auto force_scalar = std::pow(delta_t, 2) / (2 * p.getM());
@@ -45,6 +54,7 @@ constexpr void calculateX(std::span<Particle> particles, double delta_t) noexcep
 	}
 }
 
+/// This function updates the velocity of each particle
 constexpr void calculateV(std::span<Particle> particles, double delta_t) noexcept {
 	for (auto& p : particles) {
 		const auto velocity_scalar = delta_t / (2 * p.getM());
@@ -60,6 +70,7 @@ void plotParticles(std::span<Particle> particles, int iteration) {
 	writer.plotParticles(particles, out_name, iteration);
 }
 
+/// This function updates all values for the start of the next tick (currently only the old Force)
 constexpr void update_values(std::span<Particle> ps) noexcept {
 	for (auto& p : ps) {
 		p.setOldF(p.getF());

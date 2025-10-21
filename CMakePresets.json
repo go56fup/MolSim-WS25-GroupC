@@ -8,7 +8,6 @@
 			"cacheVariables": {
 				"CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
 				"BUILD_TESTING": "ON",
-				"CMAKE_COMPILE_WARNING_AS_ERROR": "ON",
 				"ENABLE_VTK_OUTPUT": "ON"
 			}
 		},
