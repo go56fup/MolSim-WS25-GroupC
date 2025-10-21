@@ -1,5 +1,10 @@
 #pragma once
 
+/**
+ * Prints messages of different types
+ * @tparam Ts
+ * @param msgs
+ */
 template <typename... Ts>
 void debug_print_impl(const Ts&... msgs) {
 	std::cout << "[DEBUG]\t";

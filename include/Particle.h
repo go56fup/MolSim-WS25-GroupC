@@ -56,31 +56,77 @@ public:
 		vec x_arg, vec v_arg, double m_arg, int type = 0
 	);
 
+	/**
+	 * Destructor for this particle
+	 */
 	virtual ~Particle();
 
+	/**
+	 * Returns the position of this particle
+	 */
 	const vec& getX() const;
 
-	void setX(const vec&) noexcept;
+	/**
+	 * Sets the position of this particle
+	 */
+   void setX(const vec&) noexcept;
 
+	/**
+	 * Returns the velocity of this particle
+	 */
 	const vec& getV() const;
 
+   /**
+	* Sets the velocity of this particle
+	*/
 	void setV(const vec&) noexcept;
 
+	/**
+	 * Returns the force effective on this particle
+	 */
 	const vec& getF() const;
 
+	/**
+	 * Sets the force effective on this particle
+	 */
 	void setF(const vec&) noexcept;
 
+	/**
+	 * Returns the previous force effective on this particle
+	 */
 	const vec& getOldF() const;
 
+	/**
+	 * Sets the previous force effective on this particle
+	 */
 	void setOldF(const vec&) noexcept;
 
+	/**
+	 * Returns the mass of this particle
+	 */
 	double getM() const;
 
+
+	/**
+	 * Returns the type of this particle
+	 */
 	int getType() const;
 
-	constexpr bool operator==(const Particle& other) const = default;
+	/**
+	 * @param other
+	 * @return True iff other particle is equivalent to this particle
+	 */
+   constexpr bool operator==(const Particle& other) const = default;
 
+	/**
+	 * Returns the string representation of this particle
+	 */
 	std::string toString() const;
 };
 
+/**
+ * @param stream
+ * @param p
+ * @return Output stream of the particle
+ */
 std::ostream& operator<<(std::ostream& stream, Particle& p);
