@@ -7,10 +7,10 @@
 
 namespace detail {
 template <typename T>
-concept numeric = std::floating_point<T> || std::integral<T>;
+concept arithmetic = std::is_arithmetic_v<T>;
 }
 
-template <detail::numeric Value>
+template <detail::arithmetic Value>
 struct vec_3d {
 	Value x;
 	Value y;
@@ -30,7 +30,7 @@ struct vec_3d {
 		return *this;
 	}
 
-	constexpr auto operator*=(detail::numeric auto scalar) noexcept {
+	constexpr auto operator*=(detail::arithmetic auto scalar) noexcept {
 		x *= scalar;
 		y *= scalar;
 		z *= scalar;
@@ -66,34 +66,45 @@ struct vec_3d {
 	}
 };
 
-template <detail::numeric Value>
+template <detail::arithmetic Value>
 constexpr auto operator+(const vec_3d<Value>& lhs, const vec_3d<Value>& rhs) noexcept {
 	return vec_3d{lhs.x + rhs.x, lhs.y + rhs.y, lhs.z + rhs.z};
 }
 
-template <detail::numeric Value>
+template <detail::arithmetic Value>
 constexpr auto operator-(const vec_3d<Value>& lhs, const vec_3d<Value>& rhs) noexcept {
 	return vec_3d{lhs.x - rhs.x, lhs.y - rhs.y, lhs.z - rhs.z};
 }
 
-template <detail::numeric Value>
-constexpr auto operator*(detail::numeric auto scalar, const vec_3d<Value>& vector) noexcept {
+template <detail::arithmetic Value>
+constexpr auto operator*(detail::arithmetic auto scalar, const vec_3d<Value>& vector) noexcept {
 	return vec_3d{vector.x * scalar, vector.y * scalar, vector.z * scalar};
 }
 
-template <detail::numeric Value>
-constexpr auto operator*(const vec_3d<Value>& vector, detail::numeric auto scalar) noexcept {
-	return vec_3d{vector.x * scalar, vector.y * scalar, vector.z * scalar};
+template <detail::arithmetic Value>
+constexpr auto operator*(const vec_3d<Value>& vector, detail::arithmetic auto scalar) noexcept {
+	return scalar * vector;
 }
 
-template <detail::numeric Value>
-std::ostream& operator<<(std::ostream& stream, const vec_3d<Value>& vector) {
-	return stream << std::format("({}, {}, {})", vector.x, vector.y, vector.z);
-}
-
-template <detail::numeric Value>
+template <detail::arithmetic Value>
 constexpr bool operator==(const vec_3d<Value>& lhs, const vec_3d<Value>& rhs) {
 	return lhs.x == rhs.x && lhs.y == rhs.y && lhs.z == rhs.z;
+}
+
+template <typename T>
+struct std::formatter<vec_3d<T>> {
+	constexpr auto parse(std::format_parse_context& ctx) {
+		return ctx.begin();
+	}
+
+	auto format(const vec_3d<T>& v, std::format_context& ctx) const {
+		return std::format_to(ctx.out(), "({}, {}, {})", v.x, v.y, v.z);
+	}
+};
+
+template <detail::arithmetic Value>
+std::ostream& operator<<(std::ostream& stream, const vec_3d<Value>& vector) {
+	return stream << std::format("{}", vector);
 }
 
 using vec = vec_3d<double>;

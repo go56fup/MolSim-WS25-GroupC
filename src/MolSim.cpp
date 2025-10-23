@@ -1,17 +1,17 @@
+#include <charconv>
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
-#include <iostream>
-#include <vector>
 #include <ranges>
-#include <charconv>
+#include <vector>
 
-#include <vtkSmartPointer.h>
 #include <vtkPoints.h>
+#include <vtkSmartPointer.h>
 
 #include "FileReader.h"
 #include "outputWriter/VTKWriter.h"
 #include "outputWriter/XYZWriter.h"
+#include "ParticleContainer.h"
 #include "utils/ArrayUtils.h"
 #include "Vector.h"
 
@@ -53,7 +53,7 @@ constexpr void calculateV(std::span<Particle> particles, double delta_t) noexcep
 	}
 }
 
-void plotParticles(std::span<Particle> particles, int iteration) {
+void plotParticles(std::span<const Particle> particles, int iteration) {
 	std::string_view out_name = "MD_vtk";
 
 	outputWriter::VTKWriter writer;
@@ -73,7 +73,7 @@ constexpr void update_values(std::span<Particle> ps) noexcept {
 }
 
 constexpr double get_double_from_argv(std::string_view str) {
-	auto invalid_input = []{
+	auto invalid_input = [] {
 		std::cout << "Given decimal number is invalid.\n";
 		die();
 	};
@@ -114,7 +114,7 @@ int main(int argc, char* argv[]) {
 	const double end_time = get_parameters({.use_default = defaulted, .input = argv[3], .default_ = 1000});
 
 	FileReader fileReader;
-	std::vector<Particle> particles;
+	ParticleContainer particles;
 	fileReader.readFile(particles, argv[1]);
 
 	double current_time = 0;
@@ -130,7 +130,7 @@ int main(int argc, char* argv[]) {
 		if (iteration % 10 == 0) {
 			plotParticles(particles, iteration);
 		}
-		std::cout << "Iteration " << iteration << " finished." << std::endl;
+		// std::cout << "Iteration " << iteration << " finished." << std::endl;
 		update_values(particles);
 		current_time += delta_t;
 	}

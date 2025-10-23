@@ -11,4 +11,3 @@ void debug_print_impl(const Ts&... msgs) {
 #else
 #define DEBUG_LOG(...) (void)0
 #endif
-
