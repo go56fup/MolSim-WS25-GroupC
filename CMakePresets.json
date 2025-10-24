@@ -80,6 +80,12 @@
 			"name": "debug-build",
 			"inherits": "base",
 			"configurePreset": "debug"
+		},
+		{
+			"name": "documentation-build",
+			"inherits": "base",
+			"configurePreset": "release",
+			"targets": [ "doc_doxygen" ]
 		}
 	],
 	"testPresets": [
@@ -132,6 +138,14 @@
 				{ "type": "configure", "name": "debug" },
 				{ "type": "build",     "name": "debug-build" },
 				{ "type": "test",      "name": "test" }
+			]
+		},
+		{
+			"name": "documentation",
+			"description": "Build documentation with Doxygen",
+			"steps": [
+				{ "type": "configure", "name": "release" },
+				{ "type": "build",     "name": "documentation-build" }
 			]
 		}
 	]

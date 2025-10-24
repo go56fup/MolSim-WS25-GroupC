@@ -24,8 +24,8 @@
       {
         devShells.default = pkgs.mkShell.override { stdenv = llvm.libcxxStdenv; } {
           packages = with pkgs; [
+            (llvm.clang-tools.override { enableLibcxx = true; })
             llvm.libcxxClang
-            llvm.llvm
             gcc15
             cmake
             doxygen
@@ -33,8 +33,14 @@
             vtk
             cmake-format
             llvm.openmp
+            (texliveTeTeX.withPackages (ps: [ ps.newunicodechar ]))
+            ghostscript_headless
           ];
+          shellHook = ''
+            export NIX_CFLAGS_COMPILE="$NIX_CFLAGS_COMPILE -B${llvm.libcxxClang.libcxx}/lib";
+          '';
         };
+
       }
     );
 }
