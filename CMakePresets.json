@@ -1,5 +1,5 @@
 {
-	"version": 10,
+	"version": 8,
 	"configurePresets": [
 		{
 			"name": "base",
@@ -29,7 +29,8 @@
 			"description": "Configure Debug build with GCC",
 			"cacheVariables": {
 				"CMAKE_BUILD_TYPE": "Debug",
-				"CMAKE_CXX_COMPILER": "g++"
+				"CMAKE_CXX_COMPILER": "g++",
+				"ENABLE_SANITIZERS": "ON"
 			}
 		},
 		{
@@ -49,7 +50,8 @@
 			"description": "Configure Debug build with Clang",
 			"cacheVariables": {
 				"CMAKE_BUILD_TYPE": "Debug",
-				"CMAKE_CXX_COMPILER": "clang++"
+				"CMAKE_CXX_COMPILER": "clang++",
+				"ENABLE_SANITIZERS": "ON"
 			}
 		}
 	],
