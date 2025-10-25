@@ -1,5 +1,5 @@
 {
-	"version": 10,
+	"version": 8,
 	"configurePresets": [
 		{
 			"name": "base",
@@ -29,7 +29,8 @@
 			"description": "Configure Debug build with GCC",
 			"cacheVariables": {
 				"CMAKE_BUILD_TYPE": "Debug",
-				"CMAKE_CXX_COMPILER": "g++"
+				"CMAKE_CXX_COMPILER": "g++",
+				"ENABLE_SANITIZERS": "ON"
 			}
 		},
 		{
@@ -49,7 +50,8 @@
 			"description": "Configure Debug build with Clang",
 			"cacheVariables": {
 				"CMAKE_BUILD_TYPE": "Debug",
-				"CMAKE_CXX_COMPILER": "clang++"
+				"CMAKE_CXX_COMPILER": "clang++",
+				"ENABLE_SANITIZERS": "ON"
 			}
 		}
 	],
@@ -78,6 +80,12 @@
 			"name": "debug-build",
 			"inherits": "base",
 			"configurePreset": "debug"
+		},
+		{
+			"name": "documentation-build",
+			"inherits": "base",
+			"configurePreset": "release",
+			"targets": [ "doc_doxygen" ]
 		}
 	],
 	"testPresets": [
@@ -130,6 +138,14 @@
 				{ "type": "configure", "name": "debug" },
 				{ "type": "build",     "name": "debug-build" },
 				{ "type": "test",      "name": "test" }
+			]
+		},
+		{
+			"name": "documentation",
+			"description": "Build documentation with Doxygen",
+			"steps": [
+				{ "type": "configure", "name": "release" },
+				{ "type": "build",     "name": "documentation-build" }
 			]
 		}
 	]

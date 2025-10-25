@@ -8,19 +8,11 @@
 #pragma once
 
 #include <fstream>
-#include <list>
+#include <span>
+#include <string_view>
 
 #include "Particle.h"
 
-namespace outputWriter {
-
-class XYZWriter {
-public:
-	XYZWriter();
-
-	virtual ~XYZWriter();
-
-	void plotParticles(std::list<Particle> particles, const std::string& filename, int iteration);
-};
-
-}  // namespace outputWriter
+namespace outputWriter::XYZWriter {
+void plotParticles(std::span<const Particle> particles, std::string_view filename, int iteration);
+}
