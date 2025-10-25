@@ -65,6 +65,7 @@ list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/modules)
 include(vtk)
 include(clang-format)
 include(doxygen)
+include(clang-tidy)
 
 include(CTest)
 add_subdirectory(test)

@@ -54,6 +54,7 @@ private:
 		using value_type = reference;
 
 	private:
+		// NOLINTNEXTLINE(*avoid-*ref-data-members)
 		container_t& container;
 		size_type outer_idx;
 		size_type inner_idx;
@@ -154,6 +155,7 @@ private:
 	 */
 	template <Uniqueness mode>
 	class p_range {
+		// NOLINTNEXTLINE(*avoid-*ref-data-members)
 		Container& container;
 		using container_t = std::remove_reference_t<Container>;
 
@@ -167,7 +169,7 @@ private:
 		 * @brief Constructs a new pair range.
 		 * @param c Reference to the container to iterate over.
 		 */
-		constexpr p_range(Container& c) noexcept
+		explicit constexpr p_range(Container& c) noexcept
 			: container(c) {}
 
 		/**
@@ -246,6 +248,7 @@ public:
  * @return Range over unique pairs.
  */
 template <std::ranges::range Range>
+// NOLINTNEXTLINE(*missing-std-forward)
 constexpr auto unique_pairs(Range&& range) noexcept {
 	return typename detail::pairwise<Range>::uniques{range};
 }
@@ -276,6 +279,7 @@ constexpr auto unique_pairs(Range&& range) noexcept {
  * @return Range over non-unique pairs.
  */
 template <std::ranges::range Range>
+// NOLINTNEXTLINE(*missing-std-forward)
 constexpr auto pairs(Range&& range) noexcept {
 	return typename detail::pairwise<Range>::pairs{range};
 }
