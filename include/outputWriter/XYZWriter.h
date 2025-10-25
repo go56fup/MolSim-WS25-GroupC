@@ -13,15 +13,6 @@
 
 #include "Particle.h"
 
-namespace outputWriter {
-
-class XYZWriter {
-public:
-	XYZWriter();
-
-	virtual ~XYZWriter();
-
-	static void plotParticles(std::span<const Particle> particles, std::string_view filename, int iteration);
-};
-
-}  // namespace outputWriter
+namespace outputWriter::XYZWriter {
+void plotParticles(std::span<const Particle> particles, std::string_view filename, int iteration);
+}

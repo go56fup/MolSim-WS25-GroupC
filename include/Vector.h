@@ -37,7 +37,7 @@ struct vec_3d {
 	/** @brief Z component of the vector. */
 	Value z;
 
-	// TODO: maybe add arithmetic operations between compatible types
+	// TODO(tuna): maybe add arithmetic operations between compatible types
 
 	/**
 	 * @brief Adds another vector to this vector.
@@ -115,6 +115,7 @@ struct vec_3d {
 		return &x;
 	}
 
+	// NOLINTBEGIN(*pointer-arithmetic)
 	/**
 	 * @brief Returns an iterator one past the last component of this vector.
 	 *
@@ -136,6 +137,8 @@ struct vec_3d {
 	constexpr auto end() const noexcept {
 		return &x + 3;
 	}
+
+	// NOLINTEND(*pointer-arithmetic)
 
 	/**
 	 * @brief Returns a const pointer to the contigious components stored within this vector.
@@ -275,5 +278,6 @@ std::ostream& operator<<(std::ostream& stream, const vec_3d<Value>& vector) {
  */
 using vec = vec_3d<double>;
 
-/// Ensure that a 3D vector has the expected memory layout.
+// Ensure that a 3D vector has the expected memory layout.
+// NOLINTNEXTLINE(*avoid-c-arrays)
 static_assert(sizeof(vec) == sizeof(double[3]));

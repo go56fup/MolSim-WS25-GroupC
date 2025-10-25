@@ -15,11 +15,8 @@
 #include <sstream>
 #include <string>
 
-FileReader::FileReader() = default;
-
-FileReader::~FileReader() = default;
-
-void FileReader::readFile(ParticleContainer& particles, char* filename) {
+namespace FileReader {
+void readFile(ParticleContainer& particles, char* filename) {
 	vec x{};
 	vec v{};
 	double m{};
@@ -69,3 +66,4 @@ void FileReader::readFile(ParticleContainer& particles, char* filename) {
 		exit(-1);  // NOLINT(*mt-unsafe)
 	}
 }
+}  // namespace FileReader

@@ -15,13 +15,8 @@
 #include <sstream>
 #include <string_view>
 
-namespace outputWriter {
-
-XYZWriter::XYZWriter() = default;
-
-XYZWriter::~XYZWriter() = default;
-
-void XYZWriter::plotParticles(std::span<const Particle> particles, std::string_view filename, int iteration) {
+namespace outputWriter::XYZWriter {
+void plotParticles(std::span<const Particle> particles, std::string_view filename, int iteration) {
 	std::ofstream file;
 	std::stringstream strstr;
 	strstr << filename << "_" << std::setfill('0') << std::setw(4) << iteration << ".xyz";
@@ -45,5 +40,4 @@ void XYZWriter::plotParticles(std::span<const Particle> particles, std::string_v
 
 	file.close();
 }
-
-}  // namespace outputWriter
+}  // namespace outputWriter::XYZWriter

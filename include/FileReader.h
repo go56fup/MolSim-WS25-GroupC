@@ -9,10 +9,6 @@
 
 #include "ParticleContainer.h"
 
-class FileReader {
-public:
-	FileReader();
-	virtual ~FileReader();
-
-	static void readFile(ParticleContainer& particles, char* filename);
-};
+namespace FileReader {
+void readFile(ParticleContainer& particles, char* filename);
+}
