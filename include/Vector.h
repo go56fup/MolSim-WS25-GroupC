@@ -47,7 +47,7 @@ struct vec_3d {
 	 * @param other The vector to add.
 	 * @return Reference to this vector after addition.
 	 */
-	constexpr auto operator+=(const vec_3d<Value>& other) noexcept {
+	constexpr vec_3d<Value>& operator+=(const vec_3d<Value>& other) noexcept {
 		x += other.x;
 		y += other.y;
 		z += other.z;
@@ -62,7 +62,7 @@ struct vec_3d {
 	 * @param other The vector to subtract.
 	 * @return Reference to this vector after subtraction.
 	 */
-	constexpr auto operator-=(const vec_3d<Value>& other) noexcept {
+	constexpr vec_3d<Value>& operator-=(const vec_3d<Value>& other) noexcept {
 		x -= other.x;
 		y -= other.y;
 		z -= other.z;
@@ -77,7 +77,7 @@ struct vec_3d {
 	 * @param scalar The scalar.
 	 * @return Reference to this vector after scaling.
 	 */
-	constexpr auto operator*=(detail::arithmetic auto scalar) noexcept {
+	constexpr vec_3d<Value>& operator*=(detail::arithmetic auto scalar) noexcept {
 		x *= scalar;
 		y *= scalar;
 		z *= scalar;
@@ -100,7 +100,7 @@ struct vec_3d {
 	 *
 	 * @return Pointer to the first component.
 	 */
-	constexpr auto begin() noexcept {
+	constexpr Value* begin() noexcept {
 		return &x;
 	}
 
@@ -111,7 +111,7 @@ struct vec_3d {
 	 *
 	 * @return Const pointer to the first component.
 	 */
-	constexpr auto begin() const noexcept {
+	constexpr const Value* begin() const noexcept {
 		return &x;
 	}
 
@@ -123,7 +123,7 @@ struct vec_3d {
 	 *
 	 * @return Pointer to one past the last component.
 	 */
-	constexpr auto end() noexcept {
+	constexpr Value* end() noexcept {
 		return &x + 3;
 	}
 
@@ -134,7 +134,7 @@ struct vec_3d {
 	 *
 	 * @return Const pointer to one past the last component.
 	 */
-	constexpr auto end() const noexcept {
+	constexpr const Value* end() const noexcept {
 		return &x + 3;
 	}
 
@@ -170,7 +170,7 @@ struct vec_3d {
  * @return A new vector equal to the sum of the two inputs.
  */
 template <detail::arithmetic Value>
-constexpr auto operator+(const vec_3d<Value>& lhs, const vec_3d<Value>& rhs) noexcept {
+constexpr vec_3d<Value> operator+(const vec_3d<Value>& lhs, const vec_3d<Value>& rhs) noexcept {
 	return vec_3d{lhs.x + rhs.x, lhs.y + rhs.y, lhs.z + rhs.z};
 }
 
@@ -185,7 +185,7 @@ constexpr auto operator+(const vec_3d<Value>& lhs, const vec_3d<Value>& rhs) noe
  * @return A new vector equal to the difference of the two inputs.
  */
 template <detail::arithmetic Value>
-constexpr auto operator-(const vec_3d<Value>& lhs, const vec_3d<Value>& rhs) noexcept {
+constexpr vec_3d<Value> operator-(const vec_3d<Value>& lhs, const vec_3d<Value>& rhs) noexcept {
 	return vec_3d{lhs.x - rhs.x, lhs.y - rhs.y, lhs.z - rhs.z};
 }
 
@@ -200,7 +200,7 @@ constexpr auto operator-(const vec_3d<Value>& lhs, const vec_3d<Value>& rhs) noe
  * @return A new scaled vector.
  */
 template <detail::arithmetic Value>
-constexpr auto operator*(detail::arithmetic auto scalar, const vec_3d<Value>& vector) noexcept {
+constexpr vec_3d<Value> operator*(detail::arithmetic auto scalar, const vec_3d<Value>& vector) noexcept {
 	return vec_3d{vector.x * scalar, vector.y * scalar, vector.z * scalar};
 }
 
@@ -215,7 +215,7 @@ constexpr auto operator*(detail::arithmetic auto scalar, const vec_3d<Value>& ve
  * @return A new scaled vector.
  */
 template <detail::arithmetic Value>
-constexpr auto operator*(const vec_3d<Value>& vector, detail::arithmetic auto scalar) noexcept {
+constexpr vec_3d<Value> operator*(const vec_3d<Value>& vector, detail::arithmetic auto scalar) noexcept {
 	return scalar * vector;
 }
 
@@ -281,3 +281,4 @@ using vec = vec_3d<double>;
 // Ensure that a 3D vector has the expected memory layout.
 // NOLINTNEXTLINE(*avoid-c-arrays)
 static_assert(sizeof(vec) == sizeof(double[3]));
+
