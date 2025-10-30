@@ -40,7 +40,11 @@ void readFile(ParticleContainer& particles, char* filename) {
 		getline(input_file, tmp_string);
 		std::cout << "Read line: " << tmp_string << '\n';
 
-		particles.reserve(num_particles);
+		if (num_particles <= 0) {
+			std::cout << "Error reading file: non-positive particle count: " << num_particles << '\n';
+			exit(-1); // NOLINT(*mt-unsafe)
+		}
+		particles.reserve(static_cast<std::size_t>(num_particles));
 
 		for (int i = 0; i < num_particles; i++) {
 			std::istringstream datastream(tmp_string);
