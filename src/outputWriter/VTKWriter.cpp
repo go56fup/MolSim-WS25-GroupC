@@ -6,21 +6,26 @@
  */
 #ifdef ENABLE_VTK_OUTPUT
 
-#include "VTKWriter.h"
+#include "outputWriter/VTKWriter.h"
+#include "Particle.h"
 
-#include <vtkCellArray.h>
-#include <vtkDoubleArray.h>
 #include <vtkFloatArray.h>
 #include <vtkIntArray.h>
+#include <vtkNew.h>
 #include <vtkPointData.h>
+#include <vtkPoints.h>
+#include <vtkSmartPointer.h>
+#include <vtkUnstructuredGrid.h>
 #include <vtkXMLUnstructuredGridWriter.h>
 
 #include <iomanip>
+#include <span>
 #include <sstream>
+#include <string_view>
 
 namespace outputWriter {
 
-void VTKWriter::plotParticles(std::list<Particle> particles, const std::string& filename, int iteration) {
+void VTKWriter::plotParticles(std::span<const Particle> particles, std::string_view filename, int iteration) {
 	// Initialize points
 	auto points = vtkSmartPointer<vtkPoints>::New();
 
@@ -41,7 +46,7 @@ void VTKWriter::plotParticles(std::list<Particle> particles, const std::string& 
 	typeArray->SetName("type");
 	typeArray->SetNumberOfComponents(1);
 
-	for (auto& p : particles) {
+	for (const auto& p : particles) {
 		points->InsertNextPoint(p.getX().data());
 		massArray->InsertNextValue(static_cast<float>(p.getM()));
 		velocityArray->InsertNextTuple(p.getV().data());
@@ -71,6 +76,7 @@ void VTKWriter::plotParticles(std::list<Particle> particles, const std::string& 
 
 	// Write the file
 	writer->Write();
+	// TODO(tuna): deallocate correctly, leaks.
 }
 }  // namespace outputWriter
 #endif

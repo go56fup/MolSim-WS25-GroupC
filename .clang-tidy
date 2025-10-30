@@ -1,0 +1,47 @@
+Checks: [
+  "*",
+
+  "-llvmlibc*",
+  # Already enforced by clang-format, and does not work with split namespaces.
+  "-llvm-namespace-comment",
+  # fuchsia-multiple-inheritance stays on for now.
+  "-misc-use-internal-linkage",
+  "-fuchsia-default*",
+  "-fuchsia-overloaded-operator",
+  "-fuchsia-statically-constructed-objects",
+  "-fuchsia-trailing-return",
+  "-fuchsia-virtual-inheritance",
+  "-fuchsia-header-anon-namespaces",
+  "-altera-id-dependent-backward-branch",
+  "-modernize-use-trailing-return-type",
+  "-altera-unroll-loops",
+  "-hicpp-braces-around-statements",
+  "-readability-braces-around-statements",
+  "-cppcoreguidelines-pro-bounds-constant-array-index",
+  "-readability-identifier-length",
+  # clang-format takes care of this:
+  "-llvm-include-order",
+  "-modernize-use-nodiscard",
+  # Does not accept `#pragma once`.
+  "-llvm-header-guard",
+  "-altera-struct-pack-align"
+]
+
+WarningsAsErrors: ''
+HeaderFileExtensions:
+  - ''
+  - h
+  - hh
+  - hpp
+  - hxx
+ImplementationFileExtensions:
+  - c
+  - cc
+  - cpp
+  - cxx
+HeaderFilterRegex: ''
+FormatStyle:     file
+SystemHeaders:   false
+CheckOptions:
+  - key: misc-non-private-member-variables-in-classes.IgnoreClassesWithAllMemberVariablesBeingPublic
+    value: true

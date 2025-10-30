@@ -1,0 +1,7 @@
+find_program(CLANG_TIDY "clang-tidy")
+if(CLANG_TIDY)
+	message(STATUS "Found clang-tidy: ${CLANG_TIDY}")
+	set_target_properties(MolSim PROPERTIES CXX_CLANG_TIDY "clang-tidy;--header-filter=include/")
+else()
+	message(WARNING "clang-tidy not found - checks will not be performed")
+endif()

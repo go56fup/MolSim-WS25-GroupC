@@ -11,34 +11,18 @@
 #include <vtkSmartPointer.h>
 #include <vtkUnstructuredGrid.h>
 
-#include <list>
-#include <string>
+#include <span>
+#include <string_view>
 
 #include "Particle.h"
 
-namespace outputWriter {
-
+namespace outputWriter::VTKWriter {
 /**
- * This class implements the functionality to generate vtk output from
- * particles using the official VTK library.
+ * Write VTK output of particles.
+ * @param particles Particles to add to the output
+ * @param filename Output filename
+ * @param iteration Current iteration number
  */
-class VTKWriter {
-public:
-	VTKWriter() = default;
-	~VTKWriter() = default;
-
-	// Delete copy constructor and assignment operator
-	VTKWriter(const VTKWriter&) = delete;
-	VTKWriter& operator=(const VTKWriter&) = delete;
-
-	/**
-	 * Write VTK output of particles.
-	 * @param particles Particles to add to the output
-	 * @param filename Output filename
-	 * @param iteration Current iteration number
-	 */
-	void plotParticles(std::list<Particle> particles, const std::string& filename, int iteration);
-};
-
-}  // namespace outputWriter
+void plotParticles(std::span<const Particle> particles, std::string_view filename, int iteration);
+}  // namespace outputWriter::VTKWriter
 #endif

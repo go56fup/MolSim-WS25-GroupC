@@ -7,14 +7,8 @@
 
 #pragma once
 
-#include <list>
+#include "ParticleContainer.h"
 
-#include "Particle.h"
-
-class FileReader {
-public:
-	FileReader();
-	virtual ~FileReader();
-
-	void readFile(std::list<Particle>& particles, char* filename);
-};
+namespace FileReader {
+void readFile(ParticleContainer& particles, char* filename);
+}
