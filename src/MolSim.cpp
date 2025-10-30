@@ -202,13 +202,14 @@ int main(int argc, char* argv[]) {
 
 	// for this loop, we assume: current x, current f and current v are known
 	while (current_time < end_time) {
-		calculateF(gravitational_force, particles);
 		calculateX(particles, delta_t);
+		calculateF(gravitational_force, particles);
 		calculateV(particles, delta_t);
 
 		iteration++;
 		// NOLINTNEXTLINE(*magic-numbers)
 		if (iteration % 10 == 0) {
+			// TODO(tuna): Stop spewing VTK files into cwd for worksheets after 1.
 			plotParticles(outputWriter::VTKWriter::plotParticles, particles, "MD_vtk", iteration);
 		}
 		std::cout << "Iteration " << iteration << " finished.\n";
