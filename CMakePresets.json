@@ -1,0 +1,152 @@
+{
+	"version": 8,
+	"configurePresets": [
+		{
+			"name": "base",
+			"hidden": true,
+			"binaryDir": "${sourceDir}/build/${presetName}",
+			"cacheVariables": {
+				"CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+				"BUILD_TESTING": "ON",
+				"CMAKE_COMPILE_WARNING_AS_ERROR": "ON",
+				"ENABLE_VTK_OUTPUT": "ON"
+			}
+		},
+		{
+			"name": "release-gcc",
+			"inherits": "base",
+			"displayName": "Release (GCC)",
+			"description": "Configure Release build with GCC",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Release",
+				"CMAKE_CXX_COMPILER": "g++"
+			}
+		},
+		{
+			"name": "debug-gcc",
+			"inherits": "base",
+			"displayName": "Debug (GCC)",
+			"description": "Configure Debug build with GCC",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Debug",
+				"CMAKE_CXX_COMPILER": "g++",
+				"ENABLE_SANITIZERS": "ON"
+			}
+		},
+		{
+			"name": "release",
+			"inherits": "base",
+			"displayName": "Release (Clang)",
+			"description": "Configure Release build with Clang",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Release",
+				"CMAKE_CXX_COMPILER": "clang++"
+			}
+		},
+		{
+			"name": "debug",
+			"inherits": "base",
+			"displayName": "Debug (Clang)",
+			"description": "Configure Debug build with Clang",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Debug",
+				"CMAKE_CXX_COMPILER": "clang++",
+				"ENABLE_SANITIZERS": "ON"
+			}
+		}
+	],
+	"buildPresets": [
+		{
+			"name": "base",
+			"hidden": true,
+			"jobs": 0
+		},
+		{
+			"name": "release-gcc-build",
+			"inherits": "base",
+			"configurePreset": "release-gcc"
+		},
+		{
+			"name": "debug-gcc-build",
+			"inherits": "base",
+			"configurePreset": "debug-gcc"
+		},
+		{
+			"name": "release-build",
+			"inherits": "base",
+			"configurePreset": "release"
+		},
+		{
+			"name": "debug-build",
+			"inherits": "base",
+			"configurePreset": "debug"
+		},
+		{
+			"name": "documentation-build",
+			"inherits": "base",
+			"configurePreset": "release",
+			"targets": [ "doc_doxygen" ]
+		}
+	],
+	"testPresets": [
+		{
+			"name": "base",
+			"hidden": true,
+			"execution": { "jobs": 0 }
+		},
+		{
+			"name": "test-gcc",
+			"inherits": "base",
+			"configurePreset": "debug-gcc"
+		},
+		{
+			"name": "test",
+			"inherits": "base",
+			"configurePreset": "debug"
+		}
+	],
+	"workflowPresets": [
+		{
+			"name": "release-gcc",
+			"description": "Configure and build Release with GCC",
+			"steps": [
+				{ "type": "configure", "name": "release-gcc" },
+				{ "type": "build",     "name": "release-gcc-build" }
+			]
+		},
+		{
+			"name": "release",
+			"description": "Configure and build Release with Clang",
+			"steps": [
+				{ "type": "configure", "name": "release" },
+				{ "type": "build",     "name": "release-build" }
+			]
+		},
+		{
+			"name": "test-gcc",
+			"description": "Run tests with GCC in debug mode",
+			"steps": [
+				{ "type": "configure", "name": "debug-gcc" },
+				{ "type": "build",     "name": "debug-gcc-build" },
+				{ "type": "test",      "name": "test-gcc" }
+			]
+		},
+		{
+			"name": "test",
+			"description": "Run tests with Clang in debug mode",
+			"steps": [
+				{ "type": "configure", "name": "debug" },
+				{ "type": "build",     "name": "debug-build" },
+				{ "type": "test",      "name": "test" }
+			]
+		},
+		{
+			"name": "documentation",
+			"description": "Build documentation with Doxygen",
+			"steps": [
+				{ "type": "configure", "name": "release" },
+				{ "type": "build",     "name": "documentation-build" }
+			]
+		}
+	]
+}

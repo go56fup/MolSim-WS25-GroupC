@@ -1,0 +1,42 @@
+format:
+  # How wide to allow formatted cmake files
+  line_width: 100
+
+  # How many spaces to tab for indent
+  tab_size: 4
+
+  # If true, lines are indented using tab characters (utf-8
+  # 0x09) instead of <tab_size> space characters (utf-8 0x20).
+  # In cases where the layout would require a fractional tab
+  # character, the behavior of the  fractional indentation is
+  # governed by <fractional_tab_policy>
+  use_tabchars: true
+
+  # If <use_tabchars> is True, then the value of this variable
+  # indicates how fractional indentions are handled during
+  # whitespace replacement. If set to 'use-space', fractional
+  # indentation is left as spaces (utf-8 0x20). If set to
+  # '`round-up` fractional indentation is replaced with a single'
+  # tab character (utf-8 0x09) effectively shifting the column
+  # to the next tabstop
+  fractional_tab_policy: round-up
+
+  # If a positional argument group contains more than this many
+  # arguments, then force it to a vertical layout.
+  max_pargs_hwrap: 4
+
+  # If a statement is wrapped to more than one line, than dangle
+  # the closing parenthesis on its own line.
+  dangle_parens: true
+
+  # If the statement spelling length (including space and
+  # parenthesis) is smaller than this amount, then force reject
+  # nested layouts.
+  min_prefix_chars: 0
+
+  # If a candidate layout is wrapped horizontally but it exceeds
+  # this many lines, then reject the layout.
+  max_lines_hwrap: 1
+
+  # Format keywords consistently as 'lower' or 'upper' case
+  keyword_case: upper
