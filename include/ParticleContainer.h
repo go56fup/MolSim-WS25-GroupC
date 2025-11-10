@@ -1,4 +1,5 @@
 #pragma once
+#include <cstddef>
 #include <cstdint>
 #include <ranges>
 #include <vector>
@@ -36,30 +37,34 @@ private:
 	class p_iterator {
 	private:
 		using container_t = std::remove_reference_t<Container>;
-		using inner = typename container_t::value_type;
+		using inner_wo_quals = typename container_t::value_type;
+		using inner = std::conditional_t<std::is_const_v<container_t>, const inner_wo_quals, inner_wo_quals>;
 
 	public:
 		/// Standard iterator category.
-		using iterator_category = std::output_iterator_tag;
+		using iterator_category = std::input_iterator_tag;
 		/// Type used for differences between indices.
 		using difference_type = std::ptrdiff_t;
 		/// Type used for indexing.
 		using size_type = typename container_t::size_type;
 		using pointer = void;
-		/// Mutable reference to two elements of the container.
+		/// Reference to two elements of the container.
 		using reference = std::pair<inner&, inner&>;
-		/// Const reference to two elements of the container.
-		using const_reference = std::pair<const inner&, const inner&>;
 		/// The type returned from @ref operator*, which is a reference.
 		using value_type = reference;
 
 	private:
 		// NOLINTNEXTLINE(*avoid-*ref-data-members)
-		container_t& container;
+		container_t* container;
 		size_type outer_idx;
 		size_type inner_idx;
 
 	public:
+		constexpr p_iterator() noexcept
+			: container(nullptr)
+			, outer_idx(0)
+			, inner_idx(0) {}
+
 		/**
 		 * @brief Constructs a new pairwise iterator.
 		 *
@@ -68,24 +73,17 @@ private:
 		 * @param j_start Initial inner index.
 		 */
 		constexpr p_iterator(Container& c, size_type i_start, size_type j_start) noexcept
-			: container(c)
+			: container(&c)
 			, outer_idx(i_start)
 			, inner_idx(j_start) {}
-
-		/**
-		 * @brief Dereferences this const iterator.
-		 * @return Pair of constant references to the current elements.
-		 */
-		constexpr const_reference operator*() const noexcept {
-			return {container[outer_idx], container[inner_idx]};
-		}
 
 		/**
 		 * @brief Dereferences this iterator.
 		 * @return Pair of mutable references to the current elements.
 		 */
-		constexpr reference operator*() noexcept {
-			return {container[outer_idx], container[inner_idx]};
+
+		constexpr reference operator*() const noexcept {
+			return reference{(*container)[outer_idx], (*container)[inner_idx]};
 		}
 
 		/**
@@ -94,7 +92,7 @@ private:
 		 * @return Reference to this iterator after increment.
 		 */
 		constexpr p_iterator& operator++() noexcept {
-			const auto size = std::ranges::size(container);
+			const auto size = std::ranges::size(*container);
 
 			const auto check_and_do_outer_inc = [&] {
 				// e.g. for {0, 1, 2}.
@@ -142,7 +140,7 @@ private:
 		 * @return `true` @a iff both iterators reference the same position in the same container.
 		 */
 		constexpr bool operator==(const p_iterator& other) const noexcept {
-			return &container == &other.container && outer_idx == other.outer_idx && inner_idx == other.inner_idx;
+			return container == other.container && outer_idx == other.outer_idx && inner_idx == other.inner_idx;
 		}
 	};
 
@@ -176,7 +174,7 @@ private:
 		 * @brief Returns an iterator to the first pair in the range.
 		 * @return Iterator to the beginning of the pair sequence.
 		 */
-		constexpr iterator begin() noexcept {
+		constexpr iterator begin() const noexcept {
 			if (std::ranges::size(container) < 2) return end();
 			return iterator(container, 0, 1);
 		}
@@ -185,7 +183,7 @@ private:
 		 * @brief Returns the end iterator for non-unique pairs.
 		 * @return Iterator marking the end of the range.
 		 */
-		constexpr iterator end() noexcept
+		constexpr iterator end() const noexcept
 			requires(mode == Uniqueness::non_unique)
 		{
 			return iterator(container, std::ranges::size(container), 0);
@@ -195,7 +193,7 @@ private:
 		 * @brief Returns the end iterator for unique pairs.
 		 * @return Iterator marking the end of the range.
 		 */
-		constexpr iterator end() noexcept
+		constexpr iterator end() const noexcept
 			requires(mode == Uniqueness::unique)
 		{
 			const auto size = std::ranges::size(container);
@@ -304,3 +302,4 @@ constexpr auto pairs(Range&& range) noexcept {
  * This type is used throughout the simulation to store all particle objects.
  */
 using ParticleContainer = std::vector<Particle>;
+static_assert(std::ranges::range<decltype(unique_pairs(std::declval<ParticleContainer>()))>);

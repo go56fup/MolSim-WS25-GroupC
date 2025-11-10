@@ -1,0 +1,42 @@
+on:
+  pull_request:
+    branches:
+      - 'master'
+  push:
+    branches:
+      - '*ssignment*'
+jobs:
+  run_gtest_suite:
+    name: Google Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: libvtk9-dev doxygen gcc-14 g++-14 clang-20 clang-tidy-20 clang-format-20 cmake-format
+          version: 1.0
+    
+      - name: Install Dependencies
+        run: |
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-14 60 \
+          --slave /usr/bin/g++ g++ /usr/bin/g++-14 && \
+          sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-20 1000 &&
+          sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-20 1000 && \
+          sudo update-alternatives --install /usr/bin/clang-tidy clang-tidy /usr/bin/clang-tidy-20 1000 && \
+          sudo update-alternatives --install /usr/bin/clang-format clang-format /usr/bin/clang-format-20 1000
+
+      - name: Check toolchain versions
+        run: |
+          sudo update-alternatives --display clang && clang++ --version && clang-tidy --version && \
+          g++ --version && cmake --version
+
+      - name: Run test suite with GCC
+        run: cmake --workflow --preset test-gcc 
+
+      - name: Run test suite with Clang
+        run: cmake --workflow --preset test-gcc
+
+      - name: Check formatting
+        run: |
+          clang-format --dry-run --Werror **/*.cpp **/*.h && \
+          cmake-format --check **/CMakeLists.txt cmake/modules/*.cmake

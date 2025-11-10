@@ -7,8 +7,10 @@
 
 #pragma once
 
+#include <string_view>
+
 #include "ParticleContainer.h"
 
 namespace FileReader {
-void readFile(ParticleContainer& particles, char* filename);
+void readFile(ParticleContainer& particles, std::string_view filename);
 }
