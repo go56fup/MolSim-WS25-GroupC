@@ -9,7 +9,18 @@
 				"CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
 				"BUILD_TESTING": "ON",
 				"CMAKE_COMPILE_WARNING_AS_ERROR": "ON",
-				"ENABLE_VTK_OUTPUT": "ON"
+				"ENABLE_VTK_OUTPUT": "ON",
+				"CMAKE_COLOR_DIAGNOSTICS": "OFF"
+			}
+		},
+		{
+			"name": "debug-base",
+			"hidden": true,
+			"inherits": "base",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Debug",
+				"ENABLE_SANITIZERS": "ON",
+				"ENABLE_COVERAGE": "ON"
 			}
 		},
 		{
@@ -24,13 +35,11 @@
 		},
 		{
 			"name": "debug-gcc",
-			"inherits": "base",
+			"inherits": "debug-base",
 			"displayName": "Debug (GCC)",
 			"description": "Configure Debug build with GCC",
 			"cacheVariables": {
-				"CMAKE_BUILD_TYPE": "Debug",
-				"CMAKE_CXX_COMPILER": "g++",
-				"ENABLE_SANITIZERS": "ON"
+				"CMAKE_CXX_COMPILER": "g++"
 			}
 		},
 		{
@@ -49,9 +58,7 @@
 			"displayName": "Debug (Clang)",
 			"description": "Configure Debug build with Clang",
 			"cacheVariables": {
-				"CMAKE_BUILD_TYPE": "Debug",
-				"CMAKE_CXX_COMPILER": "clang++",
-				"ENABLE_SANITIZERS": "ON"
+				"CMAKE_CXX_COMPILER": "clang++"
 			}
 		}
 	],
@@ -92,7 +99,10 @@
 		{
 			"name": "base",
 			"hidden": true,
-			"execution": { "jobs": 0 }
+			"execution": { "jobs": 0 },
+			"output": {
+				"outputOnFailure": true
+			}
 		},
 		{
 			"name": "test-gcc",

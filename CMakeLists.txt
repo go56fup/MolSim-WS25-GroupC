@@ -66,6 +66,11 @@ include(vtk)
 include(clang-format)
 include(doxygen)
 include(clang-tidy)
+include(third-party)
+
+get_third_party(TARGET third_party)
+target_link_libraries(MolSim PRIVATE third_party)
 
 include(CTest)
 add_subdirectory(test)
+

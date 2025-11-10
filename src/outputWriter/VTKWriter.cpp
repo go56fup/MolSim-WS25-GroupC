@@ -47,11 +47,11 @@ void VTKWriter::plotParticles(std::span<const Particle> particles, std::string_v
 	typeArray->SetNumberOfComponents(1);
 
 	for (const auto& p : particles) {
-		points->InsertNextPoint(p.getX().data());
-		massArray->InsertNextValue(static_cast<float>(p.getM()));
-		velocityArray->InsertNextTuple(p.getV().data());
-		forceArray->InsertNextTuple(p.getF().data());
-		typeArray->InsertNextValue(p.getType());
+		points->InsertNextPoint(p.x.data());
+		massArray->InsertNextValue(static_cast<float>(p.m));
+		velocityArray->InsertNextTuple(p.v.data());
+		forceArray->InsertNextTuple(p.f.data());
+		typeArray->InsertNextValue(p.type);
 	}
 
 	// Set up the grid

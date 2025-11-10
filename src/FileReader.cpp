@@ -42,7 +42,7 @@ void readFile(ParticleContainer& particles, char* filename) {
 
 		if (num_particles <= 0) {
 			std::cout << "Error reading file: non-positive particle count: " << num_particles << '\n';
-			exit(-1); // NOLINT(*mt-unsafe)
+			exit(-1);  // NOLINT(*mt-unsafe)
 		}
 		particles.reserve(static_cast<std::size_t>(num_particles));
 

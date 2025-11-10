@@ -27,11 +27,10 @@ void plotParticles(std::span<const Particle> particles, std::string_view filenam
 			"file format doku.\n";
 
 	for (const auto& p : particles) {
-		auto x = p.getX();
 		file << "Ar ";
 		file.setf(std::ios_base::showpoint);
 
-		for (auto& xi : x) {
+		for (const auto& xi : p.x) {
 			file << xi << " ";
 		}
 

@@ -6,6 +6,7 @@
 #include <span>
 
 #include "Particle.h"
+#include "CompilerTraits.h"
 
 /**
  * @brief Concept that defines a force calculator.
@@ -38,13 +39,11 @@ namespace detail {
  * @param p2 The particle exerting the force (particle j).
  * @return A vector representing the force acting on @p p1 from @p p2.
  */
-// TOOD(tuna): Currently defined in a header even though non-constexpr because of cmath,
-// fix that restriction.
-inline vec calculate_component(const Particle& p1, const Particle& p2) noexcept {
-	const auto xi = p1.getX();
-	const auto xj = p2.getX();
+CONSTEXPR_IF_GCC inline vec calculate_component(const Particle& p1, const Particle& p2) noexcept {
+	const auto& xi = p1.x;
+	const auto& xj = p2.x;
 	const double reciprocal = std::pow((xi - xj).euclidian_norm(), 3);
-	const double scaling_factor = p1.getM() * p2.getM() / reciprocal;
+	const double scaling_factor = p1.m * p2.m / reciprocal;
 	return scaling_factor * (xj - xi);
 }
 }  // namespace detail
@@ -67,6 +66,6 @@ constexpr void gravitational_force(std::span<Particle> particles) noexcept {
 			const auto f_ij = detail::calculate_component(p1, p2);
 			new_f += f_ij;
 		}
-		p1.setF(new_f);
+		p1.f = new_f;
 	}
 }

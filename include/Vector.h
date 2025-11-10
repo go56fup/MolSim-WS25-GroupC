@@ -1,9 +1,10 @@
 #pragma once
 
-#include <array>
 #include <cmath>
 #include <format>
-#include <span>
+
+#include "CompilerTraits.h"
+#include "Debug.h"
 
 namespace detail {
 /**
@@ -27,7 +28,11 @@ concept arithmetic = std::is_arithmetic_v<T>;
  * @tparam Value The numeric type of the vector components. Must satisfy detail::arithmetic.
  */
 template <detail::arithmetic Value>
-struct vec_3d {
+// Discarding the argument of the special member function in flag_special_member_funcs is
+// on purpose.
+// NOLINTNEXTLINE(*slicing)
+struct vec_3d /* : flag_special_member_funcs<"vec_3d"> */ {
+public:
 	/** @brief X component of the vector. */
 	Value x;
 
@@ -36,6 +41,16 @@ struct vec_3d {
 
 	/** @brief Z component of the vector. */
 	Value z;
+
+	constexpr vec_3d(Value arg_x, Value arg_y, Value arg_z) noexcept
+		: x(arg_x)
+		, y(arg_y)
+		, z(arg_z) {}
+
+	constexpr vec_3d() noexcept
+		: x{}
+		, y{}
+		, z{} {}
 
 	// TODO(tuna): maybe add arithmetic operations between compatible types
 
@@ -89,7 +104,7 @@ struct vec_3d {
 	 *
 	 * @return √(x² + y² + z²).
 	 */
-	double euclidian_norm() const noexcept {
+	CONSTEXPR_IF_GCC double euclidian_norm() const noexcept {
 		return std::sqrt(std::pow(x, 2) + std::pow(y, 2) + std::pow(z, 2));
 	}
 
@@ -281,4 +296,3 @@ using vec = vec_3d<double>;
 // Ensure that a 3D vector has the expected memory layout.
 // NOLINTNEXTLINE(*avoid-c-arrays)
 static_assert(sizeof(vec) == sizeof(double[3]));
-

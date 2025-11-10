@@ -35,12 +35,12 @@
             llvm.openmp
             (texliveTeTeX.withPackages (ps: [ ps.newunicodechar ]))
             ghostscript_headless
+            lcov
           ];
           shellHook = ''
             export NIX_CFLAGS_COMPILE="$NIX_CFLAGS_COMPILE -B${llvm.libcxxClang.libcxx}/lib";
           '';
         };
-
       }
     );
 }

@@ -24,7 +24,9 @@ Checks: [
   "-modernize-use-nodiscard",
   # Does not accept `#pragma once`.
   "-llvm-header-guard",
-  "-altera-struct-pack-align"
+  "-altera-struct-pack-align",
+  # Not naming parameters is a common practice for tag types for example.
+  "-*named-parameter"
 ]
 
 WarningsAsErrors: ''

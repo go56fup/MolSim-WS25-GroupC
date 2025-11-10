@@ -280,7 +280,51 @@ TAB_SIZE               = 8
 # with the commands \{ and \} for these it is advised to use the version @{ and
 # @} or use a double escape (\\{ and \\})
 
-ALIASES                =
+
+ALIASES += gtest_equ_desc{1}="@brief Compile-time equivalent of `\1`."
+
+ALIASES += gtest_equ{2}="@def STATIC_\1(\2)^^@gtest_equ_desc{\1}"
+ALIASES += gtest_equ{3}="@def STATIC_\1(\2\,\3)^^@gtest_equ_desc{\1}"
+ALIASES += gtest_equ{4}="@def STATIC_\1(\2\,\3\,\4)^^@gtest_equ_desc{\1}"
+ALIASES += gtest_equ{5}="@def STATIC_\1(\2\,\3\,\4\,\5)^^@gtest_equ_desc{\1}"
+ALIASES += gtest_equ{6}="@def STATIC_\1(\2\,\3\,\4\,\5\,\6)^^@gtest_equ_desc{\1}"
+ALIASES += gtest_equ{7}="@def STATIC_\1(\2\,\3\,\4\,\5\,\6\,\7)^^@gtest_equ_desc{\1}"
+
+ALIASES += gtest_equ_val{1}="@gtest_equ{\1,val1,val2}"
+ALIASES += gtest_equ_str{1}="@gtest_equ{\1,str1,str2}"
+
+ALIASES += gtest_sect{2}="@name STATIC_\{ASSERT\,EXPECT\}_\1(\2)^^@\{"
+ALIASES += gtest_sect{3}="@name STATIC_\{ASSERT\,EXPECT\}_\1(\2, \3)^^@\{"
+ALIASES += gtest_sect{4}="@name STATIC_\{ASSERT\,EXPECT\}_\1(\2, \3, \4)^^@\{"
+
+ALIASES += gtest_sect_str{1}="@name STATIC_\{ASSERT\,EXPECT\}_\1(str1, str2)^^@\{"
+ALIASES += gtest_sect_val{1}="@name STATIC_\{ASSERT\,EXPECT\}_\1(val1, val2)^^@\{"
+
+ALIASES += gtest_cmp_section_header{2}="@gtest_sect_val{\1}^^@brief Verifies that `val1 \2 val2`."
+ALIASES += gtest_cmp_section_begin{2}="@gtest_cmp_section_header{\1,\2}^^@gtest_params_val"
+
+ALIASES += hand{1}="\1-hand side of the comparison."
+ALIASES += gtest_params{2}="@param \1 @hand{Left}^^@param \2 @hand{Right}"
+ALIASES += gtest_params_val="@gtest_params{val1,val2}"
+ALIASES += gtest_params_str="@gtest_params{str1,str2}"
+
+ALIASES += gtest_str_base{1}="@brief Verifies that two C strings `str1` and `str2` have \1 contents"
+ALIASES += gtest_str_ins_verify{1}="@gtest_str_base{\1}, ignoring case."
+ALIASES += gtest_str_verify{1}="@gtest_str_base{\1}."
+
+ALIASES += gtest_str_section_header{2}="@gtest_sect_str{\1}^^@gtest_str_verify{\2}"
+ALIASES += gtest_str_section_begin{2}="@gtest_str_section_header{\1,\2}^^@gtest_params_str"
+
+ALIASES += gtest_str_ins_section_header{2}="@gtest_sect_str{\1}^^@gtest_str_ins_verify{\2}"
+ALIASES += gtest_str_ins_section_begin{2}="@gtest_str_ins_section_header{\1,\2}^^@gtest_params_str"
+
+ALIASES += gtest_fp_verify{1}="@brief Verifies that two two `\1` values `val1` and `val2` are approximately equal."
+ALIASES += gtest_fp_section_header{2}="@gtest_sect_str{\1}^^@gtest_fp_verify{\2}"
+ALIASES += gtest_fp_section_begin{2}="@gtest_fp_section_header{\1,\2}^^@gtest_params_val"
+
+ALIASES += gtest_nth_param{2}="@param val\1 \2 argument to pass into `pred` (for `*PRED\1` or higher)."
+
+
 
 # Set the OPTIMIZE_OUTPUT_FOR_C tag to YES if your project consists of C sources
 # only. Doxygen will then generate output that is more tailored for C. For
@@ -981,7 +1025,7 @@ WARN_LOGFILE           =
 # spaces. See also FILE_PATTERNS and EXTENSION_MAPPING
 # Note: If this tag is empty the current directory is searched.
 
-INPUT                  = README.md src include
+INPUT                  = README.md src include test
 
 # This tag can be used to specify the character encoding of the source files
 # that Doxygen parses. Internally Doxygen uses the UTF-8 encoding. Doxygen uses
