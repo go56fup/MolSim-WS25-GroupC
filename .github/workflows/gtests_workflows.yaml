@@ -14,9 +14,17 @@ jobs:
     steps:
 
       - uses: actions/checkout@v4
+      
+      - name: Cache APT Dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            /var/cache/apt/archives
+            /var/lib/apt/lists
+          key: ${{ runner.os }}-apt-cache-${{ hashFiles('.github/workflows/main.yml') }}
     
       - name: Install Dependencies (VTK, Doxygen)
-        run: sudo apt-get update && sudo apt-get install -y libvtk9-dev doxygen
+        run: sudo apt-get update && sudo apt-get install -y libvtk9-dev doxygen libspdlog-dev
 
       - name: Run GTests
         run: cmake --workflow --preset test-gcc
