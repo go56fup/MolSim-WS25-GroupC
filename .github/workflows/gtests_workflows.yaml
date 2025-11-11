@@ -1,0 +1,16 @@
+on:
+  pull_request:
+    branches:
+      - 'main'
+  push:
+    branches:
+      - 'Assignment*'
+      - 'workflow*'
+
+jobs:
+  run_gtest_suite:
+    name: Google Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: cmake --workflow --preset test-gcc
