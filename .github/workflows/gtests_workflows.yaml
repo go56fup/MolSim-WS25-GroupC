@@ -12,5 +12,13 @@ jobs:
     name: Google Tests
     runs-on: ubuntu-latest
     steps:
+
       - uses: actions/checkout@v4
+    
+      - name: Install VTK Dependencies
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y libvtk-dev 
+
+      - name: Run GTests
       - run: cmake --workflow --preset test-gcc
