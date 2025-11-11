@@ -16,7 +16,7 @@ jobs:
       - uses: actions/checkout@v4
     
       - name: Install VTK Dependencies
-        run: sudo apt-get update && sudo apt-get install -y libvtk-dev
+        run: sudo apt-get update && sudo apt-get install -y libvtk9-dev
 
       - name: Run GTests
         run: cmake --workflow --preset test-gcc
