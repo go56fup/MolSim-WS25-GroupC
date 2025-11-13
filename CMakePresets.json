@@ -24,7 +24,7 @@
 				"ENABLE_STATIC_TESTING": "ON"
 			},
 			"environment": {
-				"LSAN_OPTIONS": "suppressions=utils/lsan_ignorelist"
+				"LSAN_OPTIONS": "suppressions=${fileDir}/utils/lsan_ignorelist"
 			}
 		},
 		{

@@ -34,7 +34,7 @@ jobs:
         run: cmake --workflow --preset test-gcc 
 
       - name: Run test suite with Clang
-        run: cmake --workflow --preset test-gcc
+        run: cmake --workflow --preset test
 
       - name: Check formatting
         run: |
