@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - '*ssignment*'
+      - 'workflow*'
 jobs:
   run_gtest_suite:
     name: Google Tests
