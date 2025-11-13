@@ -12,6 +12,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          packages: libvtk9-dev doxygen gcc-14 g++-14 clang-20 clang-tidy-20 clang-format-20 cmake-format
+          version: 1.0
     
       - name: Install Dependencies
         run: |
