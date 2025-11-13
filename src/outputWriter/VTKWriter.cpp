@@ -30,28 +30,28 @@ void VTKWriter::plotParticles(std::span<const Particle> particles, std::string_v
 	auto points = vtkSmartPointer<vtkPoints>::New();
 
 	// Create and configure data arrays
-	vtkNew<vtkFloatArray> massArray;
+	const vtkNew<vtkFloatArray> massArray;
 	massArray->SetName("mass");
 	massArray->SetNumberOfComponents(1);
 
-	vtkNew<vtkFloatArray> velocityArray;
+	const vtkNew<vtkFloatArray> velocityArray;
 	velocityArray->SetName("velocity");
 	velocityArray->SetNumberOfComponents(3);
 
-	vtkNew<vtkFloatArray> forceArray;
+	const vtkNew<vtkFloatArray> forceArray;
 	forceArray->SetName("force");
 	forceArray->SetNumberOfComponents(3);
 
-	vtkNew<vtkIntArray> typeArray;
+	const vtkNew<vtkIntArray> typeArray;
 	typeArray->SetName("type");
 	typeArray->SetNumberOfComponents(1);
 
 	for (const auto& p : particles) {
-		points->InsertNextPoint(p.getX().data());
-		massArray->InsertNextValue(static_cast<float>(p.getM()));
-		velocityArray->InsertNextTuple(p.getV().data());
-		forceArray->InsertNextTuple(p.getF().data());
-		typeArray->InsertNextValue(p.getType());
+		points->InsertNextPoint(p.x.data());
+		massArray->InsertNextValue(static_cast<float>(p.m));
+		velocityArray->InsertNextTuple(p.v.data());
+		forceArray->InsertNextTuple(p.f.data());
+		typeArray->InsertNextValue(p.type);
 	}
 
 	// Set up the grid
@@ -69,14 +69,13 @@ void VTKWriter::plotParticles(std::span<const Particle> particles, std::string_v
 	strstr << filename << "_" << std::setfill('0') << std::setw(4) << iteration << ".vtu";
 
 	// Create writer and set data
-	vtkNew<vtkXMLUnstructuredGridWriter> writer;
+	const vtkNew<vtkXMLUnstructuredGridWriter> writer;
 	writer->SetFileName(strstr.str().c_str());
 	writer->SetInputData(grid);
 	writer->SetDataModeToAscii();
 
 	// Write the file
 	writer->Write();
-	// TODO(tuna): deallocate correctly, leaks.
 }
 }  // namespace outputWriter
 #endif

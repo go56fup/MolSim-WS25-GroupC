@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.31)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -37,26 +37,29 @@ add_executable(MolSim ${MY_SRC})
 
 target_include_directories(MolSim PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-# activate all compiler warnings. Clean up your code :P depending on the compiler different flags
-# are used
+add_library(project_options INTERFACE)
 target_compile_options(
-	MolSim
-	PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wall
-			-Wextra
-			-Wpedantic
-			-Wconversion>
-			# disable some spam warnings for icpc...
-			$<$<CXX_COMPILER_ID:Intel>:-w3
-			-wd383,981,1418,1572,2259>
+	project_options
+	INTERFACE $<$<CXX_COMPILER_ID:GNU>:-Wall
+				-Wextra
+				-Wpedantic
+				-Wconversion>
+				# disable some spam warnings for icpc...
+				$<$<CXX_COMPILER_ID:Intel>:-w3
+				-wd383,981,1418,1572,2259>
 )
 
 if(ENABLE_SANITIZERS)
-	target_compile_options(MolSim PRIVATE "-fsanitize=undefined,address")
-	target_link_options(MolSim PRIVATE "-fsanitize=undefined,address")
+	target_compile_options(project_options INTERFACE "-fsanitize=undefined,address")
+	target_link_options(project_options INTERFACE "-fsanitize=undefined,address")
 endif()
 
 if(ENABLE_VTK_OUTPUT)
-	target_compile_definitions(MolSim PRIVATE "ENABLE_VTK_OUTPUT")
+	target_compile_definitions(project_options INTERFACE "ENABLE_VTK_OUTPUT")
+endif()
+
+if(BENCHMARK_PRESET)
+	target_compile_definitions(MolSim PRIVATE "BENCHMARK_PRESET=${BENCHMARK_PRESET}")
 endif()
 
 # add additional modules
@@ -66,6 +69,13 @@ include(vtk)
 include(clang-format)
 include(doxygen)
 include(clang-tidy)
+include(third-party)
+
+get_third_party(TARGET third_party)
+target_link_libraries(project_options INTERFACE third_party)
 
 include(CTest)
 add_subdirectory(test)
+generate_documentation_target()
+
+target_link_libraries(MolSim PRIVATE project_options)

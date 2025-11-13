@@ -2,11 +2,11 @@
 
 # Modified from https://github.com/andrewseidl/githook-clang-format
 # Use the following command to activate it on your local instance of the repo.
-# cd .git/hooks && ln -s ../../hooks/pre-commit
+# cd .git/hooks && ln -s ../../utils/hooks/pre-commit
 
 format_file() {
   file="$1"
-  if [ -f $file ]; then
+  if [ -f "$file" ]; then
     clang-format -i "$file"
     git add "$file"
   fi

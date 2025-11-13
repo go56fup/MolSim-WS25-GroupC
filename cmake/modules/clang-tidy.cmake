@@ -1,7 +1,12 @@
+option(ENABLE_CLANG_TIDY "Run clang-tidy on the codebase, increases build times dramatically" OFF)
+if(NOT ENABLE_CLANG_TIDY)
+	return()
+endif()
+
 find_program(CLANG_TIDY "clang-tidy")
 if(CLANG_TIDY)
 	message(STATUS "Found clang-tidy: ${CLANG_TIDY}")
-	set_target_properties(MolSim PROPERTIES CXX_CLANG_TIDY "clang-tidy;--header-filter=include/")
+	set_target_properties(MolSim PROPERTIES CXX_CLANG_TIDY "${CLANG_TIDY};--header-filter=include/")
 else()
 	message(WARNING "clang-tidy not found - checks will not be performed")
 endif()
