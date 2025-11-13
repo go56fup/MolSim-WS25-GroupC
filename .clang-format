@@ -1,7 +1,21 @@
-# base is Google style guide
-BasedOnStyle: Google
-# we want more space per line
+IndentWidth: 4
+TabWidth: 4
+UseTab: AlignWithSpaces
+SeparateDefinitionBlocks: Always
+AllowShortFunctionsOnASingleLine: Empty
+AccessModifierOffset: -4
+AlignAfterOpenBracket: BlockIndent
+BreakConstructorInitializers: BeforeComma
+PackConstructorInitializers: Never
 ColumnLimit: 120
-# ensure consistent pointer alignment
-DerivePointerAlignment: false
-PointerAlignment: Right
+Cpp11BracedListStyle: true
+PointerAlignment: Left
+SpacesBeforeTrailingComments: 2
+AlwaysBreakTemplateDeclarations: Yes
+RequiresClausePosition: OwnLine
+AllowShortIfStatementsOnASingleLine: WithoutElse
+SortIncludes: CaseInsensitive
+QualifierAlignment: Left
+AlignTrailingComments:
+  Kind: Always
+  OverEmptyLines: 2

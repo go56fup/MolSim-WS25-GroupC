@@ -6,61 +6,68 @@
  */
 
 #include "FileReader.h"
+#include "ParticleContainer.h"
+#include "Vector.h"
 
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <string>
 
-FileReader::FileReader() = default;
+namespace FileReader {
+void readFile(ParticleContainer& particles, char* filename) {
+	vec x{};
+	vec v{};
+	double m{};
+	int num_particles = 0;
 
-FileReader::~FileReader() = default;
+	std::ifstream input_file(filename);
+	std::string tmp_string;
 
-void FileReader::readFile(std::list<Particle> &particles, char *filename) {
-  std::array<double, 3> x;
-  std::array<double, 3> v;
-  double m;
-  int num_particles = 0;
+	if (input_file.is_open()) {
+		getline(input_file, tmp_string);
+		std::cout << "Read line: " << tmp_string << '\n';
 
-  std::ifstream input_file(filename);
-  std::string tmp_string;
+		while (tmp_string.empty() or tmp_string[0] == '#') {
+			getline(input_file, tmp_string);
+			std::cout << "Read line: " << tmp_string << '\n';
+		}
 
-  if (input_file.is_open()) {
-    getline(input_file, tmp_string);
-    std::cout << "Read line: " << tmp_string << std::endl;
+		std::istringstream numstream(tmp_string);
+		numstream >> num_particles;
+		std::cout << "Reading " << num_particles << ".\n";
+		getline(input_file, tmp_string);
+		std::cout << "Read line: " << tmp_string << '\n';
 
-    while (tmp_string.empty() or tmp_string[0] == '#') {
-      getline(input_file, tmp_string);
-      std::cout << "Read line: " << tmp_string << std::endl;
-    }
+		if (num_particles <= 0) {
+			std::cout << "Error reading file: non-positive particle count: " << num_particles << '\n';
+			exit(-1); // NOLINT(*mt-unsafe)
+		}
+		particles.reserve(static_cast<std::size_t>(num_particles));
 
-    std::istringstream numstream(tmp_string);
-    numstream >> num_particles;
-    std::cout << "Reading " << num_particles << "." << std::endl;
-    getline(input_file, tmp_string);
-    std::cout << "Read line: " << tmp_string << std::endl;
+		for (int i = 0; i < num_particles; i++) {
+			std::istringstream datastream(tmp_string);
 
-    for (int i = 0; i < num_particles; i++) {
-      std::istringstream datastream(tmp_string);
+			for (auto& xj : x) {
+				datastream >> xj;
+			}
+			for (auto& vj : v) {
+				datastream >> vj;
+			}
+			if (datastream.eof()) {
+				std::cout << "Error reading file: eof reached unexpectedly reading from line " << i << '\n';
+				exit(-1);  // NOLINT(*mt-unsafe)
+			}
+			datastream >> m;
+			particles.emplace_back(x, v, m);
 
-      for (auto &xj : x) {
-        datastream >> xj;
-      }
-      for (auto &vj : v) {
-        datastream >> vj;
-      }
-      if (datastream.eof()) {
-        std::cout << "Error reading file: eof reached unexpectedly reading from line " << i << std::endl;
-        exit(-1);
-      }
-      datastream >> m;
-      particles.emplace_back(x, v, m);
-
-      getline(input_file, tmp_string);
-      std::cout << "Read line: " << tmp_string << std::endl;
-    }
-  } else {
-    std::cout << "Error: could not open file " << filename << std::endl;
-    exit(-1);
-  }
+			getline(input_file, tmp_string);
+			std::cout << "Read line: " << tmp_string << '\n';
+		}
+	} else {
+		std::cout << "Error: could not open file " << filename << '\n';
+		exit(-1);  // NOLINT(*mt-unsafe)
+	}
 }
+}  // namespace FileReader
