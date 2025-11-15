@@ -4,7 +4,6 @@
 #include "outputWriter/VTKWriter.h"
 #define OUTPUT_WRITER outputWriter::VTKWriter
 #else
-#include "outputWriter/TXTWriter.h"
-// #define OUTPUT_WRITER outputWriter::XYZWriter
-#define OUTPUT_WRITER outputWriter::TXTWriter
+#include "outputWriter/XYZWriter.h"
+#define OUTPUT_WRITER outputWriter::XYZWriter
 #endif

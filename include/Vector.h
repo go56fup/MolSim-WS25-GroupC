@@ -34,9 +34,11 @@ template <detail::arithmetic Value>
 // on purpose.
 // NOLINTNEXTLINE(*slicing)
 struct vec_3d
+#ifndef IS_GCC
 /// @cond DO_NOT_DOCUMENT
-// LOG_SPECIAL_MEMBER_FUNCS_DEBUG("vec_3d")
+LOG_SPECIAL_MEMBER_FUNCS_DEBUG("vec_3d")
 /// @endcond
+#endif
 {
 public:
 	/** @brief X component of the vector. */

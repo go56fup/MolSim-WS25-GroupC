@@ -1,7 +1,6 @@
 #include <cstdlib>
 #include <exception>
 #include <filesystem>
-#include <span>
 #include <sstream>
 #include <vector>
 

@@ -7,10 +7,12 @@
 
 #pragma once
 
+#include <concepts>
 #include <iostream>
 #include <source_location>
 #include <string>
 #include <string_view>
+#include <utility>
 
 #include <fmt/base.h>
 
@@ -32,6 +34,10 @@ LOG_SPECIAL_MEMBER_FUNCS_DEBUG("Particle")
 #endif
 /// @endcond
 {
+private:
+	using flag = flag_special_member_funcs<"Particle">;
+	using vec_args = std::tuple<double&, double&, double&>;
+
 public:
 	/**
 	 * Position of the particle
@@ -103,7 +109,21 @@ public:
 		, type(type_arg)
 
 	{
-		flag_special_member_funcs<"Particle">::log_special_mem("parameterized construction", loc);
+		flag::annotate_construction("parameterized", loc);
+	}
+
+	template <std::same_as<vec_args> VecArgs>
+	constexpr Particle(
+		// See previous constructor for rationale.
+	    // NOLINTNEXTLINE(*easily-swappable-parameters)
+		std::piecewise_construct_t, VecArgs&& x_arg, VecArgs&& v_arg, double m_arg, int type_arg = 0,
+		const std::source_location& loc = std::source_location::current()
+	) noexcept
+		: x(std::make_from_tuple<vec>(std::forward<VecArgs>(x_arg)))
+		, v(std::make_from_tuple<vec>(std::forward<VecArgs>(v_arg)))
+		, m(m_arg)
+		, type(type_arg) {
+		flag::annotate_construction("piecewise", loc);
 	}
 
 	/**
@@ -115,6 +135,27 @@ public:
 };
 
 /**
+ * @brief Specialization of the {fmt} API for Particle.
+ *
+ * Enables use of fmt::format and fmt::print with Particle objects.
+ *
+ */
+template <>
+struct fmt::formatter<Particle> {
+	/** @brief Parses the format specification (no-op for this type). */
+	constexpr auto parse(fmt::format_parse_context& ctx) {
+		return ctx.begin();
+	}
+
+	/** @brief Formats `Particle` objects". */
+	auto format(const Particle& p, fmt::format_context& ctx) const {
+		return fmt::format_to(
+			ctx.out(), "Particle X: {} v: {} f: {} old_f: {} type: {}", p.x, p.v, p.f, p.old_f, p.type
+		);
+	}
+};
+
+/**
  * @brief Stream output operator for Particle.
  *
  * Allows output of particles using `operator<<`.
@@ -123,7 +164,7 @@ public:
  * @param p Particle to print.
  * @return Reference to the modified output stream.
  */
-constexpr std::ostream& operator<<(std::ostream& stream, Particle& p) {
+constexpr std::ostream& operator<<(std::ostream& stream, const Particle& p) {
 	return stream << fmt::format("Particle X: {} v: {} f: {} old_f: {} type: {}", p.x, p.v, p.f, p.old_f, p.type);
 }
 

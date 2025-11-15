@@ -51,8 +51,8 @@ constexpr void calculateF(force_calculator auto&& calculator, std::span<Particle
 constexpr void calculateX(std::span<Particle> particles, double delta_t) noexcept {
 	for (auto& p : particles) {
 		const auto force_scalar = std::pow(delta_t, 2) / (2 * p.m);
-		const auto new_x = p.x + delta_t * p.v + p.old_f * force_scalar;
-		p.x = new_x;
+		// TODO(tuna): check if expression templates are needed here
+		p.x = p.x + delta_t * p.v + p.old_f * force_scalar;
 	}
 }
 
@@ -70,8 +70,7 @@ constexpr void calculateX(std::span<Particle> particles, double delta_t) noexcep
 constexpr void calculateV(std::span<Particle> particles, double delta_t) noexcept {
 	for (auto& p : particles) {
 		const auto velocity_scalar = delta_t / (2 * p.m);
-		const auto new_v = p.v + velocity_scalar * (p.old_f + p.f);
-		p.v = new_v;
+		p.v = p.v + velocity_scalar * (p.old_f + p.f);
 	}
 }
 
@@ -87,7 +86,7 @@ constexpr void calculateV(std::span<Particle> particles, double delta_t) noexcep
  * @param out_name  Base name for the output file.
  * @param iteration Current simulation iteration (used for output naming).
  */
-inline void plotParticles(
+constexpr void plotParticles(
 	particle_io_provider auto&& io_provider, std::span<const Particle> particles, std::string_view out_name,
 	int iteration
 ) {
@@ -129,10 +128,12 @@ constexpr void run_sim_iteration(ForceCalculator&& force_calc, std::span<Particl
 	update_values(particles);
 }
 
+// TODO(anyone): do tparam docs
 /** @brief Compile-time options for the simulation. */
+template <particle_io_provider IOProvider, force_calculator ForceCalc>
 struct sim_traits {
-	/// Whether to call `plotParticles` and generate output.
-	bool create_output = true;
+	ForceCalc force = lennard_jones_force;
+	IOProvider io = OUTPUT_WRITER::plotParticles;
 };
 
 /**
@@ -145,22 +146,20 @@ struct sim_traits {
  * @param args Simulation parameters (@p delta_t and @p end_time)
  * @param output_path Path to put simulation result files into
  **/
-template <sim_traits Traits = {}>
+template <sim_traits Traits = {.force = lennard_jones_force, .io = OUTPUT_WRITER::plotParticles}>
 constexpr void
 run_simulation(std::span<Particle> particles, const sim_args& args, std::string_view output_path) noexcept {
 	double current_time = 0;
 	int iteration = 0;
+	constexpr auto plot_every_nth_iter = 10;
 	const std::string output_prefix = std::string(output_path) + "/MD_vtk";
+	for (const auto& p: particles) { spdlog::info(p); }
 
 	while (current_time < args.end_time) {
-		if constexpr (Traits.create_output) {
-			// NOLINTNEXTLINE(*magic-numbers)
-			if (iteration % 10 == 0) {
-				plotParticles(OUTPUT_WRITER::plotParticles, particles, output_prefix, iteration);
-			}
+		if (iteration % plot_every_nth_iter == 0) {
+			plotParticles(Traits.io, particles, output_prefix, iteration);
 		}
-
-		run_sim_iteration(lennard_jones_force, particles, args.delta_t);
+		run_sim_iteration(Traits.force, particles, args.delta_t);
 		current_time += args.delta_t;
 		++iteration;
 	}
@@ -186,7 +185,7 @@ constexpr void cuboid_generator(
 			for (int k = 0; k < scale.z; ++k) {
 				particles.emplace_back(
 					vec{origin.x + (i * distance), origin.y + (j * distance), origin.z + (k * distance)},
-					maxwellBoltzmannDistributedVelocity<3>(brownian_mean) + initial_velocity, mass
+					maxwellBoltzmannDistributedVelocity<2>(brownian_mean) + initial_velocity, mass
 				);
 			}
 		}

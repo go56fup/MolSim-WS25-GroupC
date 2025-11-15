@@ -11,7 +11,7 @@
  *
  * A callable satisfies this concept if it can be invoked as-if it shares this signature:
  * @verbatim
- void operator()(std::span<const Particles> particles, std::string_view base_name, int iteration)
+ void operator()(std::span<const Particle> particles, std::string_view base_name, int iteration)
  @endverbatim
  * where @p particles is the particles to output, @p base_name is the base name for the output files being
  * generated and @p iteration is the current simulation iteration.

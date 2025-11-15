@@ -21,7 +21,7 @@ include(GoogleTest)
 option(BUILD_STATIC_TESTING "Enable compile-time tests" OFF)
 
 function(create_test_target)
-	set(oneValueArgs TARGET)
+	set(oneValueArgs TARGET PREFIX)
 	set(multiValueArgs SOURCES)
 	cmake_parse_arguments(
 		PARSE_ARGV
@@ -45,13 +45,13 @@ function(create_test_target)
 	if(CXX_COMPILER_ID STREQUAL Clang)
 		target_compile_options("${tests_TARGET}" PRIVATE -fmacro-backtrace-limit=0)
 	endif()
-	gtest_discover_tests("${tests_TARGET}")
+	gtest_discover_tests("${tests_TARGET}" TEST_PREFIX "${tests_PREFIX}")
 endfunction()
 
 file(GLOB_RECURSE TEST_SRC "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp")
 
 if(ENABLE_STATIC_TESTING)
-	create_test_target(TARGET MolSim_Test_static SOURCES ${TEST_SRC})
+	create_test_target(TARGET MolSim_Test_static PREFIX "compile." SOURCES ${TEST_SRC})
 	if(CMAKE_CXX_COMPILER_ID STREQUAL GNU)
 		target_compile_options(
 			MolSim_Test_static PRIVATE "-fconstexpr-loop-limit=2147483647"
@@ -65,7 +65,7 @@ set constexpr evaluation steps to maximum. Compilation may fail."
 		)
 	endif()
 endif()
-create_test_target(TARGET MolSim_Test_runtime SOURCES ${TEST_SRC})
+create_test_target(TARGET MolSim_Test_runtime PREFIX "runtime." SOURCES ${TEST_SRC})
 target_compile_definitions(MolSim_Test_runtime PRIVATE "GTEST_CONFIG_RUNTIME_STATIC_EXPECT")
 if(ENABLE_COVERAGE)
 	if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")

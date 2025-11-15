@@ -17,22 +17,25 @@
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <utility>
 
 namespace detail {
 // TODO(tuna): add proper error handling during parse, maybe even just switch over to scnlib
+
 void parse_particle(ParticleContainer& particles, std::istringstream& datastream) {
-	vec x{};
-	vec v{};
+	double x_x{};
+	double x_y{};
+	double x_z{};
+	double v_x{};
+	double v_y{};
+	double v_z{};
+
 	double m{};
 
-	for (auto& xj : x) {
-		datastream >> xj;
-	}
-	for (auto& vj : v) {
-		datastream >> vj;
-	}
-	datastream >> m;
-	particles.emplace_back(x, v, m);
+	datastream >> x_x >> x_y >> x_z >> v_x >> v_y >> v_z >> m;
+	particles.emplace_back(
+		std::piecewise_construct, std::forward_as_tuple(x_x, x_y, x_z), std::forward_as_tuple(v_x, v_y, v_z), m
+	);
 }
 
 void parse_cuboid(ParticleContainer& particles, std::istringstream& datastream) {

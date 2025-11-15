@@ -86,3 +86,17 @@ TEST(SimTests, HalleysComet) {
 	GCC_STATIC_EXPECT_DOUBLE_EQ(comet_initial.x, comet_after_one_revolution.x - deviation_x);
 	GCC_STATIC_EXPECT_DOUBLE_EQ(comet_initial.y, comet_after_one_revolution.y - deviation_y);
 }
+
+constexpr void nothing_io(std::span<const Particle>, std::string_view, int) {}
+
+TEST(SimTests, PlottingTest) {
+	GTEST_CXP_GCC auto result = std::invoke([] {
+		std::array<Particle, 2> particles = {Particle{vec{}, vec{}, 1}, Particle{vec{1, 0, 0}, vec{}, 1}};
+		GTEST_CXP double delta_t = 0.014;
+		run_simulation<{.force = gravitational_force, .io = nothing_io}>(
+			particles, {.delta_t = delta_t, .end_time = delta_t}, "unused"
+		);
+		return particles;
+	});
+	GCC_STATIC_EXPECT_EQ(result[0].f, vec(1, 0, 0));
+}
