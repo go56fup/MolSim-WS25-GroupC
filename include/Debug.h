@@ -57,6 +57,14 @@ public:
 		);
 	}
 
+	// TODO(anyone): document me
+	static constexpr void annotate_construction(std::string_view reason, const std::source_location& location) {
+		runtime_log(
+			"{}:{}:{}: " + DerivedName + "'s last logged construction was {}\n", location.file_name(), location.line(),
+			location.column(), reason
+		);
+	}
+
 	/**
 	 * @brief Prints a log message only at runtime.
 	 *

@@ -21,7 +21,7 @@
 template <typename Candidate>
 concept force_calculator = requires(Candidate f, const Particle& p1, const Particle& p2) {
 	{ std::invoke(f, p1, p2) } -> std::same_as<vec>;
-};
+} && std::is_nothrow_invocable_v<Candidate, Particle&, Particle&> && std::is_trivially_copyable_v<Candidate>;
 
 /**
  * @brief Computes the gravitational force exerted on one particle by another.

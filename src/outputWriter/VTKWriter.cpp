@@ -8,6 +8,7 @@
 
 #include "outputWriter/VTKWriter.h"
 #include "Particle.h"
+#include "ParticleContainer.h"
 
 #include <vtkFloatArray.h>
 #include <vtkIntArray.h>
@@ -19,13 +20,12 @@
 #include <vtkXMLUnstructuredGridWriter.h>
 
 #include <iomanip>
-#include <span>
 #include <sstream>
 #include <string_view>
 
 namespace outputWriter {
 
-void VTKWriter::plotParticles(std::span<const Particle> particles, std::string_view filename, int iteration) {
+void VTKWriter::plotParticles(ParticleContainer& particles, std::string_view filename, int iteration) {
 	// Initialize points
 	auto points = vtkSmartPointer<vtkPoints>::New();
 
@@ -46,12 +46,14 @@ void VTKWriter::plotParticles(std::span<const Particle> particles, std::string_v
 	typeArray->SetName("type");
 	typeArray->SetNumberOfComponents(1);
 
-	for (const auto& p : particles) {
-		points->InsertNextPoint(p.x.data());
-		massArray->InsertNextValue(static_cast<float>(p.m));
-		velocityArray->InsertNextTuple(p.v.data());
-		forceArray->InsertNextTuple(p.f.data());
-		typeArray->InsertNextValue(p.type);
+	for (const auto& cell : particles) {
+		for (const auto& p : cell) {
+			points->InsertNextPoint(p.x.data());
+			massArray->InsertNextValue(static_cast<float>(p.m));
+			velocityArray->InsertNextTuple(p.v.data());
+			forceArray->InsertNextTuple(p.f.data());
+			typeArray->InsertNextValue(p.type);
+		}
 	}
 
 	// Set up the grid

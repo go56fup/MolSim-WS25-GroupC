@@ -17,7 +17,7 @@ inline void plotParticles(std::span<const Particle> particles, std::string_view 
 	file.open(strstr.str().c_str());
 
 	for (const auto& p : particles) {
-		file << p.toString() << '\n';
+		file << p << '\n';
 	}
 
 	file.close();

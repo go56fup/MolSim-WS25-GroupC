@@ -2,14 +2,88 @@
 
 #include <cmath>
 #include <functional>
+#include <ranges>
 #include <span>
 #include <string_view>
 
+#include <spdlog/spdlog.h>
+
+#include "Concepts.h"
 #include "ForceCalculators.h"
 #include "IOProviders.h"
 #include "outputWriter/outputWriters.h"
+#include "outputWriter/VTKWriter.h"
 #include "ParticleContainer.h"
-#include "utils/MaxwellBoltzmannDistribution.h"
+
+constexpr void update_particle_forces(force_calculator auto calculator, Particle& p1, Particle& p2) noexcept {
+	const auto f_ij = std::invoke(calculator, p1, p2);
+	p1.f += f_ij;
+	p2.f -= f_ij;
+}
+
+enum class bounds_type : std::uint8_t { none = 0, x_min, y_min, z_min, x_max, y_max, z_max };
+
+constexpr bounds_type
+bounds_check(const ParticleContainer::index& current, const ParticleContainer::index& boundaries) noexcept {
+	if (current.x == 0) {
+		return bounds_type::x_min;
+	}
+	if (current.y == 0) {
+		return bounds_type::y_min;
+	}
+	if (current.z == 0) {
+		return bounds_type::z_min;
+	}
+	if (current.x == boundaries.x) {
+		return bounds_type::x_max;
+	}
+	if (current.y == boundaries.y) {
+		return bounds_type::y_max;
+	}
+	if (current.z == boundaries.z) {
+		return bounds_type::z_max;
+	}
+	return bounds_type::none;
+};
+
+constexpr void if_cell_at_border_reflect_via_ghost_particle(
+	ParticleContainer::cell& current_cell, const ParticleContainer::index& current_cell_idx,
+	const ParticleContainer::index& bounds, force_calculator auto calculator
+) noexcept {
+	static constexpr double ghost_particle_threshold = 1;
+
+#define REFLECT_IF(check, x_mod, y_mod, z_mod)                                                                         \
+	do {                                                                                                               \
+		for (auto& p : current_cell) {                                                                                 \
+			if (p.x.check) {                                                                                           \
+				p.f += std::invoke(calculator, p, Particle{{p.x.x_mod, p.x.y_mod, p.x.z_mod}, {}, p.m});               \
+			}                                                                                                          \
+		}                                                                                                              \
+	} while (0)
+
+	switch (bounds_check(current_cell_idx, bounds)) {
+	case bounds_type::none:
+		return;
+	case bounds_type::x_min:
+		REFLECT_IF(x <= ghost_particle_threshold, x * -1, y, z);
+		break;
+	case bounds_type::y_min:
+		REFLECT_IF(y <= ghost_particle_threshold, x, y * -1, z);
+		break;
+	case bounds_type::z_min:
+		REFLECT_IF(z <= ghost_particle_threshold, x, y, z * -1);
+		break;
+	case bounds_type::x_max:
+		REFLECT_IF(x >= bounds.x - ghost_particle_threshold, x + bounds.x, y, z);
+		break;
+	case bounds_type::y_max:
+		REFLECT_IF(y >= bounds.y - ghost_particle_threshold, x, y + bounds.y, z);
+		break;
+	case bounds_type::z_max:
+		REFLECT_IF(z >= bounds.z - ghost_particle_threshold, x, y, z + bounds.z);
+		break;
+	}
+}
 
 /**
  * @brief Calculates forces on a collection of particles using the provided force calculator.
@@ -22,18 +96,23 @@
  * @param particles The span over particles on which forces will be calculated.
  *
  */
-constexpr void calculateF(force_calculator auto&& calculator, std::span<Particle> particles) noexcept(
-	noexcept(std::invoke(calculator, Particle{}, Particle{}))
-) {
-	// TODO(tuna): see if this actually compiles down to a mask over simd like it should
-	for (auto& p : particles) {
-		p.f = {};
-	}
+constexpr void calculate_forces(force_calculator auto calculator, ParticleContainer& particles) noexcept {
+	for (const auto& [current_cell_idx, target_cell_idx] : particles.directional_interactions()) {
+		// TODO(tuna): see if after the implementation of the border iterator whether we still need the indices
+		SPDLOG_TRACE("Directionally interacting cells: {} -> {}", current_cell_idx, target_cell_idx);
+		auto& current_cell = particles[current_cell_idx];
+		auto& target_cell = particles[target_cell_idx];
 
-	for (auto&& [p1, p2] : unique_pairs(particles)) {
-		const auto f_ij = std::invoke(calculator, p1, p2);
-		p1.f += f_ij;
-		p2.f -= f_ij;
+		for (auto&& [p1, p2] : unique_pairs(current_cell)) {
+			update_particle_forces(calculator, p1, p2);
+		}
+		for (auto& p1 : current_cell) {
+			for (auto& p2 : target_cell) {
+				update_particle_forces(calculator, p1, p2);
+			}
+		}
+		// TODO(tuna): there must be a more efficient way to check this rather than checking for every cell
+		if_cell_at_border_reflect_via_ghost_particle(current_cell, current_cell_idx, particles.grid_size(), calculator);
 	}
 }
 
@@ -48,11 +127,11 @@ constexpr void calculateF(force_calculator auto&& calculator, std::span<Particle
  * @param particles Mutable span over particles to update.
  * @param delta_t The time step for integration.
  */
-constexpr void calculateX(std::span<Particle> particles, double delta_t) noexcept {
+constexpr void calculateX(range_of<Particle> auto&& particles, double delta_t) noexcept {
 	for (auto& p : particles) {
 		const auto force_scalar = std::pow(delta_t, 2) / (2 * p.m);
-		const auto new_x = p.x + delta_t * p.v + p.old_f * force_scalar;
-		p.x = new_x;
+		// TODO(tuna): check if expression templates are needed here
+		p.x = p.x + delta_t * p.v + p.old_f * force_scalar;
 	}
 }
 
@@ -67,14 +146,14 @@ constexpr void calculateX(std::span<Particle> particles, double delta_t) noexcep
  * @param particles Mutable span over particles to update.
  * @param delta_t The time step for integration.
  */
-constexpr void calculateV(std::span<Particle> particles, double delta_t) noexcept {
+constexpr void calculateV(range_of<Particle> auto&& particles, double delta_t) noexcept {
 	for (auto& p : particles) {
 		const auto velocity_scalar = delta_t / (2 * p.m);
-		const auto new_v = p.v + velocity_scalar * (p.old_f + p.f);
-		p.v = new_v;
+		p.v = p.v + velocity_scalar * (p.old_f + p.f);
 	}
 }
 
+// TODO(tuna): fix docs
 /**
  * @brief Exports particle data using the given I/O provider.
  *
@@ -87,9 +166,8 @@ constexpr void calculateV(std::span<Particle> particles, double delta_t) noexcep
  * @param out_name  Base name for the output file.
  * @param iteration Current simulation iteration (used for output naming).
  */
-inline void plotParticles(
-	particle_io_provider auto&& io_provider, std::span<const Particle> particles, std::string_view out_name,
-	int iteration
+constexpr void plotParticles(
+	particle_io_provider auto&& io_provider, ParticleContainer& particles, std::string_view out_name, int iteration
 ) {
 	io_provider(particles, out_name, iteration);
 }
@@ -102,7 +180,7 @@ inline void plotParticles(
  *
  * @param particles Mutable span over particles to update.
  */
-constexpr void update_values(std::span<Particle> particles) noexcept {
+constexpr void update_values(range_of<Particle> auto&& particles) noexcept {
 	for (auto& p : particles) {
 		p.old_f = p.f;
 	}
@@ -121,20 +199,23 @@ struct sim_args {
  * @param particles Mutable span over particles to run simulation tick for
  * @param delta_t Tick length
  */
-template <force_calculator ForceCalculator>
-constexpr void run_sim_iteration(ForceCalculator&& force_calc, std::span<Particle> particles, double delta_t) noexcept {
-	calculateX(particles, delta_t);
-	calculateF(std::forward<ForceCalculator>(force_calc), particles);
-	calculateV(particles, delta_t);
-	update_values(particles);
+constexpr void
+run_sim_iteration(force_calculator auto force_calc, ParticleContainer& particles, double delta_t) noexcept {
+	calculateX(particles.view(), delta_t);
+	calculate_forces(force_calc, particles);
+	calculateV(particles.view(), delta_t);
+	update_values(particles.view());
 }
 
+// TODO(anyone): do tparam docs
 /** @brief Compile-time options for the simulation. */
+template <particle_io_provider IOProvider, force_calculator ForceCalc>
 struct sim_traits {
-	/// Whether to call `plotParticles` and generate output.
-	bool create_output = true;
+	ForceCalc force = lennard_jones_force;
+	IOProvider io = OUTPUT_WRITER::plotParticles;
 };
 
+// TODO(anyone): update span references
 /**
  * @brief Start the simulation.
  *
@@ -145,50 +226,20 @@ struct sim_traits {
  * @param args Simulation parameters (@p delta_t and @p end_time)
  * @param output_path Path to put simulation result files into
  **/
-template <sim_traits Traits = {}>
+template <sim_traits Traits = {.force = lennard_jones_force, .io = OUTPUT_WRITER::plotParticles}>
 constexpr void
-run_simulation(std::span<Particle> particles, const sim_args& args, std::string_view output_path) noexcept {
+run_simulation(ParticleContainer& particles, const sim_args& args, std::string_view output_path) noexcept {
 	double current_time = 0;
 	int iteration = 0;
+	constexpr auto plot_every_nth_iter = 10;
 	const std::string output_prefix = std::string(output_path) + "/MD_vtk";
 
 	while (current_time < args.end_time) {
-		if constexpr (Traits.create_output) {
-			// NOLINTNEXTLINE(*magic-numbers)
-			if (iteration % 10 == 0) {
-				plotParticles(OUTPUT_WRITER::plotParticles, particles, output_prefix, iteration);
-			}
+		if (iteration % plot_every_nth_iter == 0) {
+			plotParticles(Traits.io, particles, output_prefix, iteration);
 		}
-
-		run_sim_iteration(lennard_jones_force, particles, args.delta_t);
+		run_sim_iteration(Traits.force, particles, args.delta_t);
 		current_time += args.delta_t;
 		++iteration;
-	}
-}
-
-/**
- * @brief Create a 3D grid of particles, representing one body.
- *
- * @param particles Particle container to add generated particles onto
- * @param origin Position of the lower left front-side corner
- * @param initial_velocity Initial additional velocity of each particle
- * @param scale Number of particles in each direction
- * @param distance Relative distance between two particles
- * @param mass Mass of one particle
- * @param mean_brownian Average velocity of the Brownian Motion
- **/
-constexpr void cuboid_generator(
-	ParticleContainer& particles, const vec& origin, const vec_3d<int>& scale, double distance,
-	const vec& initial_velocity, double mass, double brownian_mean
-) {
-	for (int i = 0; i < scale.x; ++i) {
-		for (int j = 0; j < scale.y; ++j) {
-			for (int k = 0; k < scale.z; ++k) {
-				particles.emplace_back(
-					vec{origin.x + (i * distance), origin.y + (j * distance), origin.z + (k * distance)},
-					maxwellBoltzmannDistributedVelocity<3>(brownian_mean) + initial_velocity, mass
-				);
-			}
-		}
 	}
 }

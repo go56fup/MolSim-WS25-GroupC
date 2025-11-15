@@ -46,3 +46,51 @@ jobs:
         run: |
           clang-format --dry-run --Werror **/*.cpp **/*.h && \
           cmake-format --check **/CMakeLists.txt cmake/modules/*.cmake
+
+  check_mac_build:
+    name: Google Tests (macOS)
+    runs-on: macos-latest
+
+    steps:
+     - uses: actions/checkout@v4
+
+     - name: Install Dependencies via Homebrew
+       run: |
+         brew update && \
+         brew install gcc@14 llvm@20 doxygen vtk
+         echo 'export PATH="/opt/homebrew/opt/llvm@20/bin:$PATH"' >> /Users/runner/.bash_profile
+         export PATH="/opt/homebrew/opt/llvm@20/bin:$PATH"
+         export LDFLAGS="-L/opt/homebrew/opt/llvm@20/lib"
+         export CPPFLAGS="-I/opt/homebrew/opt/llvm@20/include"
+         export CMAKE_PREFIX_PATH="/opt/homebrew/opt/llvm@20"
+         source ~/.bash_profile
+
+
+     - name: Check toolchain versions
+       run: |
+         hash -r
+         echo $PATH
+         echo $LDFLAGS
+         echo $CPPFLAGS
+         echo $CMAKE_PREFIX_PATH
+         ls /opt/homebrew/opt/llvm@20/bin
+         which clang
+         clang --version
+         which clang++
+         clang++ --version
+         g++ --version
+         cmake --version
+         which g++-14
+
+     - name: Run test suite with GCC
+       run: cmake --workflow --preset test
+
+     - name: Run test suite with Clang
+       run: cmake --workflow --preset test-clang
+
+     - name: Run simulation with GCC
+       run: build/debug/MolSim input/eingabe-sonne.txt --delta-t 0.0014 --end-time 0.0028 -o gcc-run
+
+     - name: Run simulation with Clang
+       run: build/debug-clang/MolSim input/eingabe-sonne.txt --delta-t 0.0014 --end-time 0.0028 -o clang-run
+

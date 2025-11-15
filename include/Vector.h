@@ -34,9 +34,11 @@ template <detail::arithmetic Value>
 // on purpose.
 // NOLINTNEXTLINE(*slicing)
 struct vec_3d
+#ifndef IS_GCC
 /// @cond DO_NOT_DOCUMENT
-// LOG_SPECIAL_MEMBER_FUNCS_DEBUG("vec_3d")
+LOG_SPECIAL_MEMBER_FUNCS_DEBUG("vec_3d")
 /// @endcond
+#endif
 {
 public:
 	/** @brief X component of the vector. */
@@ -57,8 +59,6 @@ public:
 		: x{}
 		, y{}
 		, z{} {}
-
-	// TODO(tuna): maybe add arithmetic operations between compatible types
 
 	/**
 	 * @brief Adds another vector to this vector.
@@ -178,6 +178,8 @@ public:
 	constexpr Value* data() noexcept {
 		return &x;
 	}
+	// TODO(tuna): document and see if it makes the other operator unnecessary
+	constexpr bool operator==(const vec_3d&) const = default;
 };
 
 /**
@@ -262,6 +264,7 @@ constexpr bool operator==(const vec_3d<Value>& lhs, const vec_3d<Value>& rhs) {
  *
  * @tparam Value The type of the components of the given vector.
  */
+// NOLINTBEGIN(*convert-member-functions-to-static)
 template <typename T>
 struct fmt::formatter<vec_3d<T>> {
 	/** @brief Parses the format specification (no-op for this type). */
@@ -274,6 +277,8 @@ struct fmt::formatter<vec_3d<T>> {
 		return fmt::format_to(ctx.out(), "({}, {}, {})", vector.x, vector.y, vector.z);
 	}
 };
+
+// NOLINTEND(*convert-member-functions-to-static)
 
 /**
  * @brief Stream insertion operator for vec_3d.
