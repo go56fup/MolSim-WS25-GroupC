@@ -1,6 +1,6 @@
 #!/bin/sh
 
-BUILD="./build/debug-gcc"
+BUILD="./build/debug"
 
 ctest --test-dir "$BUILD" -T Coverage
 rm -rf "$BUILD/coverage"

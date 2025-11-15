@@ -31,10 +31,16 @@ jobs:
           g++ --version && cmake --version
 
       - name: Run test suite with GCC
-        run: cmake --workflow --preset test-gcc 
+        run: cmake --workflow --preset test
 
       - name: Run test suite with Clang
-        run: cmake --workflow --preset test
+        run: cmake --workflow --preset test-clang
+
+      - name: Run simulation with GCC
+        run: build/debug/MolSim input/eingabe-sonne.txt --delta-t 0.0014 --end-time 0.0028 -o gcc-run
+
+      - name: Run simulation with Clang
+        run: build/debug-clang/MolSim input/eingabe-sonne.txt --delta-t 0.0014 --end-time 0.0028 -o clang-run
 
       - name: Check formatting
         run: |

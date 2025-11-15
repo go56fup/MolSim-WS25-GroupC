@@ -5,15 +5,15 @@ _Group C_
 The Molecular Dynamics teaching code.
 
 #### Build instructions
-To build with Clang, use:
+To build with GCC, use:
 ```
 cmake --workflow release
 ```
 The `MolSim` binary will be located under `build/release/MolSim`.
 
-To build with GCC, use
+To build with Clang, use
 ```
-cmake --workflow release-gcc
+cmake --workflow release-clang
 ```
 The `MolSim` binary will be located under `build/release-gcc/MolSim`.
 
@@ -38,11 +38,11 @@ Optional arguments:
 ```
 
 #### Running tests
-To run the tests after building with Clang, use:
+To run the tests after building with GCC, use:
 ```
 cmake --workflow test
 ```
-`test-gcc` is also available.
+`test-clang` is also available.
 
 #### Building documentation
 To build the project documentation via Doxygen, use:
