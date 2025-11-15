@@ -67,7 +67,7 @@ constexpr bool CStringEquals(const char* lhs, const char* rhs) {
 
 // Locales are not available at compile-time, and strcasecmp does not respect Unicode
 // or locales to begin with, so just assume ASCII to ensure parity.
-constexpr char constexpr_tolower(char c) {
+constexpr unsigned char constexpr_tolower(unsigned char c) {
 	return (c >= 'A' && c <= 'Z') ? (c + ('a' - 'A')) : c;
 }
 
@@ -75,10 +75,10 @@ constexpr char constexpr_tolower(char c) {
 constexpr int constexpr_strcasecmp(const char* s1, const char* s2) {
 	unsigned char c1;
 	unsigned char c2;
-
+	
 	do {
-		c1 = *s1++;
-		c2 = *s2++;
+		c1 = static_cast<unsigned char>(*s1++);
+        c2 = static_cast<unsigned char>(*s2++);
 		if (c1 != c2) {
 			c1 = constexpr_tolower(c1);
 			c2 = constexpr_tolower(c2);

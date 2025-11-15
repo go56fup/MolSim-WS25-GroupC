@@ -4,14 +4,17 @@
 #include <span>
 #include <string_view>
 
+#include "Concepts.h"
 #include "Particle.h"
+#include "ParticleContainer.h"
 
+// TODO(tuna): fix docs
 /**
  * @brief Concept that defines a particle I/O provider.
  *
  * A callable satisfies this concept if it can be invoked as-if it shares this signature:
  * @verbatim
- void operator()(std::span<const Particles> particles, std::string_view base_name, int iteration)
+ void operator()(std::span<const Particle> particles, std::string_view base_name, int iteration)
  @endverbatim
  * where @p particles is the particles to output, @p base_name is the base name for the output files being
  * generated and @p iteration is the current simulation iteration.
@@ -22,6 +25,6 @@
  */
 template <typename Candidate>
 concept particle_io_provider =
-	requires(Candidate f, std::span<const Particle> particles, std::string_view out_name, int iteration) {
+	requires(Candidate f, ParticleContainer& particles, std::string_view out_name, unsigned iteration) {
 		{ std::invoke(f, particles, out_name, iteration) } -> std::same_as<void>;
 	};

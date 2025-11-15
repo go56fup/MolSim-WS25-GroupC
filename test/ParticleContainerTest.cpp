@@ -1,49 +1,27 @@
-#include <algorithm>
-#include <array>
-#include <utility>
-
 #include <gtest/gtest.h>
 #include <gtest_constexpr.h>
 
 #include "ParticleContainer.h"
 
-// Check that unique_pairs results in the expected pairs
-TEST(UniquePairTests, HappyPath) {
-	GTEST_CXP std::array values = {1, 2, 3, 4, 5};
-	GTEST_CXP std::array<std::pair<int, int>, 10> expected{
-		{{1, 2}, {1, 3}, {1, 4}, {1, 5}, {2, 3}, {2, 4}, {2, 5}, {3, 4}, {3, 5}, {4, 5}}
-	};
+// TODO(tuna): flesh out tests
 
-	GTEST_CXP bool ranges_eq = std::ranges::equal(unique_pairs(values), expected);
-	STATIC_EXPECT_TRUE(ranges_eq);
+// NOLINTBEGIN(*magic-numbers)
+TEST(ParticleContainer, Cuboid2DPlacement) {
+	ParticleContainer container(10, 10, 10, 1);
+	std::size_t seq_no = 0;
+	container.add_cuboid<2>({5, 5, 5}, {2, 2, 1}, 1, {}, 100, 0.1, seq_no);
+	EXPECT_EQ(container.cell_containing({5, 5, 5}).at(0).m, 100);
+	EXPECT_EQ(container.cell_containing({6, 6, 5}).at(0).m, 100);
+	EXPECT_EQ(container.cell_containing({6, 5, 5}).at(0).m, 100);
 }
 
-// Check that pairs results in the expected pairs
-TEST(PairTests, HappyPath) {
-	GTEST_CXP std::array values = {1, 2, 3, 4, 5};
-	// clang-format off
-	GTEST_CXP std::array<std::pair<int, int>, 20> expected{{
-			{1, 2}, {1, 3}, {1, 4}, {1, 5},
-			{2, 1}, {2, 3}, {2, 4}, {2, 5},
-			{3, 1}, {3, 2}, {3, 4}, {3, 5},
-			{4, 1}, {4, 2}, {4, 3}, {4, 5},
-			{5, 1}, {5, 2}, {5, 3}, {5, 4}
-	}};
-	// clang-format on
-	GTEST_CXP bool ranges_eq = std::ranges::equal(pairs(values), expected);
-	STATIC_EXPECT_TRUE(ranges_eq);
+TEST(ParticleContainer, Cuboid3DPlacement) {
+	ParticleContainer container(10, 10, 10, 1);
+	std::size_t seq_no = 0;
+	container.add_cuboid<3>({5, 5, 5}, {2, 2, 2}, 1, {}, 100, 0.1, seq_no);
+	EXPECT_EQ(container.cell_containing({5, 6, 5}).at(0).m, 100);
+	EXPECT_EQ(container.cell_containing({6, 6, 6}).at(0).m, 100);
+	EXPECT_EQ(container.cell_containing({6, 5, 6}).at(0).m, 100);
 }
 
-// Check that no pairs are outputted if there aren't enough elements with unique_pairs
-TEST(UniquePairTests, NoPairs) {
-	GTEST_CXP std::array<int, 1> values{1};
-	GTEST_CXP bool unique_range_empty = std::ranges::empty(unique_pairs(values));
-	STATIC_EXPECT_TRUE(unique_range_empty);
-}
-
-// Check that no pairs are outputted if there aren't enough elements with pairs
-TEST(PairTests, NoPairs) {
-	GTEST_CXP std::array<int, 1> values{1};
-	GTEST_CXP bool nonunique_range_empty = std::ranges::empty(pairs(values));
-	STATIC_EXPECT_TRUE(nonunique_range_empty);
-}
+// NOLINTEND(*magic-numbers)

@@ -1,0 +1,41 @@
+{
+  "configuration": {
+    "delta_t": 0.00005,
+    "cutoff_radius": 3.0,
+    "sigma": 1,
+    "epsilon": 5,
+    "boundary_conditions": {
+      "x_min": "reflecting",
+      "y_min": "reflecting",
+      "z_min": "reflecting",
+      "x_max": "reflecting",
+      "y_max": "reflecting",
+      "z_max": "reflecting"
+    },
+    "end_time": 10,
+    "write_frequency": 10,
+    "base_name": "MD_vtk",
+    "domain": [
+	  120,
+      50,
+      50
+    ]
+  },
+  "bodies": [
+    {
+      "type": "disc",
+      "parameters": {
+        "center": [
+			60,
+			25
+        ],
+		"radius": 15,
+        "velocity": [
+          0,
+          -10
+        ],
+        "particle_mass": 1
+      }
+    }
+  ]
+}
