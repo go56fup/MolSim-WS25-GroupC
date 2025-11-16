@@ -264,6 +264,7 @@ constexpr bool operator==(const vec_3d<Value>& lhs, const vec_3d<Value>& rhs) {
  *
  * @tparam Value The type of the components of the given vector.
  */
+// NOLINTBEGIN(*convert-member-functions-to-static)
 template <typename T>
 struct fmt::formatter<vec_3d<T>> {
 	/** @brief Parses the format specification (no-op for this type). */
@@ -276,6 +277,7 @@ struct fmt::formatter<vec_3d<T>> {
 		return fmt::format_to(ctx.out(), "({}, {}, {})", vector.x, vector.y, vector.z);
 	}
 };
+// NOLINTEND(*convert-member-functions-to-static)
 
 /**
  * @brief Stream insertion operator for vec_3d.

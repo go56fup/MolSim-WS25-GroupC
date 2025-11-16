@@ -140,6 +140,7 @@ public:
  * Enables use of fmt::format and fmt::print with Particle objects.
  *
  */
+// NOLINTBEGIN(*convert-member-functions-to-static)
 template <>
 struct fmt::formatter<Particle> {
 	/** @brief Parses the format specification (no-op for this type). */
@@ -154,6 +155,7 @@ struct fmt::formatter<Particle> {
 		);
 	}
 };
+// NOLINTEND(*convert-member-functions-to-static)
 
 /**
  * @brief Stream output operator for Particle.

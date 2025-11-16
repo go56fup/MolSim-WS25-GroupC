@@ -153,7 +153,6 @@ run_simulation(std::span<Particle> particles, const sim_args& args, std::string_
 	int iteration = 0;
 	constexpr auto plot_every_nth_iter = 10;
 	const std::string output_prefix = std::string(output_path) + "/MD_vtk";
-	for (const auto& p: particles) { spdlog::info(p); }
 
 	while (current_time < args.end_time) {
 		if (iteration % plot_every_nth_iter == 0) {
