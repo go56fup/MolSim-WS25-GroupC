@@ -277,6 +277,7 @@ struct fmt::formatter<vec_3d<T>> {
 		return fmt::format_to(ctx.out(), "({}, {}, {})", vector.x, vector.y, vector.z);
 	}
 };
+
 // NOLINTEND(*convert-member-functions-to-static)
 
 /**

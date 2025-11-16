@@ -67,6 +67,9 @@ jobs:
 
      - name: Check toolchain versions
        run: |
+         hash -r
+         echo $PATH
+         ls /opt/homebrew/opt/llvm@20/bin
          which clang
          clang --version
          which clang++

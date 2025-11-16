@@ -155,6 +155,7 @@ struct fmt::formatter<Particle> {
 		);
 	}
 };
+
 // NOLINTEND(*convert-member-functions-to-static)
 
 /**
