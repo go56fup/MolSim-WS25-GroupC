@@ -57,11 +57,13 @@ jobs:
      - name: Install Dependencies via Homebrew
        run: |
          brew update && \
-         brew install gcc@14 llvm@20 doxygen vtk && \
+         brew install gcc@14 llvm@20 doxygen vtk
 
-         export PATH="/opt/homebrew/opt/llvm/bin:$PATH" && \
-         export LDFLAGS="-L/opt/homebrew/opt/llvm/lib" && \
-         export CPPFLAGS="-I/opt/homebrew/opt/llvm/include"
+         export PATH="/opt/homebrew/opt/llvm@20/bin:$PATH"
+         export LDFLAGS="-L/opt/homebrew/opt/llvm@20/lib"
+         export CPPFLAGS="-I/opt/homebrew/opt/llvm@20/include"
+         export CMAKE_PREFIX_PATH="/opt/homebrew/opt/llvm@20"
+
 
      - name: Check toolchain versions
        run: |
@@ -83,3 +85,4 @@ jobs:
 
      - name: Run simulation with Clang
        run: build/debug-clang/MolSim input/eingabe-sonne.txt --delta-t 0.0014 --end-time 0.0028 -o clang-run
+
