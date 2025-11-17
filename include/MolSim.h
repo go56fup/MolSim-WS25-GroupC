@@ -190,3 +190,16 @@ constexpr void cuboid_generator(
 		}
 	}
 }
+
+constexpr void disk_generator(ParticleContainer& particles, const vec& origin, const vec& initial_velocity, const int radius, const double distance,  double mass) {
+	for (int i = -radius; i<= radius; i++) {
+		for (int j = -radius; j<= radius; j++) {
+			if (std::sqrt(std::pow((i* distance), 2) + std::pow((j * distance), 2)) > (radius* distance)) continue;
+			particles.emplace_back(
+				  vec{origin.x + (i* distance), origin.y + (j * distance), origin.z}
+				  ,initial_velocity
+				  ,mass
+				);
+		}
+	}
+}
