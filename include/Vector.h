@@ -60,8 +60,6 @@ public:
 		, y{}
 		, z{} {}
 
-	// TODO(tuna): maybe add arithmetic operations between compatible types
-
 	/**
 	 * @brief Adds another vector to this vector.
 	 *
@@ -303,6 +301,9 @@ std::ostream& operator<<(std::ostream& stream, const vec_3d<Value>& vector) {
  * @typedef vec
  */
 using vec = vec_3d<double>;
+
+// TODO(anyone): document me
+using index_3d = vec_3d<std::size_t>;
 
 // Ensure that a 3D vector has the expected memory layout.
 // NOLINTNEXTLINE(*avoid-c-arrays)

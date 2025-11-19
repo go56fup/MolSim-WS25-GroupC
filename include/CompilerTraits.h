@@ -19,3 +19,10 @@
 #else
 #define CONSTEXPR_IF_GCC
 #endif
+
+// TODO(anyone): document me
+#ifdef __clang__
+#define MUSTTAIL [[clang::musttail]]
+#else
+#define MUSTTAIL
+#endif

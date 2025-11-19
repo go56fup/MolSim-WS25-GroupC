@@ -12,6 +12,24 @@
 #include "MolSim.h"
 #include "ParticleContainer.h"
 
+struct use_formatting_t {};
+
+inline constexpr use_formatting_t use_formatting{};
+
+// TODO(tuna): look into how spdlog implements its overloads for fmt and remove the tag type if possible
+// TODO(tuna): grep for exit and replace with terminating_log -- look up docs for die
+template <typename... Args>
+[[noreturn]] void terminating_log(use_formatting_t, std::format_string<Args...> fmt_string, Args&&... args) {
+	spdlog::critical(fmt_string, std::forward<Args>(args)...);
+	std::exit(1);  // NOLINT(*mt-unsafe)
+}
+
+[[noreturn]] void terminating_log(std::string_view msg) {
+	spdlog::critical(msg);
+	std::exit(1);  // NOLINT(*mt-unsafe)
+}
+
+
 /**
  * @brief Entry point of our simulation program.
  *
@@ -57,8 +75,7 @@ int usual_main(int argc, char* argv[]) {
 		spdlog::error(err.what());
 		std::ostringstream os;
 		os << program;
-		spdlog::error(os.str());
-		std::exit(1);  // NOLINT(*mt-unsafe)
+		terminating_log(os.str());
 	}
 	spdlog::set_level(spdlog::level::from_str(program.get("--log-level")));
 
@@ -68,7 +85,7 @@ int usual_main(int argc, char* argv[]) {
 		std::filesystem::create_directories(output_name);
 	}
 
-	ParticleContainer particles;
+	ParticleContainer particles(1, 1, 1);
 	const auto files = program.get<std::vector<std::string>>("files");
 	for (const auto& file : files) {
 		FileReader::readFile(particles, file);

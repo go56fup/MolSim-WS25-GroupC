@@ -17,8 +17,6 @@
 #include <sstream>
 #include <string>
 #include <string_view>
-#include <tuple>
-#include <utility>
 
 namespace detail {
 // TODO(tuna): add proper error handling during parse, maybe even just switch over to scnlib
@@ -34,9 +32,8 @@ void parse_particle(ParticleContainer& particles, std::istringstream& datastream
 	double m{};
 
 	datastream >> x_x >> x_y >> x_z >> v_x >> v_y >> v_z >> m;
-	particles.emplace_back(
-		std::piecewise_construct, std::forward_as_tuple(x_x, x_y, x_z), std::forward_as_tuple(v_x, v_y, v_z), m
-	);
+	// TODO(tuna): see if emplaceing via std::piecewise_construct is possible
+	particles.emplace(vec(x_x, x_y, x_z), vec(v_x, v_y, v_z), m);
 }
 
 void parse_cuboid(ParticleContainer& particles, std::istringstream& datastream) {
@@ -94,7 +91,6 @@ void readFile(ParticleContainer& particles, std::string_view filename) {
 		spdlog::error("Error reading file: non-positive particle count: {}", num_particles);
 		exit(-1);  // NOLINT(*mt-unsafe)
 	}
-	particles.reserve(static_cast<std::size_t>(num_particles));
 
 	for (int i = 0; i < num_particles; i++) {
 		std::istringstream datastream(tmp_string);

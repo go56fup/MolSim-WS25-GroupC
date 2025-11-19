@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <functional>
+#include <ranges>
 #include <span>
 #include <string_view>
 
@@ -10,6 +11,23 @@
 #include "outputWriter/outputWriters.h"
 #include "ParticleContainer.h"
 #include "utils/MaxwellBoltzmannDistribution.h"
+
+template <typename Range, typename Element>
+concept range_of = std::ranges::range<Range> && (std::same_as<std::ranges::range_value_t<Range>, Element> ||
+                                                 std::same_as<std::ranges::range_reference_t<Range>, Element>);
+
+
+constexpr void calculate_force(force_calculator auto calculator, Particle& p1, Particle& p2) noexcept
+	// TODO(tuna): see if this actually compiles down to a mask over simd like it should
+	for (auto& p : particles) {
+		p.f = {};
+	}
+
+	for (auto&& [p1, p2] : unique_pairs(particles)) {
+		const auto f_ij = std::invoke(calculator, p1, p2);
+		p1.f += f_ij;
+		p2.f -= f_ij;
+	}
 
 /**
  * @brief Calculates forces on a collection of particles using the provided force calculator.
@@ -22,18 +40,15 @@
  * @param particles The span over particles on which forces will be calculated.
  *
  */
-constexpr void calculateF(force_calculator auto&& calculator, std::span<Particle> particles) noexcept(
-	noexcept(std::invoke(calculator, Particle{}, Particle{}))
+constexpr void calculate_forces(force_calculator auto calculator, ParticleContainer& particles) noexcept
 ) {
-	// TODO(tuna): see if this actually compiles down to a mask over simd like it should
-	for (auto& p : particles) {
-		p.f = {};
-	}
-
-	for (auto&& [p1, p2] : unique_pairs(particles)) {
-		const auto f_ij = std::invoke(calculator, p1, p2);
-		p1.f += f_ij;
-		p2.f -= f_ij;
+	for (auto&& [current_cell, target_cell] : particles.directional_interactions()) {
+		for (auto&& [p1, p2] : unique_pairs(current_cell)) {
+			calculate_force(calculator, p1, p2);
+		}
+		for (auto&& [p1, p2] : std::views::cartesian_product(current_cell, dest_cell)) {
+			calculate_force(calculator, p1, p2);
+		}
 	}
 }
 
@@ -48,11 +63,16 @@ constexpr void calculateF(force_calculator auto&& calculator, std::span<Particle
  * @param particles Mutable span over particles to update.
  * @param delta_t The time step for integration.
  */
-constexpr void calculateX(std::span<Particle> particles, double delta_t) noexcept {
+constexpr void calculateX(force_calculator auto calculator, ParticleContainer& particles, double delta_t) noexcept {
 	for (auto& p : particles) {
 		const auto force_scalar = std::pow(delta_t, 2) / (2 * p.m);
 		// TODO(tuna): check if expression templates are needed here
 		p.x = p.x + delta_t * p.v + p.old_f * force_scalar;
+		while (p.on_or_beyond_boundary_cell(particles.domain())) {
+			Particle ghost_particle(/* mirror */);
+			calculate_force(calculator, p, ghost_particle);
+			MUSTTAIL return calculateX(calculator, particles, delta_t);
+		}
 	}
 }
 
@@ -67,7 +87,7 @@ constexpr void calculateX(std::span<Particle> particles, double delta_t) noexcep
  * @param particles Mutable span over particles to update.
  * @param delta_t The time step for integration.
  */
-constexpr void calculateV(std::span<Particle> particles, double delta_t) noexcept {
+constexpr void calculateV(range_of<Particle> auto&& particles, double delta_t) noexcept {
 	for (auto& p : particles) {
 		const auto velocity_scalar = delta_t / (2 * p.m);
 		p.v = p.v + velocity_scalar * (p.old_f + p.f);
@@ -87,7 +107,7 @@ constexpr void calculateV(std::span<Particle> particles, double delta_t) noexcep
  * @param iteration Current simulation iteration (used for output naming).
  */
 constexpr void plotParticles(
-	particle_io_provider auto&& io_provider, std::span<const Particle> particles, std::string_view out_name,
+	particle_io_provider auto&& io_provider, range_of<Particle> auto&& particles, std::string_view out_name,
 	int iteration
 ) {
 	io_provider(particles, out_name, iteration);
@@ -136,6 +156,7 @@ struct sim_traits {
 	IOProvider io = OUTPUT_WRITER::plotParticles;
 };
 
+// TODO(anyone): update span references
 /**
  * @brief Start the simulation.
  *
@@ -148,7 +169,7 @@ struct sim_traits {
  **/
 template <sim_traits Traits = {.force = lennard_jones_force, .io = OUTPUT_WRITER::plotParticles}>
 constexpr void
-run_simulation(std::span<Particle> particles, const sim_args& args, std::string_view output_path) noexcept {
+run_simulation(ParticleContainer& particles, const sim_args& args, std::string_view output_path) noexcept {
 	double current_time = 0;
 	int iteration = 0;
 	constexpr auto plot_every_nth_iter = 10;
@@ -156,7 +177,7 @@ run_simulation(std::span<Particle> particles, const sim_args& args, std::string_
 
 	while (current_time < args.end_time) {
 		if (iteration % plot_every_nth_iter == 0) {
-			plotParticles(Traits.io, particles, output_prefix, iteration);
+			plotParticles(Traits.io, particles.view(), output_prefix, iteration);
 		}
 		run_sim_iteration(Traits.force, particles, args.delta_t);
 		current_time += args.delta_t;
@@ -182,7 +203,7 @@ constexpr void cuboid_generator(
 	for (int i = 0; i < scale.x; ++i) {
 		for (int j = 0; j < scale.y; ++j) {
 			for (int k = 0; k < scale.z; ++k) {
-				particles.emplace_back(
+				particles.emplace(
 					vec{origin.x + (i * distance), origin.y + (j * distance), origin.z + (k * distance)},
 					maxwellBoltzmannDistributedVelocity<2>(brownian_mean) + initial_velocity, mass
 				);

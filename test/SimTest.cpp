@@ -24,6 +24,7 @@ template class flag_special_member_funcs<"Particle">;
 // Check that gravitational force is calculated correctly
 TEST(ForceTests, BasicGravitation) {
 	GTEST_CXP_GCC auto particles_f = std::invoke([] {
+		ParticleContainer particles(1, 1, 1);
 		std::array<Particle, 2> particles = {Particle{vec{}, vec{}, 1}, Particle{vec{1, 0, 0}, vec{}, 1}};
 		calculateF(gravitational_force, particles);
 		return particles;
