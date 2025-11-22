@@ -5,7 +5,10 @@
 #include <ranges>
 #include <vector>
 
+#include "Concepts.h"
 #include "Particle.h"
+
+// TOOD(tuna): split out into files
 
 namespace detail {
 /**
@@ -282,27 +285,22 @@ constexpr auto pairs(Range&& range) noexcept {
 	return typename detail::pairwise<Range>::pairs{range};
 }
 
-namespace detail {
-constexpr std::size_t linear_index(std::size_t i, std::size_t j, std::size_t k, const index_3d& domain) noexcept {
-	return (i * domain.x * domain.y) + (j * domain.y) + k;
-}
-
-constexpr std::size_t linear_index(const index_3d& three_d_index, const index_3d& domain) noexcept {
-	return linear_index(three_d_index.x, three_d_index.y, three_d_index.z, domain);
-}
-}  // namespace detail
-
 /**
  * @brief The container type used to hold particles.
  *
  * This type is used throughout the simulation to store all particle objects.
  */
 class ParticleContainer {
+private:
+	constexpr std::size_t linear_index(std::size_t i, std::size_t j, std::size_t k) const noexcept {
+		return (i * domain_.x * domain_.y) + (j * domain_.y) + k;
+	}
+
 public:
-	using Cell = std::vector<Particle>;
+	using cell = std::vector<Particle>;
 	static constexpr double cutoff_radius = 3.0;
 
-	template <std::same_as<index_3d> DomainT>
+	template <fwd_reference_to<index_3d> DomainT>
 	constexpr explicit ParticleContainer(DomainT&& domain)
 		: domain_(std::forward<DomainT>(domain)) {
 		const auto x = static_cast<double>(domain_.x);
@@ -327,15 +325,15 @@ public:
 		);
 	}
 
-	template <std::same_as<Particle> ParticleT>
+	template <fwd_reference_to<Particle> ParticleT>
 	constexpr void place(ParticleT&& particle) noexcept {
 		grid[pos_to_linear_index(particle.x)] = std::forward<ParticleT>(particle);
 	}
 
-	template <typename... Args>
+	template <fwd_reference_to<vec> VecT, typename... Args>
 		requires std::constructible_from<Particle, vec, Args...>
-	constexpr void emplace(const vec& pos, Args&&... args) {
-		grid[pos_to_linear_index(pos)].emplace_back(pos, std::forward<Args>(args)...);
+	constexpr void emplace(VecT&& pos, Args&&... args) {
+		grid[pos_to_linear_index(pos)].emplace_back(std::forward<VecT>(pos), std::forward<Args>(args)...);
 	}
 
 	// TODO(tuna): constrain return types with concepts
@@ -349,29 +347,30 @@ public:
 		return grid.end();
 	}
 
-	constexpr Cell& operator[](std::size_t one_d_index) noexcept {
-		return grid[one_d_index];
+	constexpr cell& operator[](const index_3d& three_d_index) noexcept {
+		return grid[linear_index(three_d_index.x, three_d_index.y, three_d_index.z)];
 	}
 
-	constexpr const Cell& operator[](std::size_t one_d_index) const noexcept {
-		return grid[one_d_index];
+	constexpr const cell& operator[](const index_3d& three_d_index) const noexcept {
+		return grid[linear_index(three_d_index.x, three_d_index.y, three_d_index.z)];
 	}
 
 	constexpr const index_3d& domain() const noexcept {
 		return domain_;
 	}
 
-	constexpr auto view() const noexcept {
+	constexpr range_of<Particle> auto view() noexcept {
 		return grid | std::views::join;
+	}
+
+	// TODO(tuna): fix this
+	constexpr range_of</* const */ Particle> auto view() const noexcept {
+		return std::as_const(grid) | std::views::join;
 	}
 
 private:
 	static constexpr double div_round_up(double x, double y) noexcept {
 		return (x + y - 1) / y;
-	}
-
-	constexpr std::size_t linear_index(std::size_t i, std::size_t j, std::size_t k) {
-		return detail::linear_index(i, j, k, domain_);
 	}
 
 	constexpr std::size_t pos_to_linear_index(const vec& pos) {
@@ -381,23 +380,19 @@ private:
 		return linear_index(x, y, z);
 	}
 
-	std::vector<Cell> grid;
-	// TODO(tuna): see if storing z is necessary
+	std::vector<cell> grid;
 	index_3d domain_;
 
 public:
 	using size_type = std::size_t;
-	using value_type = Cell;
+	using value_type = cell;
 };
 
 namespace detail {
 
 class interactions_iterator {
 private:
-	using container_t = ParticleContainer;
-	using inner_wo_quals = typename ParticleContainer::value_type;
-	using inner = std::conditional_t<std::is_const_v<container_t>, const inner_wo_quals, inner_wo_quals>;
-	using index_3d = vec_3d<std::size_t>;
+	using inner = typename ParticleContainer::value_type;
 
 public:
 	/// Standard iterator category.
@@ -405,19 +400,17 @@ public:
 	/// Type used for differences between indices.
 	using difference_type = std::ptrdiff_t;
 	/// Type used for indexing.
-	using size_type = typename container_t::size_type;
+	using size_type = std::size_t;
 	using pointer = void;
 	/// Reference to two elements of the container.
-	using reference = std::pair<inner&, inner&>;
+	using reference = std::pair<const index_3d&, const index_3d&>;
 	/// The type returned from @ref operator*, which is a reference.
 	using value_type = reference;
 
 private:
-	container_t* container;
+	ParticleContainer* container;
 	index_3d current_cell_idx;
-	index_3d target_cell_idx;
 	std::size_t displacement_idx;
-	index_3d domain;
 
 	enum class axis : std::uint8_t { x, y, z };
 
@@ -435,22 +428,24 @@ private:
 	};
 
 	template <typename T>
-	constexpr std::make_signed_t<T> add_signed(T unsigned_, std::make_signed_t<T> signed_) {
+	static constexpr std::make_signed_t<T> add_signed(T unsigned_, std::make_signed_t<T> signed_) {
 		return static_cast<decltype(signed_)>(unsigned_) + signed_;
 	}
 
 	template <axis a>
-	constexpr bool out_of_bounds(const vec_3d<std::ptrdiff_t>& displacement) noexcept {
+	constexpr bool out_of_bounds(const vec_3d<std::ptrdiff_t>& displacement) const noexcept {
 		static constexpr auto proj_size_t = axis_ptr<std::size_t>(a);
 		static constexpr auto proj_ptrdiff_t = axis_ptr<std::ptrdiff_t>(a);
 
+		// TODO(tuna): see if caching the result of the below add_signed (which is just do_displacement)
+		// is worth the increase in the iterator's size in terms of performance
 		return (displacement.*proj_ptrdiff_t < 0 && current_cell_idx.*proj_size_t == 0) ||
 		       (add_signed(current_cell_idx.*proj_size_t, displacement.*proj_ptrdiff_t) >
-		        static_cast<std::ptrdiff_t>(domain.*proj_size_t));
+		        static_cast<std::ptrdiff_t>(container->domain().*proj_size_t));
 	};
 
 	template <axis a>
-	constexpr std::size_t do_displacement(const vec_3d<std::ptrdiff_t>& displacement) noexcept {
+	constexpr std::size_t do_displacement(const vec_3d<std::ptrdiff_t>& displacement) const noexcept {
 		static constexpr auto proj_size_t = axis_ptr<std::size_t>(a);
 		static constexpr auto proj_ptrdiff_t = axis_ptr<std::ptrdiff_t>(a);
 		return static_cast<std::size_t>(add_signed(current_cell_idx.*proj_size_t, displacement.*proj_ptrdiff_t));
@@ -461,7 +456,7 @@ public:
 		: container(nullptr)
 		, displacement_idx(0) {}
 
-	template <std::same_as<index_3d> IndexT>
+	template <fwd_reference_to<index_3d> IndexT>
 	constexpr interactions_iterator(ParticleContainer& c, IndexT&& current_cell) noexcept
 		: container(&c)
 		, current_cell_idx(std::forward<IndexT>(current_cell))
@@ -471,11 +466,28 @@ public:
 	 * @brief Dereferences this iterator.
 	 * @return Pair of mutable references to the current elements.
 	 */
+	static constexpr std::array<vec_3d<std::ptrdiff_t>, 13> displacements = {
+		{{0, 0, +1},    // i,     j,     k + 1
+	     {0, +1, -1},   // i,     j + 1, k - 1
+	     {0, +1, 0},    // i,     j + 1, k
+	     {0, +1, +1},   // i,     j + 1, k + 1
+	     {1, -1, -1},   // i + 1, j - 1, k - 1
+	     {+1, -1, 0},   // i + 1, j - 1, k
+	     {+1, -1, +1},  // i + 1, j - 1, k + 1
+	     {+1, 0, -1},   // i + 1, j,     k - 1
+	     {+1, 0, 0},    // i + 1, j,     k
+	     {+1, 0, +1},   // i + 1, j,     k + 1
+	     {+1, +1, -1},  // i + 1, j + 1, k - 1
+	     {+1, +1, 0},   // i + 1, j + 1, k
+	     {+1, +1, +1}}  // i + 1, j + 1, k + 1
+	};
 
 	constexpr reference operator*() const noexcept {
+		const auto& displacement = displacements[displacement_idx];
 		return reference{
-			(*container)[detail::linear_index(current_cell_idx, domain)],
-			(*container)[detail::linear_index(target_cell_idx, domain)]
+			current_cell_idx,
+			{do_displacement<axis::x>(displacement), do_displacement<axis::y>(displacement),
+		     do_displacement<axis::z>(displacement)}
 		};
 	}
 
@@ -485,32 +497,13 @@ public:
 	 * @return Reference to this iterator after increment.
 	 */
 	constexpr interactions_iterator& operator++() noexcept {
-		// TODO(tuna): convert to 1d offsets at consteval
-		static constexpr std::array<vec_3d<std::ptrdiff_t>, 13> displacements = {
-			{{0, 0, +1},    // i,     j,     k + 1
-		     {0, +1, -1},   // i,     j + 1, k - 1
-		     {0, +1, 0},    // i,     j + 1, k
-		     {0, +1, +1},   // i,     j + 1, k + 1
-		     {1, -1, -1},   // i + 1, j - 1, k - 1
-		     {+1, -1, 0},   // i + 1, j - 1, k
-		     {+1, -1, +1},  // i + 1, j - 1, k + 1
-		     {+1, 0, -1},   // i + 1, j,     k - 1
-		     {+1, 0, 0},    // i + 1, j,     k
-		     {+1, 0, +1},   // i + 1, j,     k + 1
-		     {+1, +1, -1},  // i + 1, j + 1, k - 1
-		     {+1, +1, 0},   // i + 1, j + 1, k
-		     {+1, +1, +1}}  // i + 1, j + 1, k + 1
-		};
-
-		const auto& displacement = displacements[displacement_idx++];
-
-		if (out_of_bounds<axis::x>(displacement) || out_of_bounds<axis::y>(displacement) ||
-		    out_of_bounds<axis::z>(displacement)) {
-			return *this;
+		for (; displacement_idx < displacements.size(); ++displacement_idx) {
+			const auto& displacement = displacements[displacement_idx];
+			if (!out_of_bounds<axis::x>(displacement) && !out_of_bounds<axis::y>(displacement) &&
+			    !out_of_bounds<axis::z>(displacement)) {
+				break;
+			}
 		}
-		target_cell_idx.x = do_displacement<axis::x>(displacement);
-		target_cell_idx.y = do_displacement<axis::y>(displacement);
-		target_cell_idx.z = do_displacement<axis::z>(displacement);
 		return *this;
 	}
 
@@ -553,8 +546,10 @@ public:
 	}
 
 	constexpr iterator end() const noexcept {
-		return {container, container.domain() - index_3d{1, 1, 1}};
+		return {container, container.domain()};
 	}
+
+	// TODO(tuna): add size
 };
 
 }  // namespace detail
@@ -565,3 +560,4 @@ constexpr auto ParticleContainer::directional_interactions() noexcept {
 }
 
 static_assert(std::ranges::range<decltype(unique_pairs(std::declval<ParticleContainer>()))>);
+static_assert(std::ranges::range<decltype((std::declval<ParticleContainer>()).directional_interactions())>);

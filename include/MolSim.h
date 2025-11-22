@@ -6,28 +6,81 @@
 #include <span>
 #include <string_view>
 
+#include "Concepts.h"
 #include "ForceCalculators.h"
 #include "IOProviders.h"
 #include "outputWriter/outputWriters.h"
 #include "ParticleContainer.h"
 #include "utils/MaxwellBoltzmannDistribution.h"
 
-template <typename Range, typename Element>
-concept range_of = std::ranges::range<Range> && (std::same_as<std::ranges::range_value_t<Range>, Element> ||
-                                                 std::same_as<std::ranges::range_reference_t<Range>, Element>);
+constexpr void update_particle_forces(force_calculator auto calculator, Particle& p1, Particle& p2) noexcept {
+	const auto f_ij = std::invoke(calculator, p1, p2);
+	p1.f += f_ij;
+	p2.f -= f_ij;
+}
 
+constexpr void if_cell_at_border_reflect_via_ghost_particle(
+	ParticleContainer::cell& current_cell, const index_3d& current_cell_idx, const index_3d& domain,
+	force_calculator auto calculator
+) noexcept {
+	static constexpr double ghost_particle_threshold = 1;
+	const auto& dom_x = static_cast<double>(domain.x);
+	const auto& dom_y = static_cast<double>(domain.y);
+	const auto& dom_z = static_cast<double>(domain.z);
 
-constexpr void calculate_force(force_calculator auto calculator, Particle& p1, Particle& p2) noexcept
-	// TODO(tuna): see if this actually compiles down to a mask over simd like it should
-	for (auto& p : particles) {
-		p.f = {};
+	if (current_cell_idx.x == 0) {
+		for (auto& p : current_cell) {
+			const auto& pos = p.x;
+			if (pos.x <= ghost_particle_threshold) {
+				Particle ghost_particle({-pos.x, pos.y, pos.z}, {}, p.m);
+				p.f += std::invoke(calculator, p, ghost_particle);
+			}
+		}
+
+	} else if (current_cell_idx.y == 0) {
+		for (auto& p : current_cell) {
+			const auto& pos = p.x;
+			if (pos.y <= ghost_particle_threshold) {
+				Particle ghost_particle({pos.x, -pos.y, pos.z}, {}, p.m);
+				p.f += std::invoke(calculator, p, ghost_particle);
+			}
+		}
+
+	} else if (current_cell_idx.z == 0) {
+		for (auto& p : current_cell) {
+			const auto& pos = p.x;
+			if (pos.z <= ghost_particle_threshold) {
+				Particle ghost_particle({pos.x, pos.y, -pos.z}, {}, p.m);
+				p.f += std::invoke(calculator, p, ghost_particle);
+			}
+		}
+
+	} else if (current_cell_idx.x == domain.x) {
+		for (auto& p : current_cell) {
+			const auto& pos = p.x;
+			if (pos.x >= dom_x - ghost_particle_threshold) {
+				Particle ghost_particle({dom_x + pos.x, pos.y, pos.z}, {}, p.m);
+				p.f += std::invoke(calculator, p, ghost_particle);
+			}
+		}
+	} else if (current_cell_idx.y == domain.y) {
+		for (auto& p : current_cell) {
+			const auto& pos = p.x;
+			if (pos.y >= dom_y - ghost_particle_threshold) {
+				Particle ghost_particle({pos.x, dom_y + pos.y, pos.z}, {}, p.m);
+				p.f += std::invoke(calculator, p, ghost_particle);
+			}
+		}
+	} else if (current_cell_idx.z == domain.z) {
+		for (auto& p : current_cell) {
+			const auto& pos = p.x;
+			if (pos.z >= dom_z - ghost_particle_threshold) {
+				Particle ghost_particle({pos.x, pos.y, dom_z + pos.z}, {}, p.m);
+				p.f += std::invoke(calculator, p, ghost_particle);
+			}
+		}
 	}
-
-	for (auto&& [p1, p2] : unique_pairs(particles)) {
-		const auto f_ij = std::invoke(calculator, p1, p2);
-		p1.f += f_ij;
-		p2.f -= f_ij;
-	}
+}
 
 /**
  * @brief Calculates forces on a collection of particles using the provided force calculator.
@@ -40,15 +93,21 @@ constexpr void calculate_force(force_calculator auto calculator, Particle& p1, P
  * @param particles The span over particles on which forces will be calculated.
  *
  */
-constexpr void calculate_forces(force_calculator auto calculator, ParticleContainer& particles) noexcept
-) {
-	for (auto&& [current_cell, target_cell] : particles.directional_interactions()) {
+constexpr void calculate_forces(force_calculator auto calculator, ParticleContainer& particles) noexcept {
+	for (auto&& [current_cell_idx, target_cell_idx] : particles.directional_interactions()) {
+		const auto& current_cell = particles[current_cell_idx];
+		const auto& target_cell = particles[target_cell_idx];
+
 		for (auto&& [p1, p2] : unique_pairs(current_cell)) {
-			calculate_force(calculator, p1, p2);
+			update_particle_forces(calculator, p1, p2);
 		}
-		for (auto&& [p1, p2] : std::views::cartesian_product(current_cell, dest_cell)) {
-			calculate_force(calculator, p1, p2);
+		for (const auto& p1 : current_cell) {
+			for (const auto& p2 : target_cell) {
+				update_particle_forces(calculator, p1, p2);
+			}
 		}
+		// TODO(tuna): there must be a more efficient way to check this rather than checking for every cell
+		if_cell_at_border_reflect_via_ghost_particle(current_cell_idx, particles.domain(), calculator);
 	}
 }
 
@@ -63,16 +122,11 @@ constexpr void calculate_forces(force_calculator auto calculator, ParticleContai
  * @param particles Mutable span over particles to update.
  * @param delta_t The time step for integration.
  */
-constexpr void calculateX(force_calculator auto calculator, ParticleContainer& particles, double delta_t) noexcept {
+constexpr void calculateX(range_of<Particle> auto&& particles, double delta_t) noexcept {
 	for (auto& p : particles) {
 		const auto force_scalar = std::pow(delta_t, 2) / (2 * p.m);
 		// TODO(tuna): check if expression templates are needed here
 		p.x = p.x + delta_t * p.v + p.old_f * force_scalar;
-		while (p.on_or_beyond_boundary_cell(particles.domain())) {
-			Particle ghost_particle(/* mirror */);
-			calculate_force(calculator, p, ghost_particle);
-			MUSTTAIL return calculateX(calculator, particles, delta_t);
-		}
 	}
 }
 
@@ -107,7 +161,7 @@ constexpr void calculateV(range_of<Particle> auto&& particles, double delta_t) n
  * @param iteration Current simulation iteration (used for output naming).
  */
 constexpr void plotParticles(
-	particle_io_provider auto&& io_provider, range_of<Particle> auto&& particles, std::string_view out_name,
+	particle_io_provider auto&& io_provider, range_of<const Particle> auto&& particles, std::string_view out_name,
 	int iteration
 ) {
 	io_provider(particles, out_name, iteration);
@@ -121,7 +175,7 @@ constexpr void plotParticles(
  *
  * @param particles Mutable span over particles to update.
  */
-constexpr void update_values(std::span<Particle> particles) noexcept {
+constexpr void update_values(range_of<Particle> auto&& particles) noexcept {
 	for (auto& p : particles) {
 		p.old_f = p.f;
 	}
@@ -141,11 +195,11 @@ struct sim_args {
  * @param delta_t Tick length
  */
 template <force_calculator ForceCalculator>
-constexpr void run_sim_iteration(ForceCalculator&& force_calc, std::span<Particle> particles, double delta_t) noexcept {
-	calculateX(particles, delta_t);
+constexpr void run_sim_iteration(ForceCalculator&& force_calc, ParticleContainer& particles, double delta_t) noexcept {
+	calculateX(particles.view(), delta_t);
 	calculateF(std::forward<ForceCalculator>(force_calc), particles);
-	calculateV(particles, delta_t);
-	update_values(particles);
+	calculateV(particles.view(), delta_t);
+	update_values(particles.view());
 }
 
 // TODO(anyone): do tparam docs
@@ -203,6 +257,7 @@ constexpr void cuboid_generator(
 	for (int i = 0; i < scale.x; ++i) {
 		for (int j = 0; j < scale.y; ++j) {
 			for (int k = 0; k < scale.z; ++k) {
+				// TODO(tuna): make the 2 not a template parameter and incorporate into input file format
 				particles.emplace(
 					vec{origin.x + (i * distance), origin.y + (j * distance), origin.z + (k * distance)},
 					maxwellBoltzmannDistributedVelocity<2>(brownian_mean) + initial_velocity, mass

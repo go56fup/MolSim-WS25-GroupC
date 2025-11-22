@@ -11,7 +11,7 @@
  * accompanying `__builtin_sqrt` etc. This means some mathematical calculations can be done
  * in compile-time with GCC but not clang, where these macros come in handy.
  *
- * @note <a href="https://github.com/llvm/llvm-project/issues/160516">This issue</a> tracks clang support for
+ * @note <a href="https://github.com/llvm/llvm-project/issues/167874">This issue</a> tracks Clang support for
  * the above functions.
  */
 #ifdef IS_GCC

@@ -4,6 +4,7 @@
 #include <span>
 #include <string_view>
 
+#include "Concepts.h"
 #include "Particle.h"
 
 /**
@@ -22,6 +23,6 @@
  */
 template <typename Candidate>
 concept particle_io_provider =
-	requires(Candidate f, std::span<const Particle> particles, std::string_view out_name, int iteration) {
+requires(Candidate f, std::span<const Particle> particles, std::string_view out_name, int iteration) {
 		{ std::invoke(f, particles, out_name, iteration) } -> std::same_as<void>;
 	};

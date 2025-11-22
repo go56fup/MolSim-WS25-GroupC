@@ -20,9 +20,7 @@
         };
 
         llvm = pkgs.llvmPackages_20;
-      in
-      {
-        devShells.default = pkgs.mkShell.override { stdenv = llvm.libcxxStdenv; } {
+        devShell = pkgs.mkShell.override { stdenv = llvm.libcxxStdenv; } {
           packages = with pkgs; [
             (llvm.clang-tools.override { enableLibcxx = true; })
             llvm.libcxxClang
@@ -43,6 +41,20 @@
             export CLICOLOR=0;
           '';
         };
+        dockerImage = pkgs.dockerTools.buildLayeredImage {
+          name = "molsim-devshell";
+          tag = "latest";
+          # contents are exactly the same as your devShell
+          contents = devShell.buildInputs ++ [ devShell ];
+          config = {
+            # when container runs, drop into a shell
+            Cmd = [ "/bin/sh" ];
+          };
+        };
+      in
+      {
+        devShells.default = devShell;
+        packages."${system}".dockerImage = dockerImage;
       }
     );
 }
