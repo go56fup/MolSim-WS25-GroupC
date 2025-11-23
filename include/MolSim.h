@@ -174,7 +174,6 @@ constexpr void calculateX(ParticleContainer& particles, double delta_t) noexcept
 
 			}
 		}
-
 		//update cell coordinate (normalised)
 		i++;
 		if (i == particles.domain().x) {
