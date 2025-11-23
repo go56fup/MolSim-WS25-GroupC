@@ -122,13 +122,70 @@ constexpr void calculate_forces(force_calculator auto calculator, ParticleContai
  * @param particles Mutable span over particles to update.
  * @param delta_t The time step for integration.
  */
-constexpr void calculateX(range_of<Particle> auto&& particles, double delta_t) noexcept {
-	for (auto& p : particles) {
-		const auto force_scalar = std::pow(delta_t, 2) / (2 * p.m);
-		// TODO(tuna): check if expression templates are needed here
-		p.x = p.x + delta_t * p.v + p.old_f * force_scalar;
+constexpr void calculateX(ParticleContainer& particles, double delta_t) noexcept {
+
+	unsigned int i = 0;
+	unsigned int j = 0;
+	unsigned int k = 0;
+
+	const double cell_width = 0;
+
+	for (auto& cell : particles) {
+
+		//for j (iterator goes from top to bottom while coordinate system goes from bottom up)
+		const vec cell_origin = {i * cell_width, j * cell_width, k * cell_width};
+
+		//out of cell check
+		for (const auto& particle : cell){
+
+			const auto force_scalar = std::pow(delta_t, 2) / (2 * particle.m);
+			// TODO(tuna): check if expression templates are needed here
+			particle.x = particle.x + delta_t * particle.v + particle.old_f * force_scalar;
+
+			if (particle.x.x < cell_origin.x) {  //for x direction
+                ParticleContainer::cell& new_cell = particles[i - 1, j, k];
+				new_cell.push_back(particle);
+                //TODO(tuna) :ADD delete()
+
+			} else if (particle.x.x >= cell_origin.x + cell_width) {
+				ParticleContainer::cell& new_cell = particles[i + 1, j, k];
+				new_cell.push_back(particle);
+				//TODO(tuna) :ADD delete()
+
+			} else if (particle.x.y < cell_origin.y) { //for y direction
+				ParticleContainer::cell& new_cell = particles[i , j - 1, k];
+				new_cell.push_back(particle);
+				//TODO(tuna) :ADD delete()
+
+			} else if (particle.x.y >= cell_origin.y + cell_width) {
+				ParticleContainer::cell& new_cell = particles[i, j + 1, k];
+				new_cell.push_back(particle);
+				//TODO(tuna) :ADD delete()
+
+			} else if (particle.x.z < cell_origin.z) { //for z direction
+				ParticleContainer::cell& new_cell = particles[i , j, k - 1];
+				new_cell.push_back(particle);
+				//TODO(tuna) :ADD delete()
+
+			} else if (particle.x.z >= cell_origin.z + cell_width) {
+				ParticleContainer::cell& new_cell = particles[i, j , k + 1];
+				new_cell.push_back(particle);
+				//TODO(tuna) :ADD delete()
+
+			}
+		}
+
+		//update cell coordinate (normalised)
+		i++;
+		if (i == particles.domain().x) {
+			i = 0;
+			j++;
+		}
+		if (j == particles.domain().y) {
+			j = 0;
+			k++;
+		}
 	}
-}
 
 /**
  * @brief Updates the velocity of each particle.
@@ -170,7 +227,7 @@ constexpr void plotParticles(
 /**
  * @brief Prepares particles for the next iteration.
  *
- * Currently only sets the old force of each particle to the force calculated within the
+ * Currently, it only sets the old force of each particle to the force calculated within the
  * most recent iteration at the end of each iteraton.
  *
  * @param particles Mutable span over particles to update.
