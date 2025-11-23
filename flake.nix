@@ -54,7 +54,7 @@
       in
       {
         devShells.default = devShell;
-        packages."${system}".dockerImage = dockerImage;
+        packages.dockerImage = dockerImage;
       }
     );
 }

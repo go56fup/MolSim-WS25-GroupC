@@ -42,4 +42,15 @@ function(get_third_party)
 	FetchContent_MakeAvailable(argparse)
 	target_link_libraries("${THIRD_TARGET}" INTERFACE argparse)
 	target_include_directories("${THIRD_TARGET}" SYSTEM INTERFACE "${argparse_SOURCE_DIR}/include")
+
+	include(FetchContent)
+	FetchContent_Declare(
+		daw_json_link
+		GIT_REPOSITORY https://github.com/beached/daw_json_link
+		GIT_TAG release
+	)
+	FetchContent_MakeAvailable(daw_json_link)
+
+	target_link_libraries( "${THIRD_TARGET}" daw::daw-json-link )
+	target_include_directories("${THIRD_TARGET}" SYSTEM INTERFACE "${daw_json_link_SOURCE_DIR}/include")
 endfunction()
