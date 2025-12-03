@@ -2,8 +2,8 @@ name: Publish Docker Image
 
 on:
   push:
-    branches: ['main']
-    #paths: ['Dockerfile'] # Only run if Dockerfile changes
+    branches: ['*ssignment*']
+    paths: ['Dockerfile'] # Only run if Dockerfile changes
   workflow_dispatch: # Allows manual trigger
 
 env:
