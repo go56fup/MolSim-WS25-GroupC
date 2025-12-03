@@ -9,6 +9,7 @@ RUN apt-get update && apt-get install -y  \
      clang-tidy-20\
      clang-format-20\
      build-essential\
+     git\
      wget
 
 RUN pip install cmake-format --break-system-packages
