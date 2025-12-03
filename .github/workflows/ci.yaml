@@ -19,11 +19,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check toolchain versions
-        run: |
-          sudo update-alternatives --display clang && clang++ --version && clang-tidy --version && \
-          g++ --version && cmake --version
-
       - name: Run test suite with GCC
         run: cmake --workflow --preset test
 
