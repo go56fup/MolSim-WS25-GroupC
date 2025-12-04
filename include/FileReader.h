@@ -16,6 +16,10 @@
 #include "ParticleContainer.h"
 #include "Vector.h"
 
+
+/**
+* @brief Simulation configuration parameters parsed from JSON file.
+*/
 struct sim_configuration {
 	double delta_t;
 	double cutoff_radius;
@@ -25,12 +29,19 @@ struct sim_configuration {
 	vec domain;
 };
 
+/**
+* @brief Parameters for cuboid generation from JSON file.
+*/
 struct cuboid_particle_parameters {
 	double meshwidth;
 	double mass;
 	constexpr bool operator==(const cuboid_particle_parameters&) const = default;
 };
 
+/**
+* @brief 2D vector.
+* @tparam T vector type
+*/
 template <typename T>
 struct vec_2d {
 	T x;
@@ -42,10 +53,17 @@ struct vec_2d {
 	}
 };
 
+/**
+* @brief Dimension-dependent vector alias: 2D or 3D.
+*/
 template <std::size_t N, typename T>
 	requires(N == 2 || N == 3)
 using vec_n = std::conditional_t<N == 2, vec_2d<T>, vec_3d<T>>;
 
+/**
+* @brief Parameters describing a cuboid region from which particles are generated.
+* @tparam Dimensions Either 2 or 3.
+*/
 template <std::size_t Dimensions>
 struct cuboid_parameters {
 	vec_n<Dimensions, double> origin;
@@ -56,28 +74,39 @@ struct cuboid_parameters {
 };
 
 namespace daw::json {
+/**
+ * @brief JSON contract for 3D vectors
+ */
 template <typename T>
 struct json_data_contract<vec_3d<T>> {
 	using type = json_tuple_member_list<T, T, T>;
 };
-
+/**
+ * @brief JSON contract for 2D vectors
+ */
 template <typename T>
 struct json_data_contract<vec_2d<T>> {
 	using type = json_tuple_member_list<T, T>;
 };
-
+/**
+ * @brief JSON contract for simulation configuration
+ * */
 template <>
 struct json_data_contract<sim_configuration> {
 	using type = json_member_list<
 		json_number<"delta_t", double>, json_number<"cutoff_radius", double>, json_number<"end_time", double>,
 		json_number<"write_frequency", unsigned>, json_string<"base_name">, json_class<"domain", vec>>;
 };
-
+/**
+ * @brief JSON contract for cuboid parameters
+ */
 template <>
 struct json_data_contract<cuboid_particle_parameters> {
 	using type = json_member_list<json_number<"meshwidth", double>, json_number<"mass", double>>;
 };
-
+/**
+ * @brief JSON contract for cuboid parameters with a specified dimension
+ */
 template <std::size_t Dimensions>
 struct json_data_contract<cuboid_parameters<Dimensions>> {
 	using type = json_member_list<
@@ -87,6 +116,9 @@ struct json_data_contract<cuboid_parameters<Dimensions>> {
 		json_class<"particles", cuboid_particle_parameters>>;
 };
 
+/**
+ * @brief JSON contract for individual particles parameters
+ * */
 template <>
 struct json_data_contract<Particle> {
 	using type = json_member_list<
@@ -95,6 +127,21 @@ struct json_data_contract<Particle> {
 };
 }  // namespace daw::json
 
+
+/**
+* @brief Parse simulation configuration and particle setup from JSON text.
+*
+* This function reads a JSON document describing:
+* - simulation parameters
+* - an array of bodies
+*
+* It constructs a ParticleContainer, fills it with procedural or explicit
+* particles, and returns both the simulation configuration and container.
+*
+* @param json_data Raw JSON input string.
+* @return Pair of (sim_configuration, ParticleContainer)
+* @throws std::invalid_argument on unknown body type.
+*/
 namespace FileReader {
 constexpr std::pair<sim_configuration, ParticleContainer> parse(std::string_view json_data) noexcept(false) {
 	const auto json_val = daw::json::from_json<daw::json::json_value>(

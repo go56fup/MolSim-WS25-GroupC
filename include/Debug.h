@@ -7,41 +7,75 @@
 
 #include "FixedString.h"
 
+/**
+* @brief Class to log special member function calls of particles.
+*
+* @tparam DerivedName A compile-time fixed string representing the name of the derived type.
+*/
 template <p3094::fixed_string DerivedName>
 class flag_special_member_funcs {
 public:
+	/**
+	* @brief Constructor logs object construction.
+	* @param loc Source location of the constructor call.
+	*/
 	// NOLINTNEXTLINE(*explicit*)
 	constexpr flag_special_member_funcs(const std::source_location& loc = std::source_location::current()) {
 		log_special_mem("construction", loc);
 	}
-
+	/**
+	* @brief Copy constructor logs copy events.
+	* @param  Object being copied.
+	* @param loc Source location of the copy.
+	*/
 	constexpr flag_special_member_funcs(
 		const flag_special_member_funcs&, const std::source_location& loc = std::source_location::current()
 	) noexcept {
 		log_special_mem("copy", loc);
 	}
-
+	/**
+	* @brief Move constructor logs move events.
+	* @param Object being moved.
+	* @param loc Source location of the move.
+	*/
 	constexpr flag_special_member_funcs(
 		flag_special_member_funcs&&, const std::source_location& loc = std::source_location::current()
 	) noexcept {
 		log_special_mem("move", loc);
 	}
 
+	/**
+	* @brief Copy assignment operator logs copy assignment.
+	* @param Object being copy-assigned.
+	* @return Reference to *this.
+	*/
 	// NOLINTNEXTLINE(cert-oop54-cpp)
 	constexpr flag_special_member_funcs& operator=(const flag_special_member_funcs&) noexcept {
 		runtime_log(DerivedName + " copy assigned!\n");
 		return *this;
 	}
 
+	/**
+	* @brief Move assignment operator logs move assignment.
+	* @param Object being move-assigned.
+	* @return Reference to *this.
+	*/
 	constexpr flag_special_member_funcs& operator=(flag_special_member_funcs&&) noexcept {
 		runtime_log(DerivedName + " move assigned!\n");
 		return *this;
 	}
-
+	/**
+	* @brief Destructor logs object destruction.
+	*/
 	constexpr ~flag_special_member_funcs() noexcept {
 		runtime_log(DerivedName + " destructed!\n");
 	}
 
+	/**
+	 * @brief Equality comparison of particles through special member function.
+	 * @param other The other particle to compare with.
+	 * @return true if both particles are considered equal.
+	 */
 	constexpr bool operator==(const flag_special_member_funcs& other) const = default;
 
 	/**
@@ -58,6 +92,12 @@ public:
 	}
 
 	// TODO(anyone): document me
+	/**
+	 * @brief Logs the reason for a particle creation through a special member function.
+	 *
+	 * @param reason A description of why the particle was created
+	 * @param location Automatically captured source location of the call.
+	 */
 	static constexpr void annotate_construction(std::string_view reason, const std::source_location& location) {
 		runtime_log(
 			"{}:{}:{}: " + DerivedName + "'s last logged construction was {}\n", location.file_name(), location.line(),

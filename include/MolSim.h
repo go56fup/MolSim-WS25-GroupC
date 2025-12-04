@@ -15,14 +15,29 @@
 #include "outputWriter/VTKWriter.h"
 #include "ParticleContainer.h"
 
+/**
+ * @brief Updates forces of two particles where one particle acts on the other.
+ * @param calculator A callable object that computes forces for the particles.
+ * Its type must satisfy force_calculator.
+ * @param p1 The particle being acted upon (particle i).
+ * @param p2 The particle exerting the force (particle j).
+ */
 constexpr void update_particle_forces(force_calculator auto calculator, Particle& p1, Particle& p2) noexcept {
 	const auto f_ij = std::invoke(calculator, p1, p2);
 	p1.f += f_ij;
 	p2.f -= f_ij;
 }
 
+/**
+ * @brief Boundary types of cells.
+ */
 enum class bounds_type : std::uint8_t { none = 0, x_min, y_min, z_min, x_max, y_max, z_max };
 
+/**
+ * @param current Current cell index.
+ * @param boundaries Boundaries of cells.
+ * @return Boundary type of the cell.
+ */
 constexpr bounds_type
 bounds_check(const ParticleContainer::index& current, const ParticleContainer::index& boundaries) noexcept {
 	if (current.x == 0) {
@@ -46,6 +61,18 @@ bounds_check(const ParticleContainer::index& current, const ParticleContainer::i
 	return bounds_type::none;
 };
 
+/**
+ * @brief Apply forces to reflect particles located outside domain boundaries.
+ *
+ * Creates ghost particles next to particles in boundary cells
+ * exceeding a threshold distance from grid boundaries.
+ *
+ * @param current_cell Current cell.
+ * @param current_cell_idx Current cell index.
+ * @param bounds Boundaries of cells.
+*  @param calculator A callable object that computes forces for the particles.
+ * Its type must satisfy force_calculator.
+ */
 constexpr void if_cell_at_border_reflect_via_ghost_particle(
 	ParticleContainer::cell& current_cell, const ParticleContainer::index& current_cell_idx,
 	const ParticleContainer::index& bounds, force_calculator auto calculator
@@ -186,6 +213,7 @@ constexpr void update_values(range_of<Particle> auto&& particles) noexcept {
 	}
 }
 
+
 struct sim_args {
 	double delta_t;
 	double end_time;
@@ -208,7 +236,12 @@ run_sim_iteration(force_calculator auto force_calc, ParticleContainer& particles
 }
 
 // TODO(anyone): do tparam docs
-/** @brief Compile-time options for the simulation. */
+/**
+ *  @brief Compile-time options for the simulation.
+ *  @tparam IOProvider Callable object responsible for exporting particle data.
+ *  @tparam ForceCalc  A callable object that computes forces for the particles.
+ * Its type must satisfy force_calculator.
+ */
 template <particle_io_provider IOProvider, force_calculator ForceCalc>
 struct sim_traits {
 	ForceCalc force = lennard_jones_force;

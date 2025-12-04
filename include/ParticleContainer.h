@@ -295,23 +295,46 @@ constexpr auto pairs(Range&& range) noexcept {
  */
 class ParticleContainer {
 public:
+	/// @brief Element of the grid containing a vector of particles.
 	using cell = std::vector<Particle>;
+	/// @brief Unsigned integer type.
 	using size_type = std::uint32_t;
+	/// @brief Signed integer type.
 	using difference_type = std::int32_t;
+	/// @brief 3D index type used to address cells.
 	using index = vec_3d<size_type>;
+	/// @brief Value type stored in the container.
 	using value_type = cell;
 
 private:
+	/**
+	 * @brief Get linear index, associated with a cell's coordinates on the grid.
+	 * @param i X coordinate.
+	 * @param j Y coordinate.
+	 * @param k Z coordinate.
+	 * @return Linear index.
+	 */
 	constexpr size_type linear_index(size_type i, size_type j, size_type k) const noexcept {
 		auto result = (i * grid_size_.x * grid_size_.y) + (j * grid_size_.y) + k;
 		assert(result < grid_size_.x * grid_size_.y * grid_size_.z && "Out of bounds cell requested");
 		return result;
 	}
 
+	/**
+	 * @brief Divides to doubles and rounds up the result.
+	 * @param x Dividend.
+	 * @param y Devisor.
+	 * @return Quotient.
+	 */
 	static CONSTEXPR_IF_GCC size_type div_round_up(double x, double y) noexcept {
 		return static_cast<size_type>(std::ceil(x / y));
 	}
 
+	/**
+	 * @brief Determines the cell of a particle.
+	 * @param pos Position of a particle.
+	 * @return Linear index of the cell containing the particle.
+	 */
 	constexpr size_type pos_to_linear_index(const vec& pos) const noexcept {
 		const auto x = static_cast<size_type>(pos.x / cutoff_radius);
 		const auto y = static_cast<size_type>(pos.y / cutoff_radius);
@@ -325,6 +348,14 @@ private:
 	double cutoff_radius;
 
 public:
+	/**
+	 * @brief Constructor for a particle container.
+	 * Initialised the domain, grid size and cutoff radius.
+	 * @param x Width of the domain.
+	 * @param y Height of the domain.
+	 * @param z Depth of the domain.
+	 * @param cutoff_radius_ Cutoff radius, currently defines the dimensions of a cell
+	 */
 	constexpr ParticleContainer(double x, double y, double z, double cutoff_radius_)
 		: domain_{x, y, z}
 		, grid_size_{div_round_up(x, cutoff_radius_), div_round_up(y, cutoff_radius_), div_round_up(z, cutoff_radius_)}
@@ -337,6 +368,11 @@ public:
 		grid.resize(grid_x * grid_y * grid_z);
 	}
 
+	/**
+	 * @brief Places a particle based on it's position into a cell
+	 * @tparam ParticleT Type of the particle
+	 * @param particle Particle who is placed
+	 */
 	template <fwd_reference_to<Particle> ParticleT>
 	constexpr void place(ParticleT&& particle) {
 		grid[pos_to_linear_index(particle.x)].emplace_back(std::forward<ParticleT>(particle));
@@ -353,13 +389,13 @@ public:
 	/**
 	 * @brief Create a 3D grid of particles, representing one body.
 	 *
-	 * @param particles Particle container to add generated particles onto
 	 * @param origin Position of the lower left front-side corner
-	 * @param initial_velocity Initial additional velocity of each particle
+	 * @param velocity Initial additional velocity of each particle
 	 * @param scale Number of particles in each direction
-	 * @param distance Relative distance between two particles
+	 * @param meshwidth Relative width between two particles
 	 * @param mass Mass of one particle
-	 * @param mean_brownian Average velocity of the Brownian Motion
+	 * @param brownian_mean Average velocity of the Brownian Motion
+	 * @param seq_no Sequence number for random velocity of the Brownian Motion
 	 **/
 	template <std::size_t N>
 	constexpr std::size_t add_cuboid(
