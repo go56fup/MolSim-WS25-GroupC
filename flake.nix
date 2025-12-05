@@ -26,7 +26,7 @@
           packages = with pkgs; [
             (llvm.clang-tools.override { enableLibcxx = true; })
             llvm.libcxxClang
-            gcc14
+            gcc15
             cmake
             doxygen
             paraview
@@ -43,6 +43,7 @@
             export CLICOLOR=0;
           '';
         };
+
       }
     );
 }

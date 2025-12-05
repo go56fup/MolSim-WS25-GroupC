@@ -34,19 +34,30 @@ file(
 
 # create make target
 add_executable(MolSim ${MY_SRC})
-
-target_include_directories(MolSim PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
-
 add_library(project_options INTERFACE)
+
+target_include_directories(
+	project_options INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/input
+)
+
 target_compile_options(
 	project_options
 	INTERFACE $<$<CXX_COMPILER_ID:GNU>:-Wall
 				-Wextra
 				-Wpedantic
-				-Wconversion>
+				-Wconversion
+				# We use #embed, which is technically C++26, but we allow C23.
+				-Wno-c++26-extensions
+				>
 				# disable some spam warnings for icpc...
 				$<$<CXX_COMPILER_ID:Intel>:-w3
 				-wd383,981,1418,1572,2259>
+				$<$<CXX_COMPILER_ID:Clang>:-Wall
+				-Wextra
+				-Wpedantic
+				-Wconversion
+				-Wno-c23-extensions
+				>
 )
 
 if(ENABLE_SANITIZERS)
@@ -61,6 +72,8 @@ endif()
 if(BENCHMARK_PRESET)
 	target_compile_definitions(MolSim PRIVATE "BENCHMARK_PRESET=${BENCHMARK_PRESET}")
 endif()
+
+target_compile_definitions(MolSim PRIVATE "SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_${LOG_LEVEL}")
 
 # add additional modules
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/modules)

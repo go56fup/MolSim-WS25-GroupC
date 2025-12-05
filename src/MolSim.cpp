@@ -1,17 +1,36 @@
 #include <cstdlib>
 #include <exception>
 #include <filesystem>
-#include <span>
+#include <fstream>
 #include <sstream>
-#include <vector>
+#include <string_view>
 
 #include <argparse/argparse.hpp>
+#include <fmt/base.h>
 #include <spdlog/common.h>
 #include <spdlog/spdlog.h>
 
 #include "FileReader.h"
+#include "ForceCalculators.h"
 #include "MolSim.h"
-#include "ParticleContainer.h"
+#include "Particle.h"
+
+struct use_formatting_t {};
+
+inline constexpr use_formatting_t use_formatting{};
+
+// TODO(tuna): look into how spdlog implements its overloads for fmt and remove the tag type if possible
+// TODO(tuna): grep for exit and replace with terminating_log -- look up docs for die
+template <typename... Args>
+[[noreturn]] void terminating_log(use_formatting_t, fmt::format_string<Args...> fmt_string, Args&&... args) {
+	spdlog::critical(fmt_string, std::forward<Args>(args)...);
+	std::exit(1);  // NOLINT(*mt-unsafe)
+}
+
+[[noreturn]] void terminating_log(std::string_view msg) {
+	spdlog::critical(msg);
+	std::exit(1);  // NOLINT(*mt-unsafe)
+}
 
 /**
  * @brief Entry point of our simulation program.
@@ -28,16 +47,9 @@
 // NOLINTNEXTLINE(*avoid-c-arrays)
 int usual_main(int argc, char* argv[]) {
 	argparse::ArgumentParser program("MolSim");
+	// TODO(tuna): mark all NOLINTS with explanations
+	// Specifying defaults here.
 	// NOLINTBEGIN(*magic-numbers)
-
-	program.add_argument("-d", "--delta-t")
-		.help("the tick length used for the simulation")
-		.default_value(0.014)
-		.scan<'g', double>();
-	program.add_argument("-e", "--end-time")
-		.help("point in time to simulate until")
-		.default_value(1000.0)
-		.scan<'g', double>();
 
 	// NOLINTEND(*magic-numbers)
 
@@ -48,9 +60,8 @@ int usual_main(int argc, char* argv[]) {
 		.default_value("info");
 
 	// TODO(tuna): look into making positionals meshable, so -f val file1 file2 -f2 val should work
-	program.add_argument("files")
-		.help("input file(s) to read initial condition of particles from")
-		.nargs(argparse::nargs_pattern::at_least_one);
+	// TODO(tuna): make exactly one
+	program.add_argument("file").help("input file to read simulation parameters and initial condition of bodies from");
 
 	try {
 		program.parse_args(argc, argv);
@@ -58,8 +69,7 @@ int usual_main(int argc, char* argv[]) {
 		spdlog::error(err.what());
 		std::ostringstream os;
 		os << program;
-		spdlog::error(os.str());
-		std::exit(1);  // NOLINT(*mt-unsafe)
+		terminating_log(os.str());
 	}
 	spdlog::set_level(spdlog::level::from_str(program.get("--log-level")));
 
@@ -69,15 +79,18 @@ int usual_main(int argc, char* argv[]) {
 		std::filesystem::create_directories(output_name);
 	}
 
-	ParticleContainer particles;
-	const auto files = program.get<std::vector<std::string>>("files");
-	for (const auto& file : files) {
-		FileReader::readFile(particles, file);
-	}
-	run_simulation(
-		particles, {.delta_t = program.get<double>("--delta-t"), .end_time = program.get<double>("--end-time")},
-		output_name
-	);
+	const auto file = program.get<std::string>("file");
+	const std::ifstream t(file);
+	std::stringstream buffer;
+	buffer << t.rdbuf();
+	auto [cfg, particles] = FileReader::parse(buffer.view());
+
+	// TODO(tuna): when we add gravitation as an alternative force, change this to not be hardcoded
+	auto calc = [sigma = cfg.sigma, eps = cfg.epsilon](const Particle& p1, const Particle& p2) noexcept {
+		return lennard_jones_force(p1, p2, sigma, eps);
+	};
+
+	run_simulation(particles, cfg, calc, output_name);
 
 	spdlog::info("output written. Terminating...");
 	return 0;

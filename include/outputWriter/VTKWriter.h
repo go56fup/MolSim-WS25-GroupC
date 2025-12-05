@@ -14,7 +14,9 @@
 #include <span>
 #include <string_view>
 
+#include "Concepts.h"
 #include "Particle.h"
+#include "ParticleContainer.h"
 
 namespace outputWriter::VTKWriter {
 /**
@@ -23,6 +25,6 @@ namespace outputWriter::VTKWriter {
  * @param filename Output filename
  * @param iteration Current iteration number
  */
-void plotParticles(std::span<const Particle> particles, std::string_view filename, int iteration);
+void plotParticles(ParticleContainer& particles, std::string_view filename, unsigned iteration);
 }  // namespace outputWriter::VTKWriter
 #endif

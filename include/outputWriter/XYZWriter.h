@@ -14,5 +14,5 @@
 #include "Particle.h"
 
 namespace outputWriter::XYZWriter {
-void plotParticles(std::span<const Particle> particles, std::string_view filename, int iteration);
+void plotParticles(std::span<const Particle> particles, std::string_view filename, unsigned iteration);
 }

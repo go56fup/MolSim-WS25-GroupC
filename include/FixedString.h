@@ -2,7 +2,7 @@
  * @file FixedString.h
  * @brief A compile-time sized string implementation to be used in templates.
  *
- * The std::basic_fixed_string implementation from [P3094R6]. Slightly modified
+ * The `std::basic_fixed_string` implementation from [P3094R6]. Slightly modified
  * over from the Compiler Explorer link in the paper.
  */
 
@@ -20,6 +20,8 @@ namespace p3094 {
  * @tparam CharT Character type to be used by the string
  * @tparam N The size of the string
  */
+template <typename CharT, std::size_t N>
+class basic_fixed_string;
 
 // NOLINTBEGIN(*avoid-c-arrays)
 // NOLINTBEGIN(*pointer-arithmetic)
@@ -27,6 +29,7 @@ namespace p3094 {
 // NOLINTBEGIN(*explicit*)
 template <typename CharT, std::size_t N>
 class basic_fixed_string {
+	/// @cond DO_NOT_DOCUMENT
 public:
 	CharT data_[N + 1] = {};  // exposition only
 
@@ -249,7 +252,11 @@ public:
 	friend std::basic_ostream<CharT>& operator<<(std::basic_ostream<CharT>& os, const basic_fixed_string& str) {
 		return os << str.c_str();
 	}
+
+	/// @endcond
 };
+
+/// @cond DO_NOT_DOCUMENT
 
 // deduction guides
 template <typename CharT, std::same_as<CharT>... Rest>
@@ -267,9 +274,14 @@ constexpr void swap(basic_fixed_string<CharT, N>& x, basic_fixed_string<CharT, N
 	x.swap(y);
 }
 
+/// @endcond
+
 // typedef-names
+
 template <std::size_t N>
 using fixed_string = basic_fixed_string<char, N>;
+
+/// @cond DO_NOT_DOCUMENT
 template <std::size_t N>
 using fixed_u8string = basic_fixed_string<char8_t, N>;
 template <std::size_t N>
@@ -278,8 +290,10 @@ template <std::size_t N>
 using fixed_u32string = basic_fixed_string<char32_t, N>;
 template <std::size_t N>
 using fixed_wstring = basic_fixed_string<wchar_t, N>;
+/// @endcond
 }  // namespace p3094
 
+/// @cond DO_NOT_DOCUMENT
 // hash support
 template <std::size_t N>
 struct std::hash<p3094::fixed_string<N>> : std::hash<std::string_view> {};
@@ -304,6 +318,8 @@ struct std::formatter<p3094::basic_fixed_string<CharT, N>> : formatter<std::basi
 		return formatter<std::basic_string_view<CharT>>::format(std::basic_string_view<CharT>(str), ctx);
 	}
 };
+
+/// @endcond
 
 // NOLINTEND(*explicit*)
 // NOLINTEND(*array*-decay)
