@@ -26,7 +26,7 @@
           packages = with pkgs; [
             (llvm.clang-tools.override { enableLibcxx = true; })
             llvm.libcxxClang
-            gcc15
+            gcc14
             cmake
             doxygen
             paraview
@@ -35,12 +35,14 @@
             llvm.openmp
             (texliveTeTeX.withPackages (ps: [ ps.newunicodechar ]))
             ghostscript_headless
+            lcov
+            hyperfine
           ];
           shellHook = ''
             export NIX_CFLAGS_COMPILE="$NIX_CFLAGS_COMPILE -B${llvm.libcxxClang.libcxx}/lib";
+            export CLICOLOR=0;
           '';
         };
-
       }
     );
 }

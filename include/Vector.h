@@ -1,9 +1,12 @@
 #pragma once
 
-#include <array>
 #include <cmath>
-#include <format>
-#include <span>
+#include <ostream>
+
+#include <fmt/base.h>
+#include <fmt/format.h>
+
+#include "CompilerTraits.h"
 
 namespace detail {
 /**
@@ -27,7 +30,15 @@ concept arithmetic = std::is_arithmetic_v<T>;
  * @tparam Value The numeric type of the vector components. Must satisfy detail::arithmetic.
  */
 template <detail::arithmetic Value>
-struct vec_3d {
+// Discarding the argument of the special member function in flag_special_member_funcs is
+// on purpose.
+// NOLINTNEXTLINE(*slicing)
+struct vec_3d
+/// @cond DO_NOT_DOCUMENT
+// LOG_SPECIAL_MEMBER_FUNCS_DEBUG("vec_3d")
+/// @endcond
+{
+public:
 	/** @brief X component of the vector. */
 	Value x;
 
@@ -36,6 +47,16 @@ struct vec_3d {
 
 	/** @brief Z component of the vector. */
 	Value z;
+
+	constexpr vec_3d(Value arg_x, Value arg_y, Value arg_z) noexcept
+		: x(arg_x)
+		, y(arg_y)
+		, z(arg_z) {}
+
+	constexpr vec_3d() noexcept
+		: x{}
+		, y{}
+		, z{} {}
 
 	// TODO(tuna): maybe add arithmetic operations between compatible types
 
@@ -89,7 +110,7 @@ struct vec_3d {
 	 *
 	 * @return √(x² + y² + z²).
 	 */
-	double euclidian_norm() const noexcept {
+	CONSTEXPR_IF_GCC double euclidian_norm() const noexcept {
 		return std::sqrt(std::pow(x, 2) + std::pow(y, 2) + std::pow(z, 2));
 	}
 
@@ -235,22 +256,22 @@ constexpr bool operator==(const vec_3d<Value>& lhs, const vec_3d<Value>& rhs) {
 }
 
 /**
- * @brief Specialization of std::formatter for vec_3d.
+ * @brief Specialization of the {fmt} API for vec_3d.
  *
- * Enables use of std::format and std::print with vec_3d objects.
+ * Enables use of fmt::format and fmt::print with vec_3d objects.
  *
  * @tparam Value The type of the components of the given vector.
  */
 template <typename T>
-struct std::formatter<vec_3d<T>> {
+struct fmt::formatter<vec_3d<T>> {
 	/** @brief Parses the format specification (no-op for this type). */
-	constexpr auto parse(std::format_parse_context& ctx) {
+	constexpr auto parse(fmt::format_parse_context& ctx) {
 		return ctx.begin();
 	}
 
 	/** @brief Formats @p vector as "(x, y, z)". */
-	auto format(const vec_3d<T>& vector, std::format_context& ctx) const {
-		return std::format_to(ctx.out(), "({}, {}, {})", vector.x, vector.y, vector.z);
+	auto format(const vec_3d<T>& vector, fmt::format_context& ctx) const {
+		return fmt::format_to(ctx.out(), "({}, {}, {})", vector.x, vector.y, vector.z);
 	}
 };
 
@@ -266,7 +287,7 @@ struct std::formatter<vec_3d<T>> {
  */
 template <detail::arithmetic Value>
 std::ostream& operator<<(std::ostream& stream, const vec_3d<Value>& vector) {
-	return stream << std::format("{}", vector);
+	return stream << fmt::format("{}", vector);
 }
 
 /**
@@ -282,3 +303,6 @@ using vec = vec_3d<double>;
 // NOLINTNEXTLINE(*avoid-c-arrays)
 static_assert(sizeof(vec) == sizeof(double[3]));
 
+#ifdef NDEBUG
+static_assert(std::is_trivially_copyable_v<vec>);
+#endif
