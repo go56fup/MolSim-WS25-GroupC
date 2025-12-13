@@ -75,10 +75,10 @@ constexpr unsigned char constexpr_tolower(unsigned char c) {
 constexpr int constexpr_strcasecmp(const char* s1, const char* s2) {
 	unsigned char c1;
 	unsigned char c2;
-	
+
 	do {
 		c1 = static_cast<unsigned char>(*s1++);
-        c2 = static_cast<unsigned char>(*s2++);
+		c2 = static_cast<unsigned char>(*s2++);
 		if (c1 != c2) {
 			c1 = constexpr_tolower(c1);
 			c2 = constexpr_tolower(c2);

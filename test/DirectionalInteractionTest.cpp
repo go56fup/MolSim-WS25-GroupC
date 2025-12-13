@@ -4,7 +4,7 @@
 
 // TODO(tuna): convert to use expect_all somehow so that it can also be checked at compile time
 TEST(DirectionalInteraction, BasicTest) {
-	ParticleContainer container(2, 2, 2, 1);
+	ParticleContainer container(vec{2, 2, 2}, 1);
 	// Number of edges in 2^3 = K8.
 	static constexpr std::size_t interactions = 8 * 7 / 2;
 	[[maybe_unused]] GTEST_CXP std::array<std::pair<ParticleContainer::index, ParticleContainer::index>, interactions>

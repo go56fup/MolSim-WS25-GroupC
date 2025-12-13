@@ -16,8 +16,8 @@
     "write_frequency": 10,
     "base_name": "MD_vtk",
     "domain": [
-      180,
-      90,
+      105,
+      105,
       3
     ]
   },
@@ -26,35 +26,16 @@
       "type": "cuboid_2d",
       "parameters": {
         "origin": [
-          20,
-          20
+          1.1225,
+          1.1225
         ],
         "scale": [
-          100,
-          20
+	      45,
+          45
         ],
         "velocity": [
           0,
           0
-        ],
-        "brownian_mean": 0.1,
-        "particle_mass": 1
-      }
-    },
-    {
-      "type": "cuboid_2d",
-      "parameters": {
-        "origin": [
-          70,
-          60
-        ],
-        "scale": [
-          20,
-          20
-        ],
-        "velocity": [
-          0,
-          -10
         ],
         "brownian_mean": 0.1,
         "particle_mass": 1

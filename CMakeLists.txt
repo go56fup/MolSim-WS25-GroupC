@@ -52,11 +52,13 @@ target_compile_options(
 				# disable some spam warnings for icpc...
 				$<$<CXX_COMPILER_ID:Intel>:-w3
 				-wd383,981,1418,1572,2259>
-				$<$<CXX_COMPILER_ID:Clang>:-Wall
+				$<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>:
+				-Wall
 				-Wextra
 				-Wpedantic
 				-Wconversion
 				-Wno-c23-extensions
+				>
 				>
 )
 

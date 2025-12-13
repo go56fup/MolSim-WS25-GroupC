@@ -3,6 +3,7 @@
 #include <cmath>
 #include <concepts>
 #include <functional>
+#include <stdexcept>
 
 #include "CompilerTraits.h"
 #include "FileReader.h"
@@ -76,12 +77,14 @@ CONSTEXPR_IF_GCC inline vec gravitational_force(const Particle& p1, const Partic
  **/
 CONSTEXPR_IF_GCC inline vec
 lennard_jones_force(const Particle& p1, const Particle& p2, double sigma, double eps) noexcept {
-	SPDLOG_TRACE("Calculating Lennard-Jones forces for {} and {}", p1, p2);
+	SPDLOG_DEBUG("Calculating Lennard-Jones forces for:\n{}\n{}\n", p1, p2);
 	const auto& xi = p1.x;
 	const auto& xj = p2.x;
 	const double norm = (xi - xj).euclidian_norm();
 	assert(norm != 0 && "Two particles at the same position cannot interact.");
 	const double scaling_factor =
 		24 * eps / std::pow(norm, 2) * (std::pow(sigma / norm, 6) - 2 * (std::pow(sigma / norm, 12)));
-	return scaling_factor * (xj - xi);
+	const auto result = scaling_factor * (xj - xi);
+	SPDLOG_TRACE("calculated f: {}", result);
+	return result;
 }

@@ -9,7 +9,7 @@ TEST(BorderCellTests, TwoByTwoByTwo) {
 	static constexpr std::array<ParticleContainer::index, border_cell_count> expected{
 		{{0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {1, 1, 0}, {0, 0, 1}, {1, 0, 1}, {0, 1, 1}, {1, 1, 1}}
 	};
-	ParticleContainer container(2, 2, 2, 1);
+	ParticleContainer container(vec{2, 2, 2}, 1);
 	std::size_t i = 0;
 	for (const auto& [idx, _] : container.border_cells()) {
 		EXPECT_EQ(idx, expected[i++]);
@@ -39,7 +39,7 @@ TEST(BorderCellTests, ThreeByThreeByThree) {
 		{0, 2, 2}, {1, 2, 2}, {2, 2, 2},
 	}};
 
-	ParticleContainer container(3, 3, 3, 1);
+	ParticleContainer container(vec{3, 3, 3}, 1);
 	std::size_t i = 0;
 	for (const auto& [idx, _] : container.border_cells()) {
 		EXPECT_EQ(idx, expected[i++]);

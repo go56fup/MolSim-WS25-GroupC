@@ -43,9 +43,8 @@ struct boundary_conditions_descriptor {
 			return y_max;
 		case boundary_type::z_max:
 			return z_max;
-		case boundary_type::none:
-			assert(false && "This type is not a boundary and therefore has no associated condition");
 		}
+		assert(false && "This type is not a boundary and therefore has no associated condition");
 		std::unreachable();
 		// Having the compiler optimize a switch statement is much less cumbersome than doing it by hand.
 		// But constexpr won't allow it.
@@ -220,15 +219,27 @@ struct json_data_contract<disc_parameters> {
 
 }  // namespace daw::json
 
+constexpr void check_for_2d_domain(const vec& domain, double cutoff) noexcept(false) {
+	if (domain.z > cutoff) {
+		throw std::domain_error(
+			"Refusing to create a 3D grid with a 2D object inside. Set "
+			"the Z-size of the domain to the cutoff radius to obtain a 2D grid, "
+			"or replace the 2D body with a 3D equivalent."
+		);
+	}
+}
+
 namespace FileReader {
 constexpr std::pair<sim_configuration, ParticleContainer> parse(std::string_view json_data) noexcept(false) {
 	SPDLOG_TRACE("Running from input content: {}", json_data);
 	const auto json_val = daw::json::from_json<daw::json::json_value>(
 		json_data, daw::json::options::parse_flags<daw::json::options::UseExactMappingsByDefault::yes>
 	);
+
 	auto sim_config = json_val["configuration"].as<sim_configuration>();
 	const auto& domain = sim_config.domain;
-	ParticleContainer particles(domain.x, domain.y, domain.z, sim_config.cutoff_radius);
+	ParticleContainer particles(domain, sim_config.cutoff_radius);
+	std::once_flag two_d_domain_check;
 	std::size_t seq_no = 0;
 	for (const auto& [_, body] : json_val["bodies"]) {
 		const std::string type = body["type"].as<std::string>();
@@ -245,8 +256,8 @@ constexpr std::pair<sim_configuration, ParticleContainer> parse(std::string_view
 				);
 				// TODO(tuna): rename to square
 			} else if (type.ends_with("2d")) {
+				std::call_once(two_d_domain_check, check_for_2d_domain, sim_config.domain, sim_config.cutoff_radius);
 				const auto params = body["parameters"].as<cuboid_parameters<2>>();
-				// TODO(tuna): figure out where on the z axis to place 2d objects.
 				particles.add_cuboid<2>(
 					{params.origin.x, params.origin.y, sim_config.domain.z / 2}, {params.scale.x, params.scale.y, 1},
 					sim_config.meshwidth, params.velocity, params.particle_mass, params.brownian_mean, seq_no
@@ -256,6 +267,7 @@ constexpr std::pair<sim_configuration, ParticleContainer> parse(std::string_view
 			const auto params = body["parameters"].as<Particle>();
 			particles.place(MOVE_IF_DEBUG(params));
 		} else if (type == "disc") {
+			std::call_once(two_d_domain_check, check_for_2d_domain, sim_config.domain, sim_config.cutoff_radius);
 			const auto params = body["parameters"].as<disc_parameters>();
 			particles.add_disc(
 				{params.center.x, params.center.y, sim_config.domain.z / 2}, params.radius, sim_config.meshwidth,

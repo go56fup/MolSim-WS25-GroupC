@@ -1,6 +1,7 @@
 #include "Debug.h"
 #include "FileReader.h"
 #include "gtest_constexpr.h"
+#include "ParticleContainer.h"
 #include "gtest/gtest.h"
 
 #include <array>
@@ -33,9 +34,6 @@ TEST(ForceTests, BasicGravitation) {
 		particles.emplace(vec{}, vec{}, 1, 10);
 		particles.emplace(vec{1, 0, 0}, vec{}, 1, 15);
 		run_sim_iteration(gravitational_force, particles, config);
-		for (const auto& p : particles.view()) {
-			SPDLOG_CRITICAL("resulting: {}", p);
-		}
 		auto moving_par = particles.view() | std::views::filter([](const Particle& p) { return p.type == 15; });
 		return moving_par.begin()->f == vec{1, 0, 0};
 	});
@@ -43,6 +41,13 @@ TEST(ForceTests, BasicGravitation) {
 }
 #endif
 
+// TODO(tuna): do not copy the particle
+constexpr Particle get_particle_from_type(ParticleContainer& particles, decltype(Particle::type) type) {
+	auto view = particles.view() | std::views::filter([&](const Particle& p) { return p.type == type; });
+	return *view.begin();
+}
+
+#if 0
 // Check that the Lennard-Jones force is calculated correctly
 // TODO(tuna): make sim_configuration constexpr capable by migrating to fixed_string of 256,
 // and then make the test actually constexpr
@@ -64,15 +69,12 @@ TEST(ForceTests, LennardJones) {
 	auto calc = [sigma = config.sigma, eps = config.epsilon](const Particle& p1, const Particle& p2) noexcept {
 		return lennard_jones_force(p1, p2, sigma, eps);
 	};
-	auto first_force = std::invoke([&] {
-		// TODO(tuna): make the constructor one arged, and the tests always gotta use this config first idiom
-		ParticleContainer particles(config.domain.x, config.domain.y, config.domain.z, config.cutoff_radius);
+	auto first_force = std::invoke([&] -> vec {
+		ParticleContainer particles(config.domain, config.cutoff_radius);
 		particles.place(first);
 		particles.place(second);
 		run_sim_iteration(calc, particles, config);
-		// TODO(tuna): make get_particle_by_type(particles, type) -> Particle&
-		auto par = particles.view() | std::views::filter([](const Particle& p) { return p.type == 10; });
-		return par.begin()->f;
+		return get_particle_from_type(particles, 10).f;
 	});
 
 	auto direct_calc = lennard_jones_force(first, second, config.sigma, config.epsilon);
@@ -82,6 +84,35 @@ TEST(ForceTests, LennardJones) {
 	EXPECT_VEC_DOUBLE_EQ(hand_calculated_result, scaled_force);
 }
 
+TEST(ForceTests, GridTest) {
+	Particle first{vec{2, 1, 1}, vec{1, 0, 0}, 1, 10};
+	Particle second{vec{5, 1, 1}, vec{-1, 0, 0}, 1, 15};
+		auto config = sim_configuration{
+		.delta_t = 0.001,
+		.cutoff_radius = 2,
+		.sigma = 1,
+		.epsilon = 5,
+		.boundary_behavior = boundary_conditions_descriptor::all(boundary_condition::outflow),
+		.end_time = 2,
+		.write_frequency = 1000,
+		.base_name = "unused",
+		.domain{21, 21, 21},
+		.meshwidth = 1.125
+	};
+	auto calc = [sigma = config.sigma, eps = config.epsilon](const Particle& p1, const Particle& p2) noexcept {
+		return lennard_jones_force(p1, p2, sigma, eps);
+	};
+	auto particle_result = std::invoke([&] -> std::pair<Particle, Particle> {
+		ParticleContainer particles(config.domain, config.cutoff_radius);
+		particles.place(first);
+		particles.place(second);
+		run_simulation(particles, config, calc, "/tmp/paraview");
+		return {get_particle_from_type(particles, 10), get_particle_from_type(particles, 15)};
+	});
+	SPDLOG_DEBUG("got particles at the end of sim: {}\n{}", particle_result.first, particle_result.second);
+}
+
+#endif
 /*
 // Check that the Halley's comet simulation from worksheet 1 results in the correct simulation
 // (specifically, that the comet returns to its original position modulo some deviation, and

@@ -8,6 +8,7 @@
 
 #include "CompilerTraits.h"
 #include "Concepts.h"
+#include "Enums.h"
 #include "Particle.h"
 #include "utils/MaxwellBoltzmannDistribution.h"
 
@@ -304,13 +305,8 @@ public:
 private:
 	constexpr size_type linear_index(size_type i, size_type j, size_type k) const noexcept {
 		auto result = (i * grid_size_.y * grid_size_.z) + (j * grid_size_.z) + k;
-		SPDLOG_TRACE("requested {} {} {}, linear pos: {}", i, j, k, result);
 		assert(result < grid_size_.x * grid_size_.y * grid_size_.z && "Out of bounds cell requested");
 		return result;
-	}
-
-	static CONSTEXPR_IF_GCC size_type div_round_up(double x, double y) noexcept {
-		return static_cast<size_type>(std::ceil(x / y));
 	}
 
 	constexpr size_type pos_to_linear_index(const vec& pos) const noexcept {
@@ -318,6 +314,21 @@ private:
 		const auto y = static_cast<size_type>(pos.y / cutoff_radius_);
 		const auto z = static_cast<size_type>(pos.z / cutoff_radius_);
 		return linear_index(x, y, z);
+	}
+
+	static CONSTEXPR_IF_GCC size_type div_round_up(double x, double y) noexcept {
+		return static_cast<size_type>(std::ceil(x / y));
+	}
+
+	constexpr void check_if_oob(const vec& pos) const noexcept(false) {
+		if (pos.x >= domain_.x || pos.y >= domain_.y || pos.z >= domain_.z) {
+			throw std::domain_error(
+				fmt::format(
+					"Refusing to place particle at {}, which is on or outside the domain of the simulation: {}", pos,
+					domain_
+				)
+			);
+		}
 	}
 
 	std::vector<cell> grid;
@@ -330,9 +341,10 @@ public:
 		return cutoff_radius_;
 	}
 
-	constexpr ParticleContainer(double x, double y, double z, double cutoff_radius_arg)
-		: domain_{x, y, z}
-		, grid_size_{div_round_up(x, cutoff_radius_arg), div_round_up(y, cutoff_radius_arg), div_round_up(z, cutoff_radius_arg)}
+	template <fwd_reference_to<vec> Vec>
+	constexpr ParticleContainer(Vec domain_arg, double cutoff_radius_arg)
+		: domain_{std::forward<Vec>(domain_arg)}
+		, grid_size_{div_round_up(domain_.x, cutoff_radius_arg), div_round_up(domain_.y, cutoff_radius_arg), div_round_up(domain_.z, cutoff_radius_arg)}
 		, cutoff_radius_{cutoff_radius_arg} {
 		// Prevent implicit widening later, if x * y * z overflows for uint32, this takes care of it
 		const auto grid_x = static_cast<std::size_t>(grid_size_.x);
@@ -345,6 +357,7 @@ public:
 
 	template <fwd_reference_to<Particle> ParticleT>
 	constexpr void place(ParticleT&& particle) {
+		check_if_oob(particle.x);
 		grid[pos_to_linear_index(particle.x)].emplace_back(std::forward<ParticleT>(particle));
 	}
 
@@ -352,14 +365,7 @@ public:
 		requires std::constructible_from<Particle, vec, Args...>
 	constexpr void emplace(VecT&& pos, Args&&... args) {
 		SPDLOG_TRACE("Emplacing particle at coords: {}", pos);
-		if (pos.x >= domain_.x || pos.y >= domain_.y || pos.z >= domain_.z) {
-			throw std::domain_error(
-				fmt::format(
-					"Refusing to place particle at {}, which is on or outside the domain of the simulation: {}", pos,
-					domain_
-				)
-			);
-		}
+		check_if_oob(pos);
 		grid[pos_to_linear_index(pos)].emplace_back(std::forward<VecT>(pos), std::forward<Args>(args)...);
 	}
 
@@ -385,7 +391,7 @@ public:
 				for (size_type k = 0; k < scale.z; ++k) {
 					emplace(
 						vec{origin.x + (i * meshwidth), origin.y + (j * meshwidth), origin.z + (k * meshwidth)},
-						maxwellBoltzmannDistributedVelocity<N>(brownian_mean, seq_no) + velocity, mass
+						maxwellBoltzmannDistributedVelocity<N>(brownian_mean, seq_no) + velocity, mass, seq_no
 					);
 				}
 			}
@@ -468,8 +474,6 @@ public:
 	}
 };
 
-enum class axis : std::uint8_t { x, y, z };
-
 template <typename T>
 static consteval auto axis_ptr(axis a) {
 	switch (a) {
@@ -481,7 +485,7 @@ static consteval auto axis_ptr(axis a) {
 		return &vec_3d<T>::z;
 	}
 	std::unreachable();
-};
+}
 
 namespace detail {
 
@@ -507,6 +511,7 @@ private:
 	ParticleContainer::index current_cell_idx;
 	ParticleContainer::index target_cell_idx;
 	std::uint8_t displacement_idx;
+	// TODO(tuna): maybe add 0, 0, 0 to elide first loop in calculate_forces
 	static constexpr std::array<vec_3d<difference_type>, 13> displacements = {
 		{{0, 0, +1},    // i,     j,     k + 1
 	     {0, +1, -1},   // i,     j + 1, k - 1
@@ -596,10 +601,6 @@ public:
 				++displacement_idx;
 
 				if (success) {
-					SPDLOG_TRACE(
-						"Found correct displacement at i={}, {}, target={}", displacement_idx - 1, displacement,
-						target_cell_idx
-					);
 					return *this;
 				}
 			}
@@ -687,7 +688,6 @@ constexpr auto ParticleContainer::directional_interactions() noexcept {
 
 	return detail::interactions_range(*this);
 }
-enum class boundary_type : std::uint8_t { none, x_min, y_min, z_min, x_max, y_max, z_max };
 
 namespace detail {
 class border_cell_iterator {
@@ -711,30 +711,37 @@ public:
 private:
 	ParticleContainer* container = nullptr;
 	ParticleContainer::index idx;
-	boundary_type type = boundary_type::none;
+	boundary_type type{};
 
 	constexpr boundary_type bounds_check(const ParticleContainer::index& current) const noexcept {
 		const auto& boundaries = container->grid_size();
+		// TODO(tuna): find a way to elide these checks:
+		// for the 1-cell thick case, the cell becomes both *_min and *_max; which only
+		// happens there but causes the overhead of both checks for the majority of grid
+		// configurations
 		using enum boundary_type;
+		boundary_type result{};
+		SPDLOG_TRACE("Calculating border type of index: {}", current);
 		if (current.x == 0) {
-			return x_min;
-		}
-		if (current.y == 0) {
-			return y_min;
-		}
-		if (current.z == 0) {
-			return z_min;
+			result |= x_min;
 		}
 		if (current.x == boundaries.x - 1) {
-			return x_max;
+			result |= x_max;
+		}
+		if (current.y == 0) {
+			result |= y_min;
 		}
 		if (current.y == boundaries.y - 1) {
-			return y_max;
+			result |= y_max;
+		}
+		if (current.z == 0) {
+			result |= z_min;
 		}
 		if (current.z == boundaries.z - 1) {
-			return z_max;
+			result |= z_max;
 		}
-		return none;
+		SPDLOG_TRACE("got border type: {}", result);
+		return result;
 	};
 
 public:
@@ -749,7 +756,6 @@ public:
 
 	// TODO(tuna): mark return type of operator* value_type everyrwhere
 	constexpr value_type operator*() const noexcept {
-		SPDLOG_TRACE("Returning border cell: {}", idx);
 		return {idx, type};
 	}
 
@@ -766,7 +772,7 @@ public:
 			}
 
 			type = bounds_check(idx);
-			if (type == boundary_type::none) {
+			if (std::to_underlying(type) == 0) {
 				continue;
 			}
 			return *this;
@@ -859,7 +865,6 @@ public:
 	constexpr enumerate_cells_iterator() noexcept = default;
 
 	constexpr value_type operator*() const noexcept {
-		SPDLOG_TRACE("Returning cell: {}", idx);
 		return {idx, (*container)[idx]};
 	}
 
