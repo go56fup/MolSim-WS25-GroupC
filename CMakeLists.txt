@@ -33,7 +33,8 @@ file(
 )
 
 # create make target
-add_executable(MolSim ${MY_SRC})
+add_executable(MolSim ${MY_SRC}
+		include/Thermostat.h)
 add_library(project_options INTERFACE)
 
 target_include_directories(

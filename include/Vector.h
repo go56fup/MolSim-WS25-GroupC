@@ -117,6 +117,15 @@ public:
 	}
 
 	/**
+	 * @brief Computes the squared norm of this vector.
+	 *
+	 * @return (x² + y² + z²).
+	 */
+	constexpr double squared_norm() const noexcept {
+		return std::pow(x, 2) + std::pow(y, 2) + std::pow(z, 2);
+	}
+
+	/**
 	 * @brief Returns an iterator to the first component of this vector.
 	 *
 	 * Enables range-based for support.
