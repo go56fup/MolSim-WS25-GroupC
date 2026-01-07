@@ -161,4 +161,4 @@ public:
 
 // NOLINTEND(*convert-member-functions-to-static)
 
-enum class boundary_condition : std::uint8_t { outflow, reflecting };
+enum class boundary_condition : std::uint8_t { outflow, reflecting, periodic};

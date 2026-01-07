@@ -147,6 +147,37 @@ constexpr void delete_ouflowing_particles(
 
 #define reflect_via_ghost_particle reflect::macro
 
+constexpr void periodic(
+		particle_container::cell& cell, boundary_type border, const sim_configuration& config,
+		particle_container& particles, const particle_container::index& idx, force_calculator auto force_calc){
+	(void)(cell);
+	(void)(border);
+	(void)(config);
+	(void)(particles);
+	(void)(idx);
+	(void)(force_calc);
+
+	/*
+	using enum boundary_type;
+	const auto& grid = particles.grid_size();
+
+	auto& current_cell = cell;
+
+	switch (border) {
+
+		case (x_min):
+			particle_container::index const target_cell_idx = {grid.x, idx.y + 1 ,idx.z};
+			auto& target_cell = particles[target_cell_idx];
+
+			for (auto& p1 : current_cell) {
+				for (auto& p2 : target_cell) {
+					apply_force_interaction(force_calc, p1, p2);
+				}
+			}
+			break;
+	}*/
+};
+
 constexpr void handle_boundary_condition(
 	particle_container::cell& cell, boundary_type border, const vec& domain,
 	force_calculator auto force_calc, const sim_configuration& config
@@ -160,10 +191,13 @@ constexpr void handle_boundary_condition(
 		case boundary_condition::outflow:
 			delete_ouflowing_particles(cell, domain, border);
 			break;
+
+		case boundary_condition::periodic:
+			break;
 		}
 	};
 
-	for (auto [min, max] : border_pairs) {
+	for (auto [min, max]: border_pairs) {
 		const bool on_min = (border & min) == min;
 		const bool on_max = (border & max) == max;
 		if (on_min) {

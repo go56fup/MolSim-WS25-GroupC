@@ -33,6 +33,131 @@ apply_force_interaction(force_calculator auto calculator, particle& p1, particle
 	p2.f -= f_ij;
 }
 
+constexpr bool hasPeriodic(const sim_configuration& config) {
+	using enum boundary_type;
+	return config.boundary_behavior[x_min] == boundary_condition::periodic ||
+		   config.boundary_behavior[y_min] == boundary_condition::periodic ||
+		   config.boundary_behavior[z_min] == boundary_condition::periodic;
+}
+
+constexpr bool isPeriodic(const sim_configuration& config, const std::vector<boundary_type>& bt_array) {
+	bool result = true;
+	for(auto boundary : bt_array) {
+		result = result && config.boundary_behavior[boundary] == boundary_condition::periodic;
+	}
+
+	return result;
+}
+
+// Define the signature: void return, taking (cell, boundary, config)
+using BoundaryFunc = std::function<void(particle_container::cell&, boundary_type, const particle_container::index& idx)>;
+
+// Capture 'particles' and 'config' by reference (they live outside the function)
+// Capture 'calculator' by VALUE (since it's a template/auto param that might be local)
+BoundaryFunc funcDefiner(particle_container& particles, const sim_configuration& config,
+						 force_calculator auto calculator, boundary_type bType) {
+
+	auto behavior = config.boundary_behavior[bType];
+
+	if (behavior == boundary_condition::reflecting) {
+		return [&particles, calculator, &config](particle_container::cell& cell, boundary_type b, [[maybe_unused]] const particle_container::index& ) {
+			reflect_via_ghost_particle(cell, particles.domain(), b, calculator, config.meshwidth);
+		};
+	} else if (behavior == boundary_condition::outflow) {
+		return [&particles](particle_container::cell& cell, boundary_type b, const particle_container::index& ) {
+			delete_ouflowing_particles(cell, particles.domain(), b);
+		};
+	} else {
+		return [&particles, &config, calculator](particle_container::cell& cell, boundary_type b, const particle_container::index& idx) {
+			periodic(cell, b, config, particles, idx, calculator);
+		};
+	}
+}
+
+constexpr void loop(
+		particle_container& particles, const sim_configuration& config, force_calculator auto calculator) {
+	const auto& grid = particles.grid_size();
+	using enum boundary_type;
+	//TODO: Map to function
+
+	//x faces
+	BoundaryFunc func = funcDefiner(particles, config, calculator, x_min);
+	for (unsigned i = 0; i < grid.y; ++i) {
+		for (unsigned j = 0; j < grid.z; ++j) {
+			std::invoke(func, particles[{0, i, j}], x_min, particle_container::index {0, i, j});
+			std::invoke(func,particles[{grid.x, i, j}], x_max,particle_container::index {grid.x, i, j});
+		}
+	}
+
+	//y faces
+	func = funcDefiner(particles, config, calculator, y_min);
+	for (unsigned i = 0; i < grid.x; ++i) {
+		for (unsigned j = 0; j < grid.z; ++j) {
+			std::invoke(func, particles[{i, 0, j}], y_min, particle_container::index{i, 0, j});
+			std::invoke(func, particles[{i, grid.y, j}], y_max, particle_container::index{i, grid.y, j});
+		}
+	}
+
+	//z faces
+	func = funcDefiner(particles, config, calculator, z_min);
+	for (unsigned i = 0; i < grid.x; ++i) {
+		for (unsigned j = 0; j < grid.y; ++j) {
+			std::invoke(func, particles[{i, j, 0}], z_min, particle_container::index{i, j, 0});
+			std::invoke(func, particles[{i, j, grid.z}], z_max, particle_container::index{i, j, grid.z});
+		}
+	}
+
+	if(!hasPeriodic(config)){
+		return;
+	}
+
+	//x-y edges
+	bool cond = isPeriodic(config, {x_min, y_min});
+	if(cond) {
+		for (unsigned i = 0; i < grid.z; ++i) {
+			std::invoke(func, particles[{0, 0, i}], x_min | y_min, particle_container::index{0, 0, i});
+			std::invoke(func, particles[{0, grid.y, i}], x_min | y_max, particle_container::index{0, grid.y, i});
+			std::invoke(func, particles[{grid.x, 0, i}], x_max | y_min, particle_container::index{grid.x, 0, i});
+			std::invoke(func, particles[{grid.x, grid.y, i}], x_max | y_max, particle_container::index{grid.x, grid.y, i});
+		}
+	}
+
+	//x-z edges
+	cond = isPeriodic(config, {x_min, z_min});
+	if(cond) {
+		for (unsigned i = 0; i < grid.y; ++i) {
+			std::invoke(func, particles[{0, i, 0}], x_min | z_min, particle_container::index{0, i, 0});
+			std::invoke(func, particles[{0, i, grid.z}], x_min | z_max, particle_container::index{0, i, grid.z});
+			std::invoke(func, particles[{grid.x, i, 0}], x_max | z_min, particle_container::index{grid.x, i, 0});
+			std::invoke(func, particles[{grid.x, i, grid.z}], x_max | z_max, particle_container::index{grid.x, i, grid.z});
+		}
+	}
+
+	//y-z edges
+	cond = isPeriodic(config, {y_min, z_min});
+	if(cond) {
+		for (unsigned i = 0; i < grid.y; ++i) {
+			std::invoke(func, particles[{i, 0, 0}], y_min | z_min, particle_container::index{i, 0, 0});
+			std::invoke(func, particles[{i, 0, grid.z}], y_min | z_max, particle_container::index{i, 0, grid.z});
+			std::invoke(func, particles[{i, grid.y, 0}], y_max | z_min, particle_container::index{i, grid.y, 0});
+			std::invoke(func, particles[{i, grid.y, grid.z}], y_max | z_max, particle_container::index{i, grid.y, grid.z});
+		}
+	}
+
+	//x-y-z corners
+	cond = isPeriodic(config, {x_min, y_min, z_min});
+	if (cond) {
+		std::invoke(func, particles[{0, 0, 0}], x_min | y_min | z_min, particle_container::index{0, 0, 0});
+		std::invoke(func, particles[{0, 0, grid.z}], x_min | y_min | z_max, particle_container::index{0, 0, grid.z});
+		std::invoke(func, particles[{0, grid.y, 0}], x_min | y_max | z_min, particle_container::index{0, grid.y, 0});
+		std::invoke(func, particles[{0, grid.y, grid.z}], x_min | y_max | z_max, particle_container::index{0, grid.y, grid.z});
+		std::invoke(func, particles[{grid.x, 0, 0}], x_max | y_min | z_min, particle_container::index{grid.x, 0, 0});
+		std::invoke(func, particles[{grid.x, 0, grid.z}], x_max | y_min | z_max, particle_container::index{grid.x, 0, grid.z});
+		std::invoke(func, particles[{grid.x, grid.y, 0}], x_max | y_max | z_min, particle_container::index{grid.x, grid.y, 0});
+		std::invoke(func, particles[{grid.x, grid.y, grid.z}], x_max | y_max | z_max, particle_container::index{grid.x, grid.y, grid.z});
+	}
+}
+
 /**
  * @brief Calculates forces on a collection of particles using the provided force calculator.
  *
@@ -65,12 +190,15 @@ constexpr void calculate_forces(
 			}
 		}
 	}
-	for (auto&& [cell_idx, boundary_type] : particles.border_cells()) {
+	/*for (auto&& [cell_idx, boundary_type] : particles.border_cells()) {
 		auto& cell = particles[cell_idx];
 		const auto& bounds = particles.domain();
 		handle_boundary_condition(cell, boundary_type, bounds, calculator, config);
-	}
+	}*/
+	loop(particles, config, calculator);
 }
+
+
 
 /**
  * @brief Updates the position of each particle.
