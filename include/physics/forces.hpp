@@ -71,12 +71,14 @@ CONSTEXPR_IF_GCC inline vec gravitational_force(const particle& p1, const partic
 
  **/
 CONSTEXPR_IF_GCC inline vec
-lennard_jones_force(const particle& p1, const particle& p2, double sigma, double eps) noexcept {
+lennard_jones_force(const particle& p1, const particle& p2) noexcept {
 	TRACE_FORCES("Calculating Lennard-Jones forces for:\n{}\n{}\n", p1, p2);
 	const auto& xi = p1.x;
 	const auto& xj = p2.x;
 	const double norm = (xi - xj).euclidian_norm();
 	assert(norm != 0 && "Two particles at the same position cannot interact.");
+	const double sigma = (p1.sigma + p2.sigma) / 2;
+	const double eps = std::sqrt(p1.epsilon * p2.epsilon);
 	const double scaling_factor =
 		24 * eps / std::pow(norm, 2) * (std::pow(sigma / norm, 6) - 2 * (std::pow(sigma / norm, 12)));
 	const auto result = scaling_factor * (xj - xi);

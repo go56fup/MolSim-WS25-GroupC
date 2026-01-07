@@ -46,33 +46,27 @@ constexpr auto& particle_from_type(Container&& container, decltype(particle::typ
 
 // Check that the Lennard-Jones force is calculated correctly
 TEST(ForceTests, LennardJones) {
-	GTEST_CXP particle first(vec{4, 4, 4}, vec{}, 1, 10);
-	GTEST_CXP particle second(vec{5, 6, 4}, vec{}, 1, 15);
+	GTEST_CXP particle first(vec{4, 4, 4}, vec{}, 1, 1.0, 5.0, 10);
+	GTEST_CXP particle second(vec{5, 6, 4}, vec{}, 1, 1.0, 5.0, 15);
 	GTEST_CXP auto config = sim_configuration{
 		.delta_t = 0.0014,
 		.cutoff_radius = 5,
-		.sigma = 1,
-		.epsilon = 5,
 		.boundary_behavior = boundary_conditions_descriptor::all(boundary_condition::reflecting),
 		.end_time = 0.0014,
 		.write_frequency = 1000,
 		.base_name{std::from_range, "unused"},
 		.domain{10, 10, 10},
-		.meshwidth = 1.125
+		.create_checkpoint = false
 	};
-	GTEST_CXP auto calc = [sigma = config.sigma,
-	                       eps = config.epsilon](const particle& p1, const particle& p2) noexcept {
-		return lennard_jones_force(p1, p2, sigma, eps);
-	};
-	GTEST_CXP auto first_force = std::invoke([&] -> vec {
+	auto first_force = std::invoke([&] -> vec {
 		particle_container particles(config.domain, config.cutoff_radius);
 		particles.place(first);
 		particles.place(second);
-		run_simulation(particles, config, calc, "unused");
+		run_simulation(particles, config, lennard_jones_force, "unused");
 		return particle_from_type(particles, 10).f;
 	});
 
-	GTEST_CXP auto direct_calc = lennard_jones_force(first, second, config.sigma, config.epsilon);
+	GTEST_CXP auto direct_calc = lennard_jones_force(first, second);
 	STATIC_EXPECT_VEC_DOUBLE_EQ(first_force, direct_calc);
 	static constexpr auto hand_calculated_result = vec(2952, 5904, 0);
 	GTEST_CXP auto scaled_force = 15625 * first_force;

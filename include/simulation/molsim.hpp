@@ -9,6 +9,7 @@
 #include <fmt/compile.h>
 #include <spdlog/spdlog.h>
 
+#include "config/parse.hpp"
 #include "grid/bounds/conditions.hpp"
 #include "grid/particle_container/fwd.hpp"
 #include "grid/particle_container/particle_container.hpp"
@@ -18,6 +19,7 @@
 #include "physics/particle.hpp"
 #include "simulation/config/parse.hpp"
 #include "utility/concepts.hpp"
+#include "utility/tracing/macros.hpp"
 
 /**
  * @brief Updates forces of two particles where one particle acts on the other.
@@ -33,11 +35,206 @@ apply_force_interaction(force_calculator auto calculator, particle& p1, particle
 	p2.f -= f_ij;
 }
 
+constexpr bool hasPeriodic(const sim_configuration& config) {
+	using enum boundary_type;
+	return config.boundary_behavior[x_min] == boundary_condition::periodic ||
+	       config.boundary_behavior[y_min] == boundary_condition::periodic ||
+	       config.boundary_behavior[z_min] == boundary_condition::periodic;
+}
+
+constexpr bool
+isPeriodic(const sim_configuration& config, const std::vector<boundary_type>& bt_array) {
+	bool result = true;
+	for (auto boundary : bt_array) {
+		result = result && config.boundary_behavior[boundary] == boundary_condition::periodic;
+	}
+
+	return result;
+}
+
+// Define the signature: void return, taking (cell, boundary, config)
+using BoundaryFunc = std::function<
+	void(particle_container::cell&, boundary_type, const particle_container::index& idx)>;
+
+// TODO(tuna): move away from std::function
+// Capture 'particles' and 'config' by reference (they live outside the function)
+// Capture 'calculator' by VALUE (since it's a template/auto param that might be local)
+BoundaryFunc funcDefiner(
+	particle_container& particles, const sim_configuration& config,
+	force_calculator auto calculator, boundary_type bType
+) {
+
+	auto behavior = config.boundary_behavior[bType];
+
+	if (behavior == boundary_condition::reflecting) {
+		return
+			[&particles, calculator,
+		     &config](particle_container::cell& cell, boundary_type b, const particle_container::index&) {
+				reflect_via_ghost_particle(cell, particles.domain(), b, calculator);
+			};
+	} else /* if (behavior == boundary_condition::outflow) */ {
+		return
+			[&particles](particle_container::cell& cell, boundary_type b, const particle_container::index&) {
+				delete_ouflowing_particles(cell, particles.domain(), b);
+			};
+	}
+}
+
+constexpr void loop(
+	particle_container& particles, const sim_configuration& config, force_calculator auto calculator
+) {
+	const auto& grid = particles.grid_size();
+	using enum boundary_type;
+	// TODO: Map to function
+
+	// x faces
+	BoundaryFunc func = funcDefiner(particles, config, calculator, x_min);
+	for (unsigned i = 0; i < grid.y; ++i) {
+		for (unsigned j = 0; j < grid.z; ++j) {
+			const particle_container::index min_coords{0, i, j};
+			const particle_container::index max_coords{grid.x - 1, i, j};
+			TRACE_BORDER_CELL_ITER("min: {}, max: {}", min_coords, max_coords);
+			std::invoke(func, particles[min_coords], x_min, max_coords);
+			std::invoke(func, particles[max_coords], x_max, max_coords);
+		}
+	}
+
+	// y faces
+	func = funcDefiner(particles, config, calculator, y_min);
+	for (unsigned i = 0; i < grid.x; ++i) {
+		for (unsigned j = 0; j < grid.z; ++j) {
+			const particle_container::index min_coords{i, 0, j};
+			const particle_container::index max_coords{i, grid.y - 1, j};
+			TRACE_BORDER_CELL_ITER("min: {}, max: {}", min_coords, max_coords);
+			std::invoke(func, particles[min_coords], y_min, min_coords);
+			std::invoke(func, particles[max_coords], y_max, max_coords);
+		}
+	}
+
+	// z faces
+	func = funcDefiner(particles, config, calculator, z_min);
+	for (unsigned i = 0; i < grid.x; ++i) {
+		for (unsigned j = 0; j < grid.y; ++j) {
+			const particle_container::index min_coords{i, j, 0};
+			const particle_container::index max_coords{i, j, grid.z - 1};
+			TRACE_BORDER_CELL_ITER("min: {}, max: {}", min_coords, max_coords);
+			std::invoke(func, particles[min_coords], z_min, max_coords);
+			std::invoke(func, particles[max_coords], z_max, max_coords);
+		}
+	}
+
+	if (!hasPeriodic(config)) {
+		return;
+	}
+
+	// x-y edges
+	bool cond = isPeriodic(config, {x_min, y_min});
+	if (cond) {
+		for (unsigned i = 0; i < grid.z; ++i) {
+			std::invoke(
+				func, particles[{0, 0, i}], x_min | y_min, particle_container::index{0, 0, i}
+			);
+			std::invoke(
+				func, particles[{0, grid.y, i}], x_min | y_max,
+				particle_container::index{0, grid.y, i}
+			);
+			std::invoke(
+				func, particles[{grid.x, 0, i}], x_max | y_min,
+				particle_container::index{grid.x, 0, i}
+			);
+			std::invoke(
+				func, particles[{grid.x, grid.y, i}], x_max | y_max,
+				particle_container::index{grid.x, grid.y, i}
+			);
+		}
+	}
+
+	// x-z edges
+	cond = isPeriodic(config, {x_min, z_min});
+	if (cond) {
+		for (unsigned i = 0; i < grid.y; ++i) {
+			std::invoke(
+				func, particles[{0, i, 0}], x_min | z_min, particle_container::index{0, i, 0}
+			);
+			std::invoke(
+				func, particles[{0, i, grid.z}], x_min | z_max,
+				particle_container::index{0, i, grid.z}
+			);
+			std::invoke(
+				func, particles[{grid.x, i, 0}], x_max | z_min,
+				particle_container::index{grid.x, i, 0}
+			);
+			std::invoke(
+				func, particles[{grid.x, i, grid.z}], x_max | z_max,
+				particle_container::index{grid.x, i, grid.z}
+			);
+		}
+	}
+
+	// y-z edges
+	cond = isPeriodic(config, {y_min, z_min});
+	if (cond) {
+		for (unsigned i = 0; i < grid.y; ++i) {
+			std::invoke(
+				func, particles[{i, 0, 0}], y_min | z_min, particle_container::index{i, 0, 0}
+			);
+			std::invoke(
+				func, particles[{i, 0, grid.z}], y_min | z_max,
+				particle_container::index{i, 0, grid.z}
+			);
+			std::invoke(
+				func, particles[{i, grid.y, 0}], y_max | z_min,
+				particle_container::index{i, grid.y, 0}
+			);
+			std::invoke(
+				func, particles[{i, grid.y, grid.z}], y_max | z_max,
+				particle_container::index{i, grid.y, grid.z}
+			);
+		}
+	}
+
+	// x-y-z corners
+	cond = isPeriodic(config, {x_min, y_min, z_min});
+	if (cond) {
+		std::invoke(
+			func, particles[{0, 0, 0}], x_min | y_min | z_min, particle_container::index{0, 0, 0}
+		);
+		std::invoke(
+			func, particles[{0, 0, grid.z}], x_min | y_min | z_max,
+			particle_container::index{0, 0, grid.z}
+		);
+		std::invoke(
+			func, particles[{0, grid.y, 0}], x_min | y_max | z_min,
+			particle_container::index{0, grid.y, 0}
+		);
+		std::invoke(
+			func, particles[{0, grid.y, grid.z}], x_min | y_max | z_max,
+			particle_container::index{0, grid.y, grid.z}
+		);
+		std::invoke(
+			func, particles[{grid.x, 0, 0}], x_max | y_min | z_min,
+			particle_container::index{grid.x, 0, 0}
+		);
+		std::invoke(
+			func, particles[{grid.x, 0, grid.z}], x_max | y_min | z_max,
+			particle_container::index{grid.x, 0, grid.z}
+		);
+		std::invoke(
+			func, particles[{grid.x, grid.y, 0}], x_max | y_max | z_min,
+			particle_container::index{grid.x, grid.y, 0}
+		);
+		std::invoke(
+			func, particles[{grid.x, grid.y, grid.z}], x_max | y_max | z_max,
+			particle_container::index{grid.x, grid.y, grid.z}
+		);
+	}
+}
+
 /**
  * @brief Calculates forces on a collection of particles using the provided force calculator.
  *
- * This function delegates the force calculation to the provided @p calculator callable, allowing
- * different calculation methods.
+ * This function delegates the force calculation to the provided @p calculator callable,
+ * allowing different calculation methods.
  *
  * @param calculator A callable object that computes forces for a span of particles.
  * Its type must satisfy force_calculator.
@@ -45,19 +242,19 @@ apply_force_interaction(force_calculator auto calculator, particle& p1, particle
  *
  */
 constexpr void calculate_forces(
-	force_calculator auto calculator, particle_container& particles, const sim_configuration& config
+	force_calculator auto calculator, particle_container& container, const sim_configuration& config
 ) noexcept {
-	for (auto& cell : particles.cells()) {
+	for (auto& cell : container.cells()) {
 		for (auto&& [p1, p2] : unique_pairs(cell)) {
 			apply_force_interaction(calculator, p1, p2);
 		}
 	}
 
-	for (const auto& [current_cell_idx, target_cell_idx] : particles.directional_interactions()) {
-		// TODO(tuna): see if after the implementation of the border iterator whether we still need
-		// the indices
-		auto& current_cell = particles[current_cell_idx];
-		auto& target_cell = particles[target_cell_idx];
+	for (const auto& [current_cell_idx, target_cell_idx] : container.directional_interactions()) {
+		// TODO(tuna): see if after the implementation of the border iterator whether we still
+		// need the indices
+		auto& current_cell = container[current_cell_idx];
+		auto& target_cell = container[target_cell_idx];
 
 		for (auto& p1 : current_cell) {
 			for (auto& p2 : target_cell) {
@@ -65,11 +262,16 @@ constexpr void calculate_forces(
 			}
 		}
 	}
-	for (auto&& [cell_idx, boundary_type] : particles.border_cells()) {
-		auto& cell = particles[cell_idx];
-		const auto& bounds = particles.domain();
+#define NEW_LOOP
+#ifdef NEW_LOOP
+	loop(container, config, calculator);
+#else
+	for (auto&& [cell_idx, boundary_type] : container.border_cells()) {
+		auto& cell = container[cell_idx];
+		const auto& bounds = container.domain();
 		handle_boundary_condition(cell, boundary_type, bounds, calculator, config);
 	}
+#endif
 }
 
 /**
@@ -77,7 +279,8 @@ constexpr void calculate_forces(
  *
  * Implements the first step of the velocity Störmer-Verlet algorithm:
  * \f[
- * \vec{x}(t + \Delta t) = \vec{x}(t) + \Delta t \cdot \vec{v}(t) + \frac{\Delta t^2}{2m} \vec{F}(t)
+ * \vec{x}(t + \Delta t) = \vec{x}(t) + \Delta t \cdot \vec{v}(t) + \frac{\Delta t^2}{2m}
+ * \vec{F}(t)
  * \f]
  *
  * @param particles Mutable span over particles to update.
@@ -194,8 +397,8 @@ constexpr void calculate_x(particle_container& particles, double delta_t) noexce
  *
  * Implements the second step of the velocity Störmer-Verlet algorithm:
  * \f[
- * \vec{v}(t + \Delta t) = \vec{v}(t) + \frac{\Delta t}{2m} \left[\vec{F}(t) + \vec{F}(t + \Delta
- * t)\right]
+ * \vec{v}(t + \Delta t) = \vec{v}(t) + \frac{\Delta t}{2m} \left[\vec{F}(t) + \vec{F}(t +
+ * \Delta t)\right]
  * \f]
  *
  * @param particles Mutable span over particles to update.
@@ -217,8 +420,8 @@ constexpr void calculate_v(range_of<particle> auto&& particles, double delta_t) 
  * This function delegates to the given @p io_provider callable, allowing different
  * data exporting strategies.
  *
- * @param io_provider Callable object responsible for exporting particle data. Its type must satisfy
- * particle_io_provider.
+ * @param io_provider Callable object responsible for exporting particle data. Its type must
+ * satisfy particle_io_provider.
  * @param particles Constant span of particles to export data from.
  * @param out_name  Base name for the output file.
  * @param iteration Current simulation iteration (used for output naming).
@@ -287,7 +490,7 @@ constexpr void run_simulation(
 	auto run_sim_pass = [&]<bool IsFirstIteration = false> {
 		TRACE_SIM("beginning iteration, current_time={}", current_time);
 		if (iteration % config.write_frequency == 0) {
-			WRITE_OUTPUT(plot_particles, container, output_prefix, iteration);
+			WRITE_VTK_OUTPUT(plot_particles, container, output_prefix, iteration);
 		}
 		run_sim_iteration<IsFirstIteration>(force_calc, container, config);
 		current_time += config.delta_t;
@@ -297,5 +500,10 @@ constexpr void run_simulation(
 	run_sim_pass.template operator()<true>();
 	while (current_time < config.end_time) {
 		run_sim_pass.template operator()();
+	}
+	if (config.create_checkpoint) {
+		// TODO(tuna): specify both in terms of plot_particles, where iteration is used in the
+		// filename Or just remove plot_particles
+		WRITE_CHECKPOINT(container, fmt::format("{}_checkpoint.json", output_prefix));
 	}
 }

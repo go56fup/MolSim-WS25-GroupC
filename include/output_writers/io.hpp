@@ -1,10 +1,22 @@
 #pragma once
 
+#include "simulation/config/parse.hpp"
+
+// TODO(tuna): move to cmakepresets
+#define ENABLE_CHECKPOINT
+
 #ifdef ENABLE_VTK_OUTPUT
 #include "output_writers/vtk.hpp"
-#define WRITE_OUTPUT(plot_f, ...) plot_f(output_writer::vtk::plot_particles, __VA_ARGS__)
+#define WRITE_VTK_OUTPUT(plot_f, ...) plot_f(output_writer::vtk::plot_particles, __VA_ARGS__)
 #else
-#define WRITE_OUTPUT(...) (void)0
+#define WRITE_VTK_OUTPUT(...) (void)0
+#endif
+
+#ifdef ENABLE_CHECKPOINT
+#define WRITE_CHECKPOINT(container, output_path)                                                   \
+	config::write_state_to_file(config::dump_state(container), output_path)
+#else
+#define WRITE_CHECKPOINT(...) (void)0
 #endif
 
 // TODO(tuna): fix docs

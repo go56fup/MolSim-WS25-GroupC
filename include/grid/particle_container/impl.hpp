@@ -24,12 +24,22 @@ constexpr particle_container::size_type particle_container::linear_index(
 	particle_container::size_type z
 ) const noexcept {
 	const auto result = (x * grid_size_.y * grid_size_.z) + (y * grid_size_.z) + z;
+#if LOG_GRID
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wterminate"
+	if (result >= grid_size_.x * grid_size_.y * grid_size_.z) {
+		throw std::out_of_range(
+			fmt::format("Out of bounds cell requested for grid {}: {}, {}, {}", grid_size_, x, y, z)
+		);
+	}
+#pragma GCC diagnostic pop
+#endif
 	assert(result < grid_size_.x * grid_size_.y * grid_size_.z && "Out of bounds cell requested");
 	return result;
 }
 
-constexpr particle_container::size_type
-particle_container::pos_to_linear_index(const vec& pos) const noexcept {
+constexpr particle_container::size_type particle_container::pos_to_linear_index(const vec& pos
+) const noexcept {
 	const auto x = static_cast<size_type>(pos.x / cutoff_radius_);
 	const auto y = static_cast<size_type>(pos.y / cutoff_radius_);
 	const auto z = static_cast<size_type>(pos.z / cutoff_radius_);
@@ -41,18 +51,16 @@ particle_container::div_round_up(double dividend, double divisor) noexcept {
 	return static_cast<particle_container::size_type>(std::ceil(dividend / divisor));
 }
 
-constexpr void
-particle_container::check_if_out_of_domain_max(const vec& pos) const noexcept(false) {
+constexpr void particle_container::check_if_out_of_domain_max(const vec& pos) const
+	noexcept(false) {
 	using enum boundary_type;
 	if (out_of_bounds<x_max>(pos, domain_) || out_of_bounds<y_max>(pos, domain_) ||
 	    out_of_bounds<z_max>(pos, domain_)) {
-		throw std::domain_error(
-			fmt::format(
-				"Refusing to place particle at {}, which is on or outside the domain of the "
-				"simulation: {}",
-				pos, domain_
-			)
-		);
+		throw std::domain_error(fmt::format(
+			"Refusing to place particle at {}, which is on or outside the domain of the "
+			"simulation: {}",
+			pos, domain_
+		));
 	}
 }
 
@@ -71,7 +79,7 @@ constexpr particle_container::particle_container(Vec&& domain_arg, double cutoff
 
 template <fwd_reference_to<particle> ParticleT>
 constexpr void particle_container::place(ParticleT&& particle) {
-	TRACE_PARTICLE_CONTAINER("Placing particle at coordinates: {}", particle.x);
+	TRACE_PARTICLE_CONTAINER("Placing particle: {}", particle);
 	check_if_out_of_domain_max(particle.x);
 	grid[pos_to_linear_index(particle.x)].emplace_back(std::forward<ParticleT>(particle));
 }
@@ -89,7 +97,7 @@ constexpr void particle_container::emplace(Vec&& position, Args&&... args) {
 template <std::size_t N>
 constexpr void particle_container::add_cuboid(
 	const vec& origin, const index& scale, double meshwidth, const vec& velocity, double mass,
-	double brownian_mean, std::size_t& seq_no
+	double sigma, double epsilon, double brownian_mean, std::size_t& seq_no
 ) {
 	for (size_type i = 0; i < scale.x; ++i) {
 		for (size_type j = 0; j < scale.y; ++j) {
@@ -97,8 +105,8 @@ constexpr void particle_container::add_cuboid(
 				emplace(
 					vec{origin.x + (i * meshwidth), origin.y + (j * meshwidth),
 				        origin.z + (k * meshwidth)},
-					maxwell_boltzmann_distributed_velocity<N>(brownian_mean, seq_no) + velocity, mass,
-					LOG_PARTICLE_TYPE ? seq_no : 0
+					maxwell_boltzmann_distributed_velocity<N>(brownian_mean, seq_no) + velocity,
+					mass, sigma, epsilon, LOG_PARTICLE_TYPE ? seq_no : 0
 				);
 			}
 		}
@@ -107,7 +115,7 @@ constexpr void particle_container::add_cuboid(
 
 constexpr void particle_container::add_disc(
 	const vec& center, double radius, double meshwidth, const vec& velocity, double mass,
-	double brownian_mean, std::size_t& seq_no
+	double sigma, double epsilon, double brownian_mean, std::size_t& seq_no
 ) {
 	for (int i = static_cast<int>(-radius); i <= radius; i++) {
 		for (int j = static_cast<int>(-radius); j <= radius; j++) {
@@ -120,7 +128,7 @@ constexpr void particle_container::add_disc(
 			emplace(
 				vec{center.x + (i * meshwidth), center.y + (j * meshwidth), center.z},
 				maxwell_boltzmann_distributed_velocity<2>(brownian_mean, seq_no) + velocity, mass,
-				LOG_PARTICLE_TYPE ? seq_no : 0
+				sigma, epsilon, LOG_PARTICLE_TYPE ? seq_no : 0
 			);
 		}
 	}
@@ -158,7 +166,8 @@ constexpr range_of<particle_container::cell> auto& particle_container::cells() n
 	return grid;
 }
 
-constexpr const range_of<const particle_container::cell> auto& particle_container::cells() const noexcept {
+constexpr const range_of<const particle_container::cell> auto&
+particle_container::cells() const noexcept {
 	return grid;
 }
 
@@ -186,13 +195,13 @@ constexpr const particle_container::cell& particle_container::operator[](
 	return grid[linear_index(x, y, z)];
 }
 
-constexpr particle_container::cell&
-particle_container::cell_containing(const vec& position) noexcept {
+constexpr particle_container::cell& particle_container::cell_containing(const vec& position
+) noexcept {
 	return grid[pos_to_linear_index(position)];
 }
 
-constexpr const particle_container::cell&
-particle_container::cell_containing(const vec& pos) const noexcept {
+constexpr const particle_container::cell& particle_container::cell_containing(const vec& pos
+) const noexcept {
 	return grid[pos_to_linear_index(pos)];
 }
 

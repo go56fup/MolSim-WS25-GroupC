@@ -50,9 +50,13 @@ public:
 	/// Mass of this particle
 	double m{};
 
+	double sigma{};
+	double epsilon{};
+
 	/**
 	 * @brief Type of the particle.
-	 * Used to separate molecules belonging to different bodies, matters; identify individual particles, etc.
+	 * Used to separate molecules belonging to different bodies, matters; identify individual
+	 * particles, etc.
 	 */
 	int type = 0;
 
@@ -83,23 +87,41 @@ public:
 	 * @param m_arg Mass of particle.
 	 * @param type_arg Type identifier of particle (defaults to 0).
 	 */
-	constexpr particle(
-		// for visualization, we need always 3 coordinates
-	    // -> in case of 2d, we use only the first and the second
 
-		// I would rather not change the given implementation here.
-	    // NOLINTNEXTLINE(*easily-swappable-parameters)
-		vec x_arg, vec v_arg, double m_arg, int type_arg = 0
+	// I would rather not change the given implementation here.
+	// NOLINTBEGIN(*easily-swappable-parameters)
+	constexpr particle(
+		vec x_arg, vec v_arg, double m_arg, double sigma_, double epsilon_, int type_arg = 0
 	) noexcept
 		: x(MOVE_IF_DEBUG(x_arg))
 		, v(MOVE_IF_DEBUG(v_arg))
 		, m(m_arg)
+		, sigma(sigma_)
+		, epsilon(epsilon_)
 		, type(type_arg)
 
 	{
 		flag::annotate_construction("parameterized");
 	}
 
+	constexpr particle(
+		vec x_arg, vec v_arg, vec f_arg, vec old_f_arg, double m_arg, double sigma_,
+		double epsilon_, int type_arg
+	) noexcept
+		: x(MOVE_IF_DEBUG(x_arg))
+		, v(MOVE_IF_DEBUG(v_arg))
+		, f(MOVE_IF_DEBUG(f_arg))
+		, old_f(MOVE_IF_DEBUG(old_f_arg))
+		, m(m_arg)
+		, sigma(sigma_)
+		, epsilon(epsilon_)
+		, type(type_arg)
+
+	{
+		flag::annotate_construction("parameterized");
+	}
+
+	// TODO(tuna): see if this is even used
 	/**
 	 * @brief Piecewise construct a particle.
 	 *
@@ -124,6 +146,8 @@ public:
 		, type(type_arg) {
 		flag::annotate_construction("piecewise");
 	}
+
+	// NOLINTBEGIN(*easily-swappable-parameters)
 
 	/**
 	 * @brief Compares two particles for equality.
@@ -150,7 +174,8 @@ struct fmt::formatter<particle> {
 	/** @brief Formats `particle` objects. */
 	auto format(const particle& p, fmt::format_context& ctx) const {
 		return fmt::format_to(
-			ctx.out(), "Particle X: {} v: {} f: {} old_f: {} type: {}", p.x, p.v, p.f, p.old_f, p.type
+			ctx.out(), "Particle X: {} v: {} f: {} old_f: {} epsilon: {} sigma: {} type: {}", p.x,
+			p.v, p.f, p.old_f, p.epsilon, p.sigma, p.type
 		);
 	}
 };

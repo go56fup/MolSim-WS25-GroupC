@@ -15,13 +15,16 @@
 namespace reflect {
 constexpr void macro(
 	particle_container::cell& current_cell, const vec& domain, boundary_type border_type,
-	force_calculator auto calculator, double ghost_particle_threshold
+	force_calculator auto calculator
 ) noexcept {
 #define REFLECT_IF(check, x_mod, y_mod, z_mod)                                                     \
 	do {                                                                                           \
 		for (auto& p : current_cell) {                                                             \
+			const double ghost_particle_threshold = p.sigma * sixth_root_of_2;                     \
 			if (p.x.check) {                                                                       \
-				const particle ghost{{p.x.x_mod, p.x.y_mod, p.x.z_mod}, {}, p.m};                  \
+				const particle ghost{                                                              \
+					{p.x.x_mod, p.x.y_mod, p.x.z_mod}, {}, p.m, p.sigma, p.epsilon                 \
+				};                                                                                 \
 				TRACE_GRID("Reflecting {} with ghost: {}", p, ghost);                              \
 				p.f += std::invoke(calculator, p, ghost);                                          \
 			}                                                                                      \
@@ -59,14 +62,17 @@ constexpr void macro(
 
 constexpr void lambda(
 	std::vector<particle>& current_cell, const vec& domain, boundary_type border_type,
-	force_calculator auto calculator, double ghost_particle_threshold
+	force_calculator auto calculator
 ) noexcept {
 	using enum boundary_type;
-	const vec min{ghost_particle_threshold, ghost_particle_threshold, ghost_particle_threshold};
-	const auto max = domain - min;
 
 	auto reflect = [&]<boundary_type b>(const auto& make_ghost_pos) {
 		for (auto& p : current_cell) {
+			const double ghost_particle_threshold = p.sigma * sixth_root_of_2;
+			const vec min{
+				ghost_particle_threshold, ghost_particle_threshold, ghost_particle_threshold
+			};
+			const auto max = domain - min;
 			const bool check = out_of_bounds<b>(p.x, max, min);
 			if (check) {
 				const particle ghost{make_ghost_pos(p.x), {}, p.m};
@@ -89,21 +95,18 @@ constexpr void lambda(
 		return;
 
 	case x_max:
-		reflect.template operator()<x_max>([&](const vec& x) {
-			return vec{-x.x + 2 * domain.x, x.y, x.z};
-		});
+		reflect.template operator(
+		)<x_max>([&](const vec& x) { return vec{-x.x + 2 * domain.x, x.y, x.z}; });
 		return;
 
 	case y_max:
-		reflect.template operator()<y_max>([&](const vec& x) {
-			return vec{x.x, -x.y + 2 * domain.y, x.z};
-		});
+		reflect.template operator(
+		)<y_max>([&](const vec& x) { return vec{x.x, -x.y + 2 * domain.y, x.z}; });
 		return;
 
 	case z_max:
-		reflect.template operator()<z_max>([&](const vec& x) {
-			return vec{x.x, x.y, -x.z + 2 * domain.z};
-		});
+		reflect.template operator(
+		)<z_max>([&](const vec& x) { return vec{x.x, x.y, -x.z + 2 * domain.z}; });
 		return;
 	}
 }
@@ -155,11 +158,14 @@ constexpr void handle_boundary_condition(
 	auto exercise_boundary_condition = [&](boundary_type border) {
 		switch (config.boundary_behavior[border]) {
 		case boundary_condition::reflecting:
-			reflect_via_ghost_particle(cell, domain, border, force_calc, config.meshwidth);
+			reflect_via_ghost_particle(cell, domain, border, force_calc);
 			break;
 		case boundary_condition::outflow:
 			delete_ouflowing_particles(cell, domain, border);
 			break;
+		case boundary_condition::periodic:
+			// TODO(gabriel): implement this
+			throw std::logic_error("Not implemented");
 		}
 	};
 

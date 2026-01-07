@@ -61,6 +61,9 @@ int usual_main(int argc, char* argv[]) {
 		"input file to read simulation parameters and initial condition of bodies from"
 	);
 
+	program.add_argument("-c", "--checkpoint")
+		.help("list of particle states to add to simulation, usually generated via a checkpoint");
+
 	try {
 		program.parse_args(argc, argv);
 	} catch (const std::exception& err) {
@@ -83,14 +86,22 @@ int usual_main(int argc, char* argv[]) {
 	buffer << t.rdbuf();
 	unprocessed_config parse_result = config::parse(buffer.view());
 	particle_container container(parse_result.config.domain, parse_result.config.cutoff_radius);
-	config::populate_simulation(container, parse_result);
+	config::populate_simulation(container, parse_result.config, parse_result.bodies);
+	if (auto checkpoint = program.present("--checkpoint")) {
+		const std::ifstream t(*checkpoint);
+		std::stringstream buffer;
+		buffer << t.rdbuf();
+		config::populate_simulation(
+			container, parse_result.config,
+			daw::json::from_json<daw::json::json_value>(buffer.view())
+		);
+	}
 
 	// TODO(tuna): when we add gravitation as an alternative force, change this to not be hardcoded
-	auto calc = [sigma = parse_result.config.sigma, eps = parse_result.config.epsilon](
-					const particle& p1, const particle& p2
-				) noexcept { return lennard_jones_force(p1, p2, sigma, eps); };
+	// TODO(tuna): when we move to the lut approach for the epsilons, see if just comparing the type
+	// is faster than branchless compute
 
-	run_simulation(container, parse_result.config, calc, output_name);
+	run_simulation(container, parse_result.config, lennard_jones_force, output_name);
 
 	spdlog::info("output written. Terminating...");
 	return 0;

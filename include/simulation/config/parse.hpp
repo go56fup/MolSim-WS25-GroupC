@@ -1,12 +1,6 @@
-/*
- * FileReader.h
- *
- *  Created on: 23.02.2010
- *      Author: eckhardw
- */
-
 #pragma once
 
+#include <fstream>
 #include <stdexcept>
 #include <string_view>
 #include <type_traits>
@@ -15,11 +9,14 @@
 #include <daw/json/daw_json_link.h>
 #include <spdlog/spdlog.h>
 
-#include "grid/particle_container/fwd.hpp"
+#include "entities.hpp"
+#include "grid/enums.hpp"
+#include "grid/particle_container/particle_container.hpp"
 #include "physics/vec_3d.hpp"
 #include "simulation/config/entities.hpp"
 #include "simulation/config/json_schema.hpp"
 #include "utility/concepts.hpp"
+#include "utility/constants.hpp"
 
 namespace detail {
 constexpr void check_for_2d_domain(const vec& domain, double cutoff) noexcept(false) {
@@ -35,55 +32,91 @@ constexpr void check_for_2d_domain(const vec& domain, double cutoff) noexcept(fa
 }  // namespace detail
 
 namespace config {
-constexpr unprocessed_config parse(std::string_view json_data) {
+constexpr unprocessed_config parse(std::string_view json_data) noexcept(false) {
 	TRACE_INPUT_PARSING("Running from input content: {}", json_data);
-	return daw::json::from_json<unprocessed_config>(
-		json_data,
-		daw::json::options::parse_flags<daw::json::options::UseExactMappingsByDefault::yes>
-	);
+	auto cfg = daw::json::from_json<
+		unprocessed_config>(json_data, daw::json::options::parse_flags<daw::json::options::UseExactMappingsByDefault::yes>);
+	auto is_periodic = [&](boundary_type border) {
+		return cfg.config.boundary_behavior[border] == boundary_condition::periodic;
+	};
+	for (auto [min, max] : border_pairs) {
+		// TODO(tuna): add test that checks for this being covered
+		if (is_periodic(min) != is_periodic(max)) {
+			throw std::invalid_argument(fmt::format(
+				"Mismatched periodic boundary condition between borders {} and {}.", min, max
+			));
+		}
+	}
+	return cfg;
 }
 
+// TODO(tuna): split the configuration into global and body files, so the checkpointing basically
+// becomes a body file generator
 constexpr void populate_simulation(
-	particle_container& particles, const unprocessed_config& desc
+	particle_container& particles, const sim_configuration& config,
+	const daw::json::json_value& bodies
 ) noexcept(false) {
 	std::once_flag two_d_domain_check;
 	std::size_t seq_no = 0;
-	for (const auto& [_, body] : desc.bodies) {
+	for (const auto& [_, body] : bodies) {
 		const std::string type = body["type"].as<std::string>();
 		if (type == "cuboid") {
 			const auto params = body["parameters"].as<cuboid_parameters<3>>();
 			particles.add_cuboid<3>(
-				params.origin, params.scale, desc.config.meshwidth, params.velocity,
-				params.particle_mass, params.brownian_mean, seq_no
+				params.origin, params.scale, params.meshwidth, params.velocity,
+				params.particle_mass, params.sigma, params.epsilon, params.brownian_mean, seq_no
 			);
-		} else if (type == "square") {
+		} else if (type == "rectangle") {
 			std::call_once(
-				two_d_domain_check, detail::check_for_2d_domain, desc.config.domain,
-				desc.config.cutoff_radius
+				two_d_domain_check, detail::check_for_2d_domain, config.domain, config.cutoff_radius
 			);
 			const auto params = body["parameters"].as<cuboid_parameters<2>>();
 			particles.add_cuboid<2>(
-				{params.origin.x, params.origin.y, desc.config.domain.z / 2},
-				{params.scale.x, params.scale.y, 1}, desc.config.meshwidth, params.velocity,
-				params.particle_mass, params.brownian_mean, seq_no
+				{params.origin.x, params.origin.y, config.domain.z / 2},
+				{params.scale.x, params.scale.y, 1}, params.meshwidth, params.velocity,
+				params.particle_mass, params.sigma, params.epsilon, params.brownian_mean, seq_no
 			);
 		} else if (type == "particle") {
-			const auto params = body["parameters"].as<particle>();
-			particles.place(MOVE_IF_DEBUG(params));
+			const auto params = body["parameters"].as<particle_parameters>();
+			particles.emplace(
+				params.position, params.velocity, params.mass, params.sigma, params.epsilon
+			);
 		} else if (type == "disc") {
 			std::call_once(
-				two_d_domain_check, detail::check_for_2d_domain, desc.config.domain,
-				desc.config.cutoff_radius
+				two_d_domain_check, detail::check_for_2d_domain, config.domain, config.cutoff_radius
 			);
 			const auto params = body["parameters"].as<disc_parameters>();
 			particles.add_disc(
-				{params.center.x, params.center.y, desc.config.domain.z / 2}, params.radius,
-				desc.config.meshwidth, params.velocity, params.particle_mass, params.brownian_mean,
-				seq_no
+				{params.center.x, params.center.y, config.domain.z / 2}, params.radius,
+				params.meshwidth, params.velocity, params.particle_mass, params.sigma,
+				params.epsilon, params.brownian_mean, seq_no
 			);
+		} else if (type == "particle_state") {
+			particles.place(body["parameters"].as<particle>());
 		} else {
 			throw std::invalid_argument(fmt::format("Unknown body type: {}", type));
 		}
 	}
 }
+
+// TODO(tuna): move to output part of the codebase
+constexpr std::string dump_state(particle_container& container) {
+	std::string out = "[\n";
+	for (const particle& p : container.particles()) {
+		const auto view = serialization_view<particle>{.type = "particle_state", .parameters = p};
+		const auto json = daw::json::
+			to_json(view, daw::json::options::output_flags<daw::json::options::SerializationFormat::Pretty>);
+		fmt::format_to(std::back_inserter(out), "{},\n", json);
+	}
+	out.pop_back();
+	out.pop_back();
+	out += ']';
+	return out;
+};
+
+inline void write_state_to_file(std::string_view state, std::string_view output_path) {
+	std::ofstream out(output_path.data());
+	out << state;
+}
+
 }  // namespace config

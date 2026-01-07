@@ -61,8 +61,9 @@ private:
 
 	/**
 	 * @brief Check if the given position runs afoul of domain maximum boundaries.
+	 *
+	 * @throws std::domain_error If the given position is outside the domain.
 	 * @param pos Position to check against.
-	 * @return `true` @a iff the position is on or outside the domain in the positive direction.
 	 */
 	constexpr void check_if_out_of_domain_max(const vec& pos) const noexcept(false);
 
@@ -133,7 +134,7 @@ public:
 	template <std::size_t N>
 	constexpr void add_cuboid(
 		const vec& origin, const index& scale, double meshwidth, const vec& velocity, double mass,
-		double brownian_mean, std::size_t& seq_no
+		double sigma, double epsilon, double brownian_mean, std::size_t& seq_no
 	);
 
 	/**
@@ -150,7 +151,7 @@ public:
 	 */
 	constexpr void add_disc(
 		const vec& center, double radius, double meshwidth, const vec& velocity, double mass,
-		double brownian_mean, std::size_t& seq_no
+		double sigma, double epsilon, double brownian_mean, std::size_t& seq_no
 	);
 
 	// TODO(tuna): see if the return type specified conflicts when the container is const
@@ -194,7 +195,7 @@ public:
 	 * @return Range to const over all cells in container.
 	 */
 	constexpr const range_of<const particle_container::cell> auto& cells() const noexcept;
-	
+
 	/**
 	 * @brief Get a range over all cells in the container.
 	 * @return Range to non-const over all cells in container.
@@ -264,6 +265,7 @@ public:
 	 * @return Cutoff radius, i.e. cell dimensions.
 	 */
 	constexpr double cutoff_radius() const noexcept;
+
 	constexpr auto begin() const noexcept {
 		return grid.begin();
 	}
