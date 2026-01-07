@@ -19,14 +19,14 @@
           inherit system;
         };
 
-        llvm = pkgs.llvmPackages_20;
+        llvm = pkgs.llvmPackages_19;
       in
       {
         devShells.default = pkgs.mkShell.override { stdenv = llvm.libcxxStdenv; } {
           packages = with pkgs; [
             (llvm.clang-tools.override { enableLibcxx = true; })
             llvm.libcxxClang
-            gcc15
+            gcc14
             cmake
             doxygen
             paraview
@@ -37,6 +37,7 @@
             ghostscript_headless
             lcov
             hyperfine
+            jq
           ];
           shellHook = ''
             export NIX_CFLAGS_COMPILE="$NIX_CFLAGS_COMPILE -B${llvm.libcxxClang.libcxx}/lib";

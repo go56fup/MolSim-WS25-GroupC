@@ -7,7 +7,7 @@ AccessModifierOffset: -4
 AlignAfterOpenBracket: BlockIndent
 BreakConstructorInitializers: BeforeComma
 PackConstructorInitializers: Never
-ColumnLimit: 120
+ColumnLimit: 100
 Cpp11BracedListStyle: true
 PointerAlignment: Left
 SpacesBeforeTrailingComments: 2
