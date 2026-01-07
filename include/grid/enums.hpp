@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <utility>
 
 #include <fmt/format.h>
 
@@ -105,6 +106,21 @@ constexpr axis boundary_type_to_axis(boundary_type border) noexcept {
 
 enum class extremum : std::uint8_t { min, max };
 
+constexpr extremum boundary_type_to_extremum(boundary_type b) noexcept {
+	using enum extremum;
+	using enum boundary_type;
+	switch (b) {
+	case x_min:
+	case y_min:
+	case z_min:
+		return min;
+	case x_max:
+	case y_max:
+	case z_max:
+		return max;
+	}
+}
+
 constexpr boundary_type axis_to_boundary_type(axis a, extremum e) noexcept {
 	using enum extremum;
 	using enum boundary_type;
@@ -161,4 +177,4 @@ public:
 
 // NOLINTEND(*convert-member-functions-to-static)
 
-enum class boundary_condition : std::uint8_t { outflow, reflecting };
+enum class boundary_condition : std::uint8_t { outflow, reflecting, periodic };

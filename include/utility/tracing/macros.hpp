@@ -51,3 +51,15 @@
 #else
 #define TRACE_INPUT_PARSING(...) (void)0
 #endif
+
+#if LOG_PERIODIC
+#define TRACE_PERIODIC(...) SPDLOG_TRACE(__VA_ARGS__)
+#else
+#define TRACE_PERIODIC(...) (void)0
+#endif
+
+#if LOG_THERMOSTAT
+#define TRACE_THERMOSTAT(...) SPDLOG_TRACE(__VA_ARGS__)
+#else
+#define TRACE_THERMOSTAT(...) (void)0
+#endif

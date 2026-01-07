@@ -2,13 +2,16 @@
 #include <cstdint>
 
 #include "grid/enums.hpp"
+#include "grid/particle_container/fwd.hpp"
 #include "physics/forces.hpp"
 #include "physics/particle.hpp"
 
 template <boundary_type border, typename IndexT>
-constexpr bool out_of_bounds(const vec_3d<IndexT>& pos, const vec_3d<IndexT>& bounds, const vec_3d<IndexT>& min = {0, 0, 0}) noexcept {
+constexpr bool out_of_bounds(
+	const vec_3d<IndexT>& pos, const vec_3d<IndexT>& bounds, const vec_3d<IndexT>& min = {0, 0, 0}
+) noexcept {
 	using enum boundary_type;
-	static constexpr bool is_min = border == x_min || border == y_min || border == z_min;
+	static constexpr bool is_min = boundary_type_to_extremum(border) == extremum::min;
 	static constexpr axis ax = boundary_type_to_axis(border);
 	const auto oob = is_min ? pos[ax] <= min[ax] : pos[ax] >= bounds[ax];
 	return oob;
@@ -27,8 +30,8 @@ constexpr Unsigned
 apply_difference(std::make_signed_t<Unsigned> signed_, Unsigned unsigned_) noexcept {
 	return apply_difference(unsigned_, signed_);
 }
-// NOLINTEND(bugprone-easily-swappable-parameters)
 
+// NOLINTEND(bugprone-easily-swappable-parameters)
 
 template <std::unsigned_integral Unsigned>
 constexpr vec_3d<Unsigned>

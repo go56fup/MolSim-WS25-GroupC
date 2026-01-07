@@ -1,5 +1,8 @@
 #pragma once
 
+#include <limits>
+#include <optional>
+
 #include <daw/json/daw_json_link.h>
 
 #include "grid/enums.hpp"
@@ -53,8 +56,10 @@ private:
 		using enum boundary_condition;
 		if (condition_desc == "outflow") return outflow;
 		if (condition_desc == "reflecting") return reflecting;
+		if (condition_desc == "periodic") return periodic;
 		throw std::invalid_argument(fmt::format("Unknown boundary condition: {}", condition_desc));
 	}
+
 public:
 	static constexpr boundary_conditions_descriptor operator()(
 		std::string_view x_min, std::string_view y_min, std::string_view z_min,
@@ -71,42 +76,65 @@ public:
 	};
 };
 
+using sim_iteration_t = unsigned;
+
+struct thermostat_parameters {
+	double initial_temperature;
+	sim_iteration_t application_frequency;
+	double target_temperature;
+	double max_temperature_difference = std::numeric_limits<double>::infinity();
+	bool enforce_initial_temperature;
+};
+
+struct thermostat_parameters_constructor {
+	static constexpr thermostat_parameters operator()(
+		double initial_temperature, sim_iteration_t application_frequency,
+		std::optional<double> target_temperature, std::optional<double> max_temperature_difference, bool enforce_initial_temperature
+	) {
+		return thermostat_parameters{
+			initial_temperature, application_frequency, target_temperature.value_or(initial_temperature),
+			max_temperature_difference.value_or(std::numeric_limits<double>::infinity()), enforce_initial_temperature
+		};
+	}
+};
+
 struct sim_configuration {
 	double delta_t;
 	double cutoff_radius;
-	double sigma;
-	double epsilon;
 	boundary_conditions_descriptor boundary_behavior;
+	std::optional<thermostat_parameters> thermostat = std::nullopt;
 	double end_time;
-	unsigned write_frequency;
+	sim_iteration_t write_frequency;
 	p3094::fixed_string<32> base_name;
 	vec domain;
-	double meshwidth;
+	bool create_checkpoint;
+	std::uint8_t dimensions;
+	double gravitational_constant;
 };
 
-class sim_configuration_constructor {
-private:
-	static constexpr double sixth_root_of_2 = 1.12246204830937298143353304967917951623241111061398;
-
-public:
+struct sim_configuration_constructor {
 	template <
 		typename String, fwd_reference_to<vec> Vec,
-		fwd_reference_to<boundary_conditions_descriptor> Descriptor>
+		fwd_reference_to<boundary_conditions_descriptor> Descriptor,
+		fwd_reference_to<std::optional<thermostat_parameters>> Thermostat>
 	static constexpr sim_configuration operator()(
-		double delta_t, double cutoff_radius, double sigma, double epsilon, Descriptor&& conditions,
-		double end_time, unsigned write_frequency, String&& base_name, Vec&& domain
+		double delta_t, double cutoff_radius, Descriptor&& conditions, Thermostat&& thermostat,
+		double end_time, sim_iteration_t write_frequency, String&& base_name, Vec&& domain,
+		bool create_checkpoint, std::optional<double> gravity
 	) {
+		const decltype(sim_configuration::dimensions) dims = domain.z > cutoff_radius ? 3 : 2;
 		return sim_configuration{
 			delta_t,
 			cutoff_radius,
-			sigma,
-			epsilon,
 			std::forward<Descriptor>(conditions),
+			std::forward<Thermostat>(thermostat),
 			end_time,
 			write_frequency,
 			{std::from_range, std::forward<String>(base_name)},
 			std::forward<Vec>(domain),
-			sixth_root_of_2 * sigma
+			create_checkpoint,
+			dims,
+			gravity.value_or(0)
 		};
 	}
 };
@@ -126,24 +154,45 @@ template <std::size_t N, typename T>
 	requires(N == 2 || N == 3)
 using vec_n = std::conditional_t<N == 2, vec_2d<T>, vec_3d<T>>;
 
+// TODO(tuna): factor out meshwidth-brownian etc. into subclass that is shared
 template <std::size_t Dimensions>
 struct cuboid_parameters {
 	vec_n<Dimensions, double> origin;
 	vec_n<Dimensions, particle_container::size_type> scale;
 	vec_n<Dimensions, double> velocity;
+	double meshwidth;
 	double brownian_mean;
 	double particle_mass;
+	double sigma;
+	double epsilon;
 };
 
 struct disc_parameters {
 	vec_2d<double> center;
 	double radius;
 	vec_2d<double> velocity;
+	double meshwidth;
 	double brownian_mean;
 	double particle_mass;
+	double sigma;
+	double epsilon;
 };
 
 struct unprocessed_config {
 	sim_configuration config;
 	daw::json::json_value bodies;
+};
+
+struct particle_parameters {
+	vec position;
+	vec velocity;
+	double mass;
+	double sigma;
+	double epsilon;
+};
+
+template <typename Body>
+struct serialization_view {
+	std::string_view type;
+	const Body& parameters;
 };

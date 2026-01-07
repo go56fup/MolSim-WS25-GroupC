@@ -33,6 +33,9 @@ public:
 	using difference_type = std::int32_t;
 	/// The type used to index into this container.
 	using index = vec_3d<size_type>;
+	/// The type used to represent differences between indices.
+	// TODO(tuna): move the codebase over to this type
+	using index_diff = vec_3d<difference_type>;
 
 private:
 	/**
@@ -61,8 +64,9 @@ private:
 
 	/**
 	 * @brief Check if the given position runs afoul of domain maximum boundaries.
+	 *
+	 * @throws std::domain_error If the given position is outside the domain.
 	 * @param pos Position to check against.
-	 * @return `true` @a iff the position is on or outside the domain in the positive direction.
 	 */
 	constexpr void check_if_out_of_domain_max(const vec& pos) const noexcept(false);
 
@@ -75,6 +79,8 @@ private:
 	/// Dimension of each cell (a cube). Forms the correspondence between the position and index
 	/// world.
 	double cutoff_radius_;
+	/// Number of particles in the simulation.
+	std::size_t size_ = 0;
 
 public:
 	// TODO(tuna): make all constructors specify the object they are constructing in their @brief
@@ -133,7 +139,7 @@ public:
 	template <std::size_t N>
 	constexpr void add_cuboid(
 		const vec& origin, const index& scale, double meshwidth, const vec& velocity, double mass,
-		double brownian_mean, std::size_t& seq_no
+		double sigma, double epsilon, double brownian_mean, std::size_t& seq_no
 	);
 
 	/**
@@ -150,7 +156,7 @@ public:
 	 */
 	constexpr void add_disc(
 		const vec& center, double radius, double meshwidth, const vec& velocity, double mass,
-		double brownian_mean, std::size_t& seq_no
+		double sigma, double epsilon, double brownian_mean, std::size_t& seq_no
 	);
 
 	// TODO(tuna): see if the return type specified conflicts when the container is const
@@ -194,7 +200,7 @@ public:
 	 * @return Range to const over all cells in container.
 	 */
 	constexpr const range_of<const particle_container::cell> auto& cells() const noexcept;
-	
+
 	/**
 	 * @brief Get a range over all cells in the container.
 	 * @return Range to non-const over all cells in container.
@@ -264,19 +270,10 @@ public:
 	 * @return Cutoff radius, i.e. cell dimensions.
 	 */
 	constexpr double cutoff_radius() const noexcept;
-	constexpr auto begin() const noexcept {
-		return grid.begin();
-	}
 
-	constexpr auto end() const noexcept {
-		return grid.end();
-	}
-
-	constexpr auto begin() noexcept {
-		return grid.begin();
-	}
-
-	constexpr auto end() noexcept {
-		return grid.end();
-	}
+	/**
+	 * @brief Get the number of particles in the simulation.
+	 * @return Particle count in container.
+	 */
+	constexpr std::size_t size() const noexcept;
 };

@@ -1,0 +1,61 @@
+{
+  "configuration": {
+    "delta_t": 0.0001,
+    "cutoff_radius": 2.0,
+    "boundary_conditions": {
+      "x_min": "outflow",
+      "y_min": "outflow",
+      "z_min": "outflow",
+      "x_max": "outflow",
+      "y_max": "outflow",
+      "z_max": "outflow"
+    },
+    "end_time": 2,
+    "write_frequency": 10,
+    "base_name": "MD_vtk",
+    "domain": [
+      21,
+      21,
+      21
+    ],
+	  "create_checkpoint": true
+  },
+  "bodies": [
+    {
+      "type": "particle",
+      "parameters": {
+        "position": [
+          2,
+          1,
+          1
+        ],
+        "velocity": [
+          1,
+          0,
+          0
+        ],
+        "mass": 1,
+        "sigma": 1,
+        "epsilon": 5
+      }
+    },
+    {
+      "type": "particle",
+      "parameters": {
+        "position": [
+          5,
+          1,
+          1
+        ],
+        "velocity": [
+          -1,
+          0,
+          0
+        ],
+        "mass": 1,
+        "sigma": 1,
+        "epsilon": 5
+      }
+    }
+  ]
+}

@@ -38,10 +38,12 @@
             lcov
             hyperfine
             jq
+            perf
           ];
           shellHook = ''
             export NIX_CFLAGS_COMPILE="$NIX_CFLAGS_COMPILE -B${llvm.libcxxClang.libcxx}/lib";
             export CLICOLOR=0;
+            export NIX_ENFORCE_NO_NATIVE=0;
           '';
         };
 

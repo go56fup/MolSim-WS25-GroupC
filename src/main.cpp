@@ -24,12 +24,12 @@ inline constexpr use_formatting_t use_formatting{};
 // TODO(tuna): grep for exit and replace with terminating_log -- look up docs for die
 template <typename... Args>
 [[noreturn]] void terminating_log(fmt::format_string<Args...> fmt_string, Args&&... args) {
-	spdlog::critical(fmt_string, std::forward<Args>(args)...);
+	SPDLOG_CRITICAL(fmt_string, std::forward<Args>(args)...);
 	std::exit(1);  // NOLINT(*mt-unsafe)
 }
 
 [[noreturn]] void terminating_log(std::string_view msg) {
-	spdlog::critical(msg);
+	SPDLOG_CRITICAL(msg);
 	std::exit(1);  // NOLINT(*mt-unsafe)
 }
 
@@ -61,6 +61,9 @@ int usual_main(int argc, char* argv[]) {
 		"input file to read simulation parameters and initial condition of bodies from"
 	);
 
+	program.add_argument("-c", "--checkpoint")
+		.help("list of particle states to add to simulation, usually generated via a checkpoint");
+
 	try {
 		program.parse_args(argc, argv);
 	} catch (const std::exception& err) {
@@ -71,7 +74,7 @@ int usual_main(int argc, char* argv[]) {
 	}
 	spdlog::set_level(spdlog::level::from_str(program.get("--log-level")));
 
-	spdlog::info("Hello from MolSim for PSE!");
+	SPDLOG_INFO("Hello from MolSim for PSE!");
 	const std::string output_name = program.get("--output");
 	if (!std::filesystem::exists(output_name)) {
 		std::filesystem::create_directories(output_name);
@@ -83,28 +86,36 @@ int usual_main(int argc, char* argv[]) {
 	buffer << t.rdbuf();
 	unprocessed_config parse_result = config::parse(buffer.view());
 	particle_container container(parse_result.config.domain, parse_result.config.cutoff_radius);
-	config::populate_simulation(container, parse_result);
+	config::populate_simulation(container, parse_result.config, parse_result.bodies);
+	if (auto checkpoint = program.present("--checkpoint")) {
+		const std::ifstream t(*checkpoint);
+		std::stringstream buffer;
+		buffer << t.rdbuf();
+		config::populate_simulation(
+			container, parse_result.config,
+			daw::json::from_json<daw::json::json_value>(buffer.view())
+		);
+	}
 
 	// TODO(tuna): when we add gravitation as an alternative force, change this to not be hardcoded
-	auto calc = [sigma = parse_result.config.sigma, eps = parse_result.config.epsilon](
-					const particle& p1, const particle& p2
-				) noexcept { return lennard_jones_force(p1, p2, sigma, eps); };
+	// TODO(tuna): when we move to the lut approach for the epsilons, see if just comparing the type
+	// is faster than branchless compute
 
-	run_simulation(container, parse_result.config, calc, output_name);
+	run_simulation(container, parse_result.config, lennard_jones_force, output_name);
 
-	spdlog::info("output written. Terminating...");
+	SPDLOG_INFO("output written. Terminating...");
 	return 0;
 }
 
 #ifdef BENCHMARK_PRESET
-#include "Presets.h"
+#include "utility/presets.hpp"
 #endif
 
 // NOLINTNEXTLINE(bugprone-exception-escape)
 int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
 	// TODO(tuna): make this work
 #ifdef BENCHMARK_PRESET
-	presets::BENCHMARK_PRESET<{.create_output = false}>("unused");
+	presets::BENCHMARK_PRESET();
 #else
 	return usual_main(argc, argv);
 #endif

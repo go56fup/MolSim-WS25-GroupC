@@ -1,3 +1,4 @@
+#include <limits>
 #include <utility>
 
 #include "daw/json/daw_json_link.h"
@@ -62,8 +63,6 @@ TEST(ConfigTest, SimConfigurationComponent) {
 	GTEST_CXP auto sim_config = daw::json::from_json<sim_configuration>(R"({
 "delta_t": 0.1,
 "cutoff_radius": 0.2,
-"sigma": 0.7,
-"epsilon": 5,
 "boundary_conditions": {
 "x_min": "reflecting",
 "y_min": "outflow",
@@ -75,14 +74,13 @@ TEST(ConfigTest, SimConfigurationComponent) {
 "end_time": 0.3,
 "write_frequency": 10,
 "base_name": "base_name",
-"domain": [0.4, 0.5, 0.6]
+"domain": [0.4, 0.5, 0.6],
+"create_checkpoint": true
 })");
 	using enum boundary_condition;
 	using enum boundary_type;
 	STATIC_EXPECT_EQ(sim_config.delta_t, 0.1);
 	STATIC_EXPECT_EQ(sim_config.cutoff_radius, 0.2);
-	STATIC_EXPECT_EQ(sim_config.sigma, 0.7);
-	STATIC_EXPECT_EQ(sim_config.epsilon, 5);
 	STATIC_EXPECT_EQ(sim_config.boundary_behavior[x_min], reflecting);
 	STATIC_EXPECT_EQ(sim_config.boundary_behavior.y_min, outflow);
 	STATIC_EXPECT_EQ(sim_config.boundary_behavior[z_min], reflecting);
@@ -93,6 +91,8 @@ TEST(ConfigTest, SimConfigurationComponent) {
 	STATIC_EXPECT_EQ(sim_config.write_frequency, 10);
 	STATIC_EXPECT_STREQ(sim_config.base_name.c_str(), "base_name");
 	STATIC_EXPECT_EQ(sim_config.domain, vec(0.4, 0.5, 0.6));
+	STATIC_EXPECT_TRUE(sim_config.create_checkpoint);
+	STATIC_EXPECT_DOUBLE_EQ(sim_config.gravitational_constant, 0);
 }
 
 // Check that a cuboid description parses to the correct cuboid
@@ -102,43 +102,117 @@ TEST(ConfigTest, Cuboid3DParametersComponent) {
 "scale": [4, 5, 6],
 "velocity": [0.7, 0.8, 0.9],
 "brownian_mean": 1.1,
+"sigma": 1,
+"epsilon": 5,
 "particle_mass": 1.2,
+"meshwidth": 1.12
 })");
 	STATIC_EXPECT_EQ(params.origin, vec(0.1, 0.2, 0.3));
 	STATIC_EXPECT_EQ(params.scale, particle_container::index(4, 5, 6));
 	STATIC_EXPECT_EQ(params.velocity, vec(0.7, 0.8, 0.9));
 	STATIC_EXPECT_DOUBLE_EQ(params.brownian_mean, 1.1);
 	STATIC_EXPECT_DOUBLE_EQ(params.particle_mass, 1.2);
+	STATIC_EXPECT_DOUBLE_EQ(params.sigma, 1.0);
+	STATIC_EXPECT_DOUBLE_EQ(params.epsilon, 5.0);
+	STATIC_EXPECT_DOUBLE_EQ(params.meshwidth, 1.12);
 }
 
-// Check that a square description parses to the correct square
-TEST(ConfigTest, SquareParametersComponent) {
+// Check that a square description parses to the correct rectangle
+TEST(ConfigTest, RectangleParametersComponent) {
 	GTEST_CXP auto params = daw::json::from_json<cuboid_parameters<2>>(R"({
 "origin": [0.1, 0.2],
 "scale": [4, 5],
 "velocity": [0.7, 0.8],
 "brownian_mean": 1.1,
-"particle_mass": 1.2
+"sigma": 1,
+"epsilon": 5,
+"particle_mass": 1.2,
+"meshwidth": 1.12
 })");
 	STATIC_EXPECT_EQ(params.origin, vec(0.1, 0.2, 0));
 	STATIC_EXPECT_EQ(params.scale, particle_container::index(4, 5, 0));
 	STATIC_EXPECT_EQ(params.velocity, vec(0.7, 0.8, 0));
 	STATIC_EXPECT_DOUBLE_EQ(params.brownian_mean, 1.1);
 	STATIC_EXPECT_DOUBLE_EQ(params.particle_mass, 1.2);
+	STATIC_EXPECT_DOUBLE_EQ(params.sigma, 1.0);
+	STATIC_EXPECT_DOUBLE_EQ(params.epsilon, 5.0);
+	STATIC_EXPECT_DOUBLE_EQ(params.meshwidth, 1.12);
 }
 
 // Check that a particle description parses to the correct particle
 TEST(ConfigTest, ParticleComponent) {
-	GTEST_CXP auto p = daw::json::from_json<particle>(R"({
+	GTEST_CXP auto p = daw::json::from_json<particle_parameters>(R"({
 "position": [0.1, 0.2, 0.3],
 "velocity": [0.4, 0.5, 0.6],
 "mass": 0.7,
-"type": 8
+"sigma": 1,
+"epsilon": 5
 })");
-	STATIC_EXPECT_EQ(p.x, vec(0.1, 0.2, 0.3));
-	STATIC_EXPECT_EQ(p.v, vec(0.4, 0.5, 0.6));
-	STATIC_EXPECT_DOUBLE_EQ(p.m, 0.7);
-	STATIC_EXPECT_EQ(p.type, 8);
+	STATIC_EXPECT_EQ(p.position, vec(0.1, 0.2, 0.3));
+	STATIC_EXPECT_EQ(p.velocity, vec(0.4, 0.5, 0.6));
+	STATIC_EXPECT_DOUBLE_EQ(p.mass, 0.7);
+	STATIC_EXPECT_DOUBLE_EQ(p.sigma, 1);
+	STATIC_EXPECT_DOUBLE_EQ(p.epsilon, 5);
+}
+
+// Check that a thermostat description parses to the correct parameters to the simulation
+TEST(ConfigTest, ThermostatComponent) {
+	GTEST_CXP auto p = daw::json::from_json<thermostat_parameters>(R"({
+"initial_temperature": 0.1,
+"application_frequency": 2,
+"target_temperature": 0.2,
+"max_temperature_difference": 0.3,
+"enforce_initial_temperature": false
+})");
+	STATIC_EXPECT_DOUBLE_EQ(p.initial_temperature, 0.1);
+	STATIC_EXPECT_EQ(p.application_frequency, 2);
+	STATIC_EXPECT_DOUBLE_EQ(p.target_temperature, 0.2);
+	STATIC_EXPECT_DOUBLE_EQ(p.max_temperature_difference, 0.3);
+	STATIC_EXPECT_FALSE(p.enforce_initial_temperature);
+}
+
+// Check that user not specifying the temperature difference defaults to +inf
+TEST(ConfigTest, OptionalTemperatureDifference) {
+	GTEST_CXP auto p = daw::json::from_json<thermostat_parameters>(R"({
+"initial_temperature": 0.1,
+"application_frequency": 2,
+"target_temperature": 0.2,
+"enforce_initial_temperature": false
+})");
+	STATIC_EXPECT_DOUBLE_EQ(p.initial_temperature, 0.1);
+	STATIC_EXPECT_EQ(p.application_frequency, 2);
+	STATIC_EXPECT_DOUBLE_EQ(p.target_temperature, 0.2);
+	STATIC_EXPECT_DOUBLE_EQ(p.max_temperature_difference, std::numeric_limits<double>::infinity());
+	STATIC_EXPECT_FALSE(p.enforce_initial_temperature);
+}
+
+// Check that user not specifying the target temperature defaults to initial temperature
+TEST(ConfigTest, OptionalTargetTemperature) {
+	GTEST_CXP auto p = daw::json::from_json<thermostat_parameters>(R"({
+"initial_temperature": 0.1,
+"application_frequency": 2,
+"enforce_initial_temperature": true
+})");
+	STATIC_EXPECT_DOUBLE_EQ(p.initial_temperature, 0.1);
+	STATIC_EXPECT_EQ(p.application_frequency, 2);
+	STATIC_EXPECT_DOUBLE_EQ(p.target_temperature, 0.1);
+	STATIC_EXPECT_TRUE(p.enforce_initial_temperature);
+}
+
+// Check that user can specify null explicitly to get the default temperature difference
+TEST(ConfigTest, TemperatureDifferenceNullDefault) {
+	GTEST_CXP auto p = daw::json::from_json<thermostat_parameters>(R"({
+"initial_temperature": 0.1,
+"application_frequency": 2,
+"target_temperature": 0.2,
+"max_temperature_difference": null,
+"enforce_initial_temperature": true
+})");
+	STATIC_EXPECT_DOUBLE_EQ(p.initial_temperature, 0.1);
+	STATIC_EXPECT_EQ(p.application_frequency, 2);
+	STATIC_EXPECT_DOUBLE_EQ(p.target_temperature, 0.2);
+	STATIC_EXPECT_DOUBLE_EQ(p.max_temperature_difference, std::numeric_limits<double>::infinity());
+	STATIC_EXPECT_TRUE(p.enforce_initial_temperature);
 }
 
 // Check that parsing a configuration file results in the correct parameters to the simulation
@@ -147,8 +221,6 @@ TEST(ConfigTest, BasicConfig) {
   "configuration": {
     "delta_t": 0.1,
     "cutoff_radius": 1.0,
-    "sigma": 3.4,
-    "epsilon": 5,
     "boundary_conditions": {
       "x_min": "reflecting",
       "y_min": "reflecting",
@@ -165,7 +237,8 @@ TEST(ConfigTest, BasicConfig) {
       13.1,
       13.2,
       13.3
-    ]
+    ],
+    "create_checkpoint": true
   },
   "bodies": [
     {
@@ -175,7 +248,10 @@ TEST(ConfigTest, BasicConfig) {
         "scale": [2, 2, 2],
         "velocity": [0.1, 0.1, 0.1],
         "brownian_mean": 0.1,
-        "particle_mass": 10
+        "sigma": 1,
+        "epsilon": 5,
+        "particle_mass": 10,
+        "meshwidth": 1.12
       }
     },
     {
@@ -184,7 +260,8 @@ TEST(ConfigTest, BasicConfig) {
         "position": [2.5, 2.5, 2.5],
         "velocity": [0.2, 0.3, 0.4],
         "mass": 0.1,
-        "type": 1
+        "sigma": 1,
+        "epsilon": 5
       }
     }
   ]
@@ -195,8 +272,6 @@ TEST(ConfigTest, BasicConfig) {
 	GTEST_CXP const auto& cfg = parse_result.config;
 	STATIC_EXPECT_EQ(cfg.delta_t, 0.1);
 	STATIC_EXPECT_EQ(cfg.cutoff_radius, 1.0);
-	STATIC_EXPECT_EQ(cfg.sigma, 3.4);
-	STATIC_EXPECT_EQ(cfg.epsilon, 5);
 	STATIC_EXPECT_EQ(
 		cfg.boundary_behavior, boundary_conditions_descriptor::all(boundary_condition::reflecting)
 	);
@@ -204,10 +279,11 @@ TEST(ConfigTest, BasicConfig) {
 	STATIC_EXPECT_STREQ(cfg.base_name.c_str(), "MD_vtk");
 	STATIC_EXPECT_EQ(cfg.write_frequency, 10);
 	STATIC_EXPECT_VEC_DOUBLE_EQ(cfg.domain, vec(13.1, 13.2, 13.3));
+	STATIC_EXPECT_FALSE(cfg.thermostat.has_value());
 
 	GTEST_CXP_GCC auto ok = std::invoke([&] {
 		particle_container container(cfg.domain, cfg.cutoff_radius);
-		config::populate_simulation(container, parse_result);
+		config::populate_simulation(container, parse_result.config, parse_result.bodies);
 
 		return std::array{
 			container.cell_containing({2.5, 2.5, 2.5}).at(0).v == vec{0.2, 0.3, 0.4},
@@ -215,6 +291,53 @@ TEST(ConfigTest, BasicConfig) {
 		};
 	});
 	GCC_STATIC_EXPECT_ALL(ok);
+}
+
+// Check that supplying the optional thermostat key correctly parses relevant parameters
+TEST(ConfigTest, ThermostatOptional) {
+	GTEST_CXP std::string_view json_data = R"({
+  "configuration": {
+    "delta_t": 0.1,
+    "cutoff_radius": 1.0,
+    "boundary_conditions": {
+      "x_min": "reflecting",
+      "y_min": "reflecting",
+      "z_min": "reflecting",
+      "x_max": "reflecting",
+      "y_max": "reflecting",
+      "z_max": "reflecting"
+    },
+    "thermostat": {
+      "initial_temperature": 1.1,
+      "application_frequency": 2,
+      "target_temperature": 1.3,
+      "enforce_initial_temperature": true
+    },
+
+    "end_time": 0.3,
+    "write_frequency": 10,
+    "base_name": "MD_vtk",
+    "domain": [
+      13.1,
+      13.2,
+      13.3
+    ],
+    "create_checkpoint": true
+  },
+  "bodies": []
+})";
+	using enum boundary_condition;
+
+	GTEST_CXP auto parse_result = config::parse(json_data);
+	GTEST_CXP const auto& cfg = parse_result.config;
+	STATIC_EXPECT_TRUE(cfg.thermostat.has_value());
+	STATIC_EXPECT_DOUBLE_EQ(cfg.thermostat->initial_temperature, 1.1);
+	STATIC_EXPECT_EQ(cfg.thermostat->application_frequency, 2);
+	STATIC_EXPECT_DOUBLE_EQ(cfg.thermostat->target_temperature, 1.3);
+	STATIC_EXPECT_DOUBLE_EQ(
+		cfg.thermostat->max_temperature_difference, std::numeric_limits<double>::infinity()
+	);
+	STATIC_EXPECT_TRUE(cfg.thermostat->enforce_initial_temperature);
 }
 
 #if HAS_EMBED

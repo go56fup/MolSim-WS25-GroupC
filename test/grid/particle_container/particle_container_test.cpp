@@ -15,7 +15,7 @@ TEST(particle_container, SquarePlacement) {
 	GTEST_CXP_GCC auto ok = std::invoke([] {
 		particle_container container(vec{10, 10, 10}, 1);
 		std::size_t seq_no = 0;
-		container.add_cuboid<2>({5, 5, 5}, {2, 2, 1}, 1, {}, 100, 0.1, seq_no);
+		container.add_cuboid<2>({5, 5, 5}, {2, 2, 1}, 1, {}, 100, 0.1, 1.0, 5.0, seq_no);
 		return std::array{
 			container.cell_containing({5, 5, 5}).at(0).m == 100,
 			container.cell_containing({6, 6, 5}).at(0).m == 100,
@@ -30,7 +30,7 @@ TEST(particle_container, Cuboid3DPlacement) {
 	GTEST_CXP_GCC auto ok = std::invoke([] {
 		particle_container container(vec{10, 10, 10}, 1);
 		std::size_t seq_no = 0;
-		container.add_cuboid<3>({5, 5, 5}, {2, 2, 2}, 1, {}, 100, 0.1, seq_no);
+		container.add_cuboid<3>({5, 5, 5}, {2, 2, 2}, 1, {}, 100, 0.1, 1.0, 5.0, seq_no);
 		return std::array{
 			container.cell_containing({5, 6, 5}).at(0).m == 100,
 			container.cell_containing({6, 6, 6}).at(0).m == 100,

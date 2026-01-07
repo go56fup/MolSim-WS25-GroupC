@@ -112,7 +112,7 @@ public:
 	 * @return √(x² + y² + z²).
 	 */
 	CONSTEXPR_IF_GCC double euclidian_norm() const noexcept {
-		return std::sqrt(std::pow(x, 2) + std::pow(y, 2) + std::pow(z, 2));
+		return std::sqrt(x * x + y * y + z * z);
 	}
 
 	/**

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.30)
+cmake_minimum_required(VERSION 3.28)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -69,6 +69,7 @@ target_compile_options(
 				-Wconversion
 				-Wno-c23-extensions
 				>
+				$<$<CONFIG:Release>:-march=native>
 )
 
 if(ENABLE_SANITIZERS)
