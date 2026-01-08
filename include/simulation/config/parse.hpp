@@ -19,8 +19,8 @@
 #include "utility/constants.hpp"
 
 namespace detail {
-constexpr void check_for_2d_domain(const vec& domain, double cutoff) noexcept(false) {
-	if (domain.z > cutoff) {
+constexpr void check_for_2d_domain(const sim_configuration& config) noexcept(false) {
+	if (config.dimensions == 3) {
 		throw std::domain_error(
 			"Refusing to create a 3D grid with a 2D object inside. Set "
 			"the Z-size of the domain to the cutoff radius to obtain a 2D grid, "
@@ -67,9 +67,7 @@ constexpr void populate_simulation(
 				params.particle_mass, params.sigma, params.epsilon, params.brownian_mean, seq_no
 			);
 		} else if (type == "rectangle") {
-			std::call_once(
-				two_d_domain_check, detail::check_for_2d_domain, config.domain, config.cutoff_radius
-			);
+			std::call_once(two_d_domain_check, detail::check_for_2d_domain, config);
 			const auto params = body["parameters"].as<cuboid_parameters<2>>();
 			particles.add_cuboid<2>(
 				{params.origin.x, params.origin.y, config.domain.z / 2},
@@ -82,9 +80,7 @@ constexpr void populate_simulation(
 				params.position, params.velocity, params.mass, params.sigma, params.epsilon
 			);
 		} else if (type == "disc") {
-			std::call_once(
-				two_d_domain_check, detail::check_for_2d_domain, config.domain, config.cutoff_radius
-			);
+			std::call_once(two_d_domain_check, detail::check_for_2d_domain, config);
 			const auto params = body["parameters"].as<disc_parameters>();
 			particles.add_disc(
 				{params.center.x, params.center.y, config.domain.z / 2}, params.radius,

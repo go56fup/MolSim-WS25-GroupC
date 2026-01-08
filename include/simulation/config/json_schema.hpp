@@ -1,6 +1,7 @@
 #pragma once
 
 #include <daw/json/daw_json_link.h>
+#include <daw/json/daw_json_link_types.h>
 
 #include "entities.hpp"
 #include "simulation/config/entities.hpp"
@@ -34,7 +35,8 @@ struct json_data_contract<sim_configuration> {
 	using type = json_member_list<
 		json_number<"delta_t", double>, json_number<"cutoff_radius", double>,
 		json_class<"boundary_conditions", boundary_conditions_descriptor>,
-		json_number<"end_time", double>, json_number<"write_frequency", unsigned>,
+		json_class_null<"thermostat", std::optional<thermostat_parameters>>,
+		json_number<"end_time", double>, json_number<"write_frequency", sim_iteration_t>,
 		json_string<"base_name">, json_class<"domain", vec>, json_bool<"create_checkpoint">>;
 };
 
@@ -89,5 +91,17 @@ struct json_data_contract<serialization_view<Body>> {
 	static constexpr auto to_json_data(const serialization_view<Body>& body) {
 		return std::forward_as_tuple(body.type, body.parameters);
 	}
+};
+
+template <>
+struct json_data_contract<thermostat_parameters> {
+	using constructor_t = thermostat_parameters_constructor;
+	using type = json_member_list<
+		json_number<"initial_temperature", double>,
+		json_number<
+			"application_frequency", sim_iteration_t>,
+		json_number<"target_temperature", double>,
+		json_number_null<"max_temperature_difference", std::optional<double>>
+		>;
 };
 }  // namespace daw::json

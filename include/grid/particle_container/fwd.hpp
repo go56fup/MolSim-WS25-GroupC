@@ -76,6 +76,8 @@ private:
 	/// Dimension of each cell (a cube). Forms the correspondence between the position and index
 	/// world.
 	double cutoff_radius_;
+	/// Number of particles in the simulation.
+	std::size_t size_ = 0;
 
 public:
 	// TODO(tuna): make all constructors specify the object they are constructing in their @brief
@@ -266,19 +268,9 @@ public:
 	 */
 	constexpr double cutoff_radius() const noexcept;
 
-	constexpr auto begin() const noexcept {
-		return grid.begin();
-	}
-
-	constexpr auto end() const noexcept {
-		return grid.end();
-	}
-
-	constexpr auto begin() noexcept {
-		return grid.begin();
-	}
-
-	constexpr auto end() noexcept {
-		return grid.end();
-	}
+	/**
+	 * @brief Get the number of particles in the simulation.
+	 * @return Particle count in container.
+	 */
+	constexpr std::size_t size() const noexcept;
 };

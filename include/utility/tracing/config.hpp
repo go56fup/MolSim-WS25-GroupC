@@ -5,7 +5,7 @@
 #define LOG_PARTICLE_CONTAINER 0
 #define LOG_BORDER_CELL_ITER 1
 #define LOG_SPECIAL_MEMFUNS 0
-#define LOG_SIM 1
-#define LOG_GRID 1
+#define LOG_SIM 0
+#define LOG_GRID 0
 #define LOG_INPUT_PARSING 0
 #define LOG_PARTICLE_TYPE 1

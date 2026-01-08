@@ -82,6 +82,7 @@ constexpr void particle_container::place(ParticleT&& particle) {
 	TRACE_PARTICLE_CONTAINER("Placing particle: {}", particle);
 	check_if_out_of_domain_max(particle.x);
 	grid[pos_to_linear_index(particle.x)].emplace_back(std::forward<ParticleT>(particle));
+	++size_;
 }
 
 template <fwd_reference_to<vec> Vec, typename... Args>
@@ -92,6 +93,7 @@ constexpr void particle_container::emplace(Vec&& position, Args&&... args) {
 	grid[pos_to_linear_index(position)].emplace_back(
 		std::forward<Vec>(position), std::forward<Args>(args)...
 	);
+	++size_;
 }
 
 template <std::size_t N>
@@ -215,4 +217,8 @@ constexpr const particle_container::index& particle_container::grid_size() const
 
 constexpr double particle_container::cutoff_radius() const noexcept {
 	return cutoff_radius_;
+}
+
+constexpr std::size_t particle_container::size() const noexcept {
+	return size_;
 }

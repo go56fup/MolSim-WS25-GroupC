@@ -1,3 +1,4 @@
+#include <limits>
 #include <utility>
 
 #include "daw/json/daw_json_link.h"
@@ -153,6 +154,47 @@ TEST(ConfigTest, ParticleComponent) {
 	STATIC_EXPECT_DOUBLE_EQ(p.epsilon, 5);
 }
 
+// Check that a thermostat description parses to the correct parameters to the simulation
+TEST(ConfigTest, ThermostatComponent) {
+	GTEST_CXP auto p = daw::json::from_json<thermostat_parameters>(R"({
+"initial_temperature": 0.1,
+"application_frequency": 2,
+"target_temperature": 0.2,
+"max_temperature_difference": 0.3
+})");
+	STATIC_EXPECT_DOUBLE_EQ(p.initial_temperature, 0.1);
+	STATIC_EXPECT_EQ(p.application_frequency, 2);
+	STATIC_EXPECT_DOUBLE_EQ(p.target_temperature, 0.2);
+	STATIC_EXPECT_DOUBLE_EQ(p.max_temperature_difference, 0.3);
+}
+
+// Check that user not specifying the temperature difference defaults to +inf.
+TEST(ConfigTest, OptionalTemperatureDifference) {
+	GTEST_CXP auto p = daw::json::from_json<thermostat_parameters>(R"({
+"initial_temperature": 0.1,
+"application_frequency": 2,
+"target_temperature": 0.2
+})");
+	STATIC_EXPECT_DOUBLE_EQ(p.initial_temperature, 0.1);
+	STATIC_EXPECT_EQ(p.application_frequency, 2);
+	STATIC_EXPECT_DOUBLE_EQ(p.target_temperature, 0.2);
+	STATIC_EXPECT_DOUBLE_EQ(p.max_temperature_difference, std::numeric_limits<double>::infinity());
+}
+
+// Check that user can specify null explicitly to get the default temperature difference
+TEST(ConfigTest, TemperatureDifferenceNullDefault) {
+	GTEST_CXP auto p = daw::json::from_json<thermostat_parameters>(R"({
+"initial_temperature": 0.1,
+"application_frequency": 2,
+"target_temperature": 0.2,
+"max_temperature_difference": null
+})");
+	STATIC_EXPECT_DOUBLE_EQ(p.initial_temperature, 0.1);
+	STATIC_EXPECT_EQ(p.application_frequency, 2);
+	STATIC_EXPECT_DOUBLE_EQ(p.target_temperature, 0.2);
+	STATIC_EXPECT_DOUBLE_EQ(p.max_temperature_difference, std::numeric_limits<double>::infinity());
+}
+
 // Check that parsing a configuration file results in the correct parameters to the simulation
 TEST(ConfigTest, BasicConfig) {
 	GTEST_CXP std::string_view json_data = R"({
@@ -217,6 +259,7 @@ TEST(ConfigTest, BasicConfig) {
 	STATIC_EXPECT_STREQ(cfg.base_name.c_str(), "MD_vtk");
 	STATIC_EXPECT_EQ(cfg.write_frequency, 10);
 	STATIC_EXPECT_VEC_DOUBLE_EQ(cfg.domain, vec(13.1, 13.2, 13.3));
+	STATIC_EXPECT_FALSE(cfg.thermostat.has_value());
 
 	GTEST_CXP_GCC auto ok = std::invoke([&] {
 		particle_container container(cfg.domain, cfg.cutoff_radius);
@@ -228,6 +271,51 @@ TEST(ConfigTest, BasicConfig) {
 		};
 	});
 	GCC_STATIC_EXPECT_ALL(ok);
+}
+
+// Check that supplying the optional thermostat key correctly parses relevant parameters
+TEST(ConfigTest, ThermostatOptional) {
+	GTEST_CXP std::string_view json_data = R"({
+  "configuration": {
+    "delta_t": 0.1,
+    "cutoff_radius": 1.0,
+    "boundary_conditions": {
+      "x_min": "reflecting",
+      "y_min": "reflecting",
+      "z_min": "reflecting",
+      "x_max": "reflecting",
+      "y_max": "reflecting",
+      "z_max": "reflecting"
+    },
+    "thermostat": {
+      "initial_temperature": 1.1,
+      "application_frequency": 2,
+      "target_temperature": 1.3
+    },
+
+    "end_time": 0.3,
+    "write_frequency": 10,
+    "base_name": "MD_vtk",
+    "domain": [
+      13.1,
+      13.2,
+      13.3
+    ],
+    "create_checkpoint": true
+  },
+  "bodies": []
+})";
+	using enum boundary_condition;
+
+	GTEST_CXP auto parse_result = config::parse(json_data);
+	GTEST_CXP const auto& cfg = parse_result.config;
+	STATIC_EXPECT_TRUE(cfg.thermostat.has_value());
+	STATIC_EXPECT_DOUBLE_EQ(cfg.thermostat->initial_temperature, 1.1);
+	STATIC_EXPECT_EQ(cfg.thermostat->application_frequency, 2);
+	STATIC_EXPECT_DOUBLE_EQ(cfg.thermostat->target_temperature, 1.3);
+	STATIC_EXPECT_DOUBLE_EQ(
+		cfg.thermostat->max_temperature_difference, std::numeric_limits<double>::infinity()
+	);
 }
 
 #if HAS_EMBED

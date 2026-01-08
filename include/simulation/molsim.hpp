@@ -17,6 +17,8 @@
 #include "output_writers/io.hpp"
 #include "physics/forces.hpp"
 #include "physics/particle.hpp"
+#include "physics/thermostat.hpp"
+#include "simulation/config/entities.hpp"
 #include "simulation/config/parse.hpp"
 #include "utility/concepts.hpp"
 #include "utility/tracing/macros.hpp"
@@ -485,22 +487,43 @@ constexpr void run_simulation(
 	force_calculator auto force_calc, std::string_view output_path
 ) noexcept {
 	double current_time = 0;
-	decltype(sim_configuration::write_frequency) iteration = 0;
+	sim_iteration_t iteration = 0;
 	const std::string output_prefix = std::string(output_path) + "/" + config.base_name.c_str();
-	auto run_sim_pass = [&]<bool IsFirstIteration = false> {
+
+	struct sim_traits {
+		bool has_thermostat;
+		bool is_first_iteration = false;
+	};
+
+	auto run_sim_pass = [&]<sim_traits Traits> {
 		TRACE_SIM("beginning iteration, current_time={}", current_time);
 		if (iteration % config.write_frequency == 0) {
 			WRITE_VTK_OUTPUT(plot_particles, container, output_prefix, iteration);
 		}
-		run_sim_iteration<IsFirstIteration>(force_calc, container, config);
+		if constexpr (Traits.has_thermostat) {
+			if (iteration % config.thermostat->application_frequency == 0) {
+				run_thermostat(container, *config.thermostat, config.dimensions);
+			}
+		}
+		run_sim_iteration<Traits.is_first_iteration>(force_calc, container, config);
 		current_time += config.delta_t;
 		++iteration;
 	};
 
-	run_sim_pass.template operator()<true>();
-	while (current_time < config.end_time) {
-		run_sim_pass.template operator()();
+	auto sim = [&]<bool HasThermostat> {
+		run_sim_pass.template operator(
+		)<{.has_thermostat = HasThermostat, .is_first_iteration = true}>();
+		while (current_time < config.end_time) {
+			run_sim_pass.template operator()<{.has_thermostat = HasThermostat}>();
+		}
+	};
+
+	if (config.thermostat.has_value()) {
+		sim.template operator()<true>();
+	} else {
+		sim.template operator()<false>();
 	}
+	
 	if (config.create_checkpoint) {
 		// TODO(tuna): specify both in terms of plot_particles, where iteration is used in the
 		// filename Or just remove plot_particles

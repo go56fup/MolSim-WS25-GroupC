@@ -56,7 +56,8 @@ TEST(ForceTests, LennardJones) {
 		.write_frequency = 1000,
 		.base_name{std::from_range, "unused"},
 		.domain{10, 10, 10},
-		.create_checkpoint = false
+		.create_checkpoint = false,
+		.dimensions = 3
 	};
 	auto first_force = std::invoke([&] -> vec {
 		particle_container particles(config.domain, config.cutoff_radius);

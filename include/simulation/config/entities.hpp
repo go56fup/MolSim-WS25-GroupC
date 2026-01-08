@@ -1,5 +1,8 @@
 #pragma once
 
+#include <limits>
+#include <optional>
+
 #include <daw/json/daw_json_link.h>
 
 #include "grid/enums.hpp"
@@ -73,34 +76,62 @@ public:
 	};
 };
 
+using sim_iteration_t = unsigned;
+
+struct thermostat_parameters {
+	double initial_temperature;
+	sim_iteration_t application_frequency;
+	double target_temperature;
+	double max_temperature_difference = std::numeric_limits<double>::infinity();
+};
+
+struct thermostat_parameters_constructor {
+	static constexpr thermostat_parameters operator()(
+		double initial_temperature, sim_iteration_t application_frequency,
+		double target_temperature, std::optional<double> max_temperature_difference
+	) {
+		return thermostat_parameters{
+			initial_temperature, application_frequency, target_temperature,
+			max_temperature_difference.value_or(std::numeric_limits<double>::infinity())
+		};
+	}
+};
+
 struct sim_configuration {
 	double delta_t;
 	double cutoff_radius;
 	boundary_conditions_descriptor boundary_behavior;
+	std::optional<thermostat_parameters> thermostat = std::nullopt;
 	double end_time;
-	unsigned write_frequency;
+	sim_iteration_t write_frequency;
 	p3094::fixed_string<32> base_name;
 	vec domain;
 	bool create_checkpoint;
+	std::uint8_t dimensions;
 };
 
 struct sim_configuration_constructor {
 	template <
 		typename String, fwd_reference_to<vec> Vec,
-		fwd_reference_to<boundary_conditions_descriptor> Descriptor>
+		fwd_reference_to<boundary_conditions_descriptor> Descriptor,
+		fwd_reference_to<std::optional<thermostat_parameters>> Thermostat>
 	static constexpr sim_configuration operator()(
-		double delta_t, double cutoff_radius, Descriptor&& conditions, double end_time,
-		unsigned write_frequency, String&& base_name, Vec&& domain, bool create_checkpoint
+		double delta_t, double cutoff_radius, Descriptor&& conditions, Thermostat&& thermostat,
+		double end_time, sim_iteration_t write_frequency, String&& base_name, Vec&& domain,
+		bool create_checkpoint
 	) {
+		const decltype(sim_configuration::dimensions) dims = domain.z > cutoff_radius ? 3 : 2;
 		return sim_configuration{
 			delta_t,
 			cutoff_radius,
 			std::forward<Descriptor>(conditions),
+			std::forward<Thermostat>(thermostat),
 			end_time,
 			write_frequency,
 			{std::from_range, std::forward<String>(base_name)},
 			std::forward<Vec>(domain),
-			create_checkpoint
+			create_checkpoint,
+			dims
 		};
 	}
 };
