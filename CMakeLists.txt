@@ -33,8 +33,10 @@ file(
 )
 
 # create make target
-add_executable(MolSim ${MY_SRC})
-add_library(project_options INTERFACE)
+add_executable(MolSim ${MY_SRC}
+		test/physics/thermostat_test.cpp)
+add_library(project_options INTERFACE
+		test/physics/thermostat_test.cpp)
 
 target_include_directories(
 	project_options INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/include
