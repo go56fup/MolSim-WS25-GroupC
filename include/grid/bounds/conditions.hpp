@@ -5,6 +5,7 @@
 #include "grid/particle_container/fwd.hpp"
 #include "physics/forces.hpp"
 #include "simulation/config/entities.hpp"
+#include "iterators/periodic.hpp"
 
 // The wrapping in do-while increases this metric dramatically. Otherwise, the rest of the logic is
 // impossible to express in more granular functions without having to recompute information. The
@@ -149,6 +150,53 @@ constexpr void delete_ouflowing_particles(
 }
 
 #define reflect_via_ghost_particle reflect::macro
+
+constexpr void periodic(
+		std::vector<particle>& current_cell, boundary_type border_type,
+		force_calculator auto calculator, const particle_container::index& idx,
+		particle_container particles
+		){
+
+	using enum boundary_type;
+	using difference_type = particle_container::difference_type;
+	using signed_index = vec_3d<difference_type>;
+	signed_index current_virtual_idx{};
+
+	const auto& grid = particles.grid_size();
+	signed_index signed_grid ={
+			static_cast<difference_type>(grid.x),
+			static_cast<difference_type>(grid.y),
+			static_cast<difference_type>(grid.z)
+	};
+	vec_3d<difference_type> const signed_idx = {static_cast<difference_type>(idx.x), static_cast<difference_type>(idx.y),
+							   static_cast<difference_type>(idx.z)};
+
+	current_virtual_idx = signed_idx;
+
+	if ((border_type & x_min) == x_min) {
+		current_virtual_idx.x = signed_grid.x;
+	} if ((border_type & x_max) == x_max) {
+		current_virtual_idx.x = -1;
+	} if ((border_type & y_min) == y_min) {
+		current_virtual_idx.y = signed_grid.y;
+	} if ((border_type & y_max) == y_max) {
+		current_virtual_idx.y = -1;
+	} if ((border_type & z_min) == z_min) {
+		current_virtual_idx.z = signed_grid.z;
+	} if ((border_type & z_max) == z_max) {
+		current_virtual_idx.z = -1;
+	}
+
+	for (const auto& i : periodic_range(particles, current_virtual_idx)) {
+
+		for (auto& p1 : current_cell) {
+			for (auto& p2 : particles[i]) {
+				apply_force_interaction(calculator, p1, p2);
+			}
+		}
+	}
+}
+
 
 constexpr void handle_boundary_condition(
 	particle_container::cell& cell, boundary_type border, const vec& domain,

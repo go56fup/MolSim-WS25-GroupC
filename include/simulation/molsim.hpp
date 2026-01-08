@@ -85,10 +85,7 @@ BoundaryFunc funcDefiner(
 		assert(behavior == boundary_condition::periodic);
 		return [&](particle_container::cell& cell, boundary_type b,
 		           const particle_container::index& idx) {
-			(void)cell;
-			(void)b;
-			(void)idx;
-			// periodic();
+			periodic(cell, b, calculator, idx, particles);
 		};
 	}
 }
@@ -98,7 +95,6 @@ constexpr void loop(
 ) {
 	const auto& grid = particles.grid_size();
 	using enum boundary_type;
-	// TODO: Map to function
 
 	// x faces
 	BoundaryFunc func = funcDefiner(particles, config, calculator, x_min);
@@ -139,6 +135,11 @@ constexpr void loop(
 	if (!hasPeriodic(config)) {
 		return;
 	}
+
+	func = [&](particle_container::cell& cell, boundary_type b,
+			   const particle_container::index& idx) {
+		periodic(cell, b, calculator, idx, particles);
+	};
 
 	// x-y edges
 	bool cond = isPeriodic(config, {x_min, y_min});
