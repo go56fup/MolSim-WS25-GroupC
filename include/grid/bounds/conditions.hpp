@@ -145,6 +145,11 @@ constexpr void delete_ouflowing_particles(
 	}
 }
 
+constexpr void periodic (
+		particle_container::cell& cell, boundary_type border, const vec& domain,
+		force_calculator auto force_calc, const sim_configuration& config) {
+}
+
 #define reflect_via_ghost_particle reflect::macro
 
 constexpr void handle_boundary_condition(

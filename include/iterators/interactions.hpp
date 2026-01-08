@@ -30,7 +30,7 @@ public:
 	// directly.
 	using value_type = reference;
 
-private:
+protected:
 	/// Pointer to container which the iterator obtains the cell pairs from.
 	particle_container* container = nullptr;
 	/// Index of the first cell of the returned interacting pair.

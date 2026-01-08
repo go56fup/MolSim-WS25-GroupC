@@ -162,6 +162,8 @@ public:
 	constexpr range_of<std::pair<const index&, const index&>> auto
 	directional_interactions() noexcept;
 
+	constexpr range_of<particle_container::index> auto  periodic_neighbor_interactions(vec_3d<particle_container::difference_type> v_idx) noexcept;
+
 	// TODO(tuna): change this once the return type of the new border cell is fixed
 	/**
 	 * @brief Get a range over indices of border cells and their types.

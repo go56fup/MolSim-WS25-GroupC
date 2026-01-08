@@ -12,6 +12,7 @@
 #include "iterators/border_cells.hpp"
 #include "iterators/enumerate_cells.hpp"
 #include "iterators/interactions.hpp"
+#include "iterators/periodic.h"
 #include "physics/maxwell_boltzmann.hpp"
 #include "physics/particle.hpp"
 #include "physics/vec_3d.hpp"
@@ -131,6 +132,10 @@ constexpr range_of<
 	std::pair<const particle_container::index&, const particle_container::index&>> auto
 particle_container::directional_interactions() noexcept {
 	return interactions_range(*this);
+}
+
+constexpr range_of<particle_container::index> auto particle_container::periodic_neighbor_interactions (vec_3d<particle_container::difference_type> v_idx) noexcept {
+	return periodic_range(*this, v_idx);
 }
 
 // TODO(tuna): change this once the return type of the new border cell is fixed
