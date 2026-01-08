@@ -57,7 +57,8 @@ TEST(ForceTests, LennardJones) {
 		.base_name{std::from_range, "unused"},
 		.domain{10, 10, 10},
 		.create_checkpoint = false,
-		.dimensions = 3
+		.dimensions = 3,
+		.gravitational_constant = 0
 	};
 	auto first_force = std::invoke([&] -> vec {
 		particle_container particles(config.domain, config.cutoff_radius);

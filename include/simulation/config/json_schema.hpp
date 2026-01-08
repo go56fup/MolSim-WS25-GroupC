@@ -37,7 +37,8 @@ struct json_data_contract<sim_configuration> {
 		json_class<"boundary_conditions", boundary_conditions_descriptor>,
 		json_class_null<"thermostat", std::optional<thermostat_parameters>>,
 		json_number<"end_time", double>, json_number<"write_frequency", sim_iteration_t>,
-		json_string<"base_name">, json_class<"domain", vec>, json_bool<"create_checkpoint">>;
+		json_string<"base_name">, json_class<"domain", vec>, json_bool<"create_checkpoint">,
+		json_number_null<"gravitational_constant", std::optional<double>>>;
 };
 
 template <>

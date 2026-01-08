@@ -11,9 +11,11 @@
 
 #include "config/parse.hpp"
 #include "grid/bounds/conditions.hpp"
+#include "grid/enums.hpp"
 #include "grid/particle_container/fwd.hpp"
 #include "grid/particle_container/particle_container.hpp"
 #include "iterators/pairwise.hpp"
+#include "iterators/periodic.hpp"
 #include "output_writers/io.hpp"
 #include "physics/forces.hpp"
 #include "physics/particle.hpp"
@@ -74,11 +76,20 @@ BoundaryFunc funcDefiner(
 		     &config](particle_container::cell& cell, boundary_type b, const particle_container::index&) {
 				reflect_via_ghost_particle(cell, particles.domain(), b, calculator);
 			};
-	} else /* if (behavior == boundary_condition::outflow) */ {
+	} else if (behavior == boundary_condition::outflow) {
 		return
 			[&particles](particle_container::cell& cell, boundary_type b, const particle_container::index&) {
 				delete_ouflowing_particles(cell, particles.domain(), b);
 			};
+	} else {
+		assert(behavior == boundary_condition::periodic);
+		return [&](particle_container::cell& cell, boundary_type b,
+		           const particle_container::index& idx) {
+			(void)cell;
+			(void)b;
+			(void)idx;
+			// periodic();
+		};
 	}
 }
 
@@ -491,16 +502,16 @@ constexpr void run_simulation(
 	const std::string output_prefix = std::string(output_path) + "/" + config.base_name.c_str();
 
 	struct sim_traits {
-		bool has_thermostat;
 		bool is_first_iteration = false;
 	};
 
-	auto run_sim_pass = [&]<sim_traits Traits> {
+	const bool has_thermostat = config.thermostat.has_value();
+	auto run_sim_pass = [&]<sim_traits Traits = {}> {
 		TRACE_SIM("beginning iteration, current_time={}", current_time);
 		if (iteration % config.write_frequency == 0) {
 			WRITE_VTK_OUTPUT(plot_particles, container, output_prefix, iteration);
 		}
-		if constexpr (Traits.has_thermostat) {
+		if (has_thermostat) {
 			if (iteration % config.thermostat->application_frequency == 0) {
 				run_thermostat(container, *config.thermostat, config.dimensions);
 			}
@@ -510,20 +521,11 @@ constexpr void run_simulation(
 		++iteration;
 	};
 
-	auto sim = [&]<bool HasThermostat> {
-		run_sim_pass.template operator(
-		)<{.has_thermostat = HasThermostat, .is_first_iteration = true}>();
-		while (current_time < config.end_time) {
-			run_sim_pass.template operator()<{.has_thermostat = HasThermostat}>();
-		}
-	};
-
-	if (config.thermostat.has_value()) {
-		sim.template operator()<true>();
-	} else {
-		sim.template operator()<false>();
+	run_sim_pass.template operator()<{.is_first_iteration = true}>();
+	while (current_time < config.end_time) {
+		run_sim_pass.template operator()();
 	}
-	
+
 	if (config.create_checkpoint) {
 		// TODO(tuna): specify both in terms of plot_particles, where iteration is used in the
 		// filename Or just remove plot_particles

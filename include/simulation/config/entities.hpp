@@ -108,6 +108,7 @@ struct sim_configuration {
 	vec domain;
 	bool create_checkpoint;
 	std::uint8_t dimensions;
+	double gravitational_constant;
 };
 
 struct sim_configuration_constructor {
@@ -118,7 +119,7 @@ struct sim_configuration_constructor {
 	static constexpr sim_configuration operator()(
 		double delta_t, double cutoff_radius, Descriptor&& conditions, Thermostat&& thermostat,
 		double end_time, sim_iteration_t write_frequency, String&& base_name, Vec&& domain,
-		bool create_checkpoint
+		bool create_checkpoint, std::optional<double> gravity
 	) {
 		const decltype(sim_configuration::dimensions) dims = domain.z > cutoff_radius ? 3 : 2;
 		return sim_configuration{
@@ -131,7 +132,8 @@ struct sim_configuration_constructor {
 			{std::from_range, std::forward<String>(base_name)},
 			std::forward<Vec>(domain),
 			create_checkpoint,
-			dims
+			dims,
+			gravity.value_or(0)
 		};
 	}
 };

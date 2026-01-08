@@ -92,6 +92,7 @@ TEST(ConfigTest, SimConfigurationComponent) {
 	STATIC_EXPECT_STREQ(sim_config.base_name.c_str(), "base_name");
 	STATIC_EXPECT_EQ(sim_config.domain, vec(0.4, 0.5, 0.6));
 	STATIC_EXPECT_TRUE(sim_config.create_checkpoint);
+	STATIC_EXPECT_DOUBLE_EQ(sim_config.gravitational_constant, 0);
 }
 
 // Check that a cuboid description parses to the correct cuboid
