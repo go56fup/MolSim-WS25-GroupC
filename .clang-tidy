@@ -30,7 +30,15 @@ Checks: [
   # Not using macros whenever possible anyways, so always a false positive:
   "-cppcoreguidelines-macro-usage",
   # These checks have been removed in clang-20, so don't use them:
-  "-cert-dcl*"
+  "-cert-dcl*",
+  # Warning for #embed even though it is disabled on the driver.
+  "-clang-diagnostic-c23-extensions",
+  # I don't like uppercase literals.
+  "-hicpp-uppercase-literal-suffix",
+  "-readability-uppercase-literal-suffix",
+  # It is usually very clear what the order is, specifying the order between
+  # * and + makes code harder to read.
+  "-readability-math-missing-parentheses"
 ]
 
 WarningsAsErrors: ''

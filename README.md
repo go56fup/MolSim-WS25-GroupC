@@ -5,15 +5,15 @@ _Group C_
 The Molecular Dynamics teaching code.
 
 #### Build instructions
-To build with Clang, use:
+To build with GCC, use:
 ```
 cmake --workflow release
 ```
 The `MolSim` binary will be located under `build/release/MolSim`.
 
-To build with GCC, use
+To build with Clang, use
 ```
-cmake --workflow release-gcc
+cmake --workflow release-clang
 ```
 The `MolSim` binary will be located under `build/release-gcc/MolSim`.
 
@@ -23,26 +23,24 @@ for every run from then on.
 
 #### Running the simulation
 ```
-Usage: MolSim [--help] [--version] [--delta-t VAR] [--end-time VAR] [--output VAR] [--log-level VAR] files...
+Usage: MolSim [--help] [--version] [--output VAR] [--log-level VAR] file
 
 Positional arguments:
-  files           input file(s) to read initial condition of particles from [nargs: 1 or more]
+  file           input file to read simulation parameters and initial condition of bodies from
 
 Optional arguments:
-  -h, --help      shows help message and exits
-  -v, --version   prints version information and exits
-  -d, --delta-t   the tick length used for the simulation [nargs=0..1] [default: 0.014]
-  -e, --end-time  point in time to simulate until [nargs=0..1] [default: 1000]
-  -o, --output    output directory for resulting files [nargs=0..1] [default: "."]
-  --log-level     verbosity of log output [nargs=0..1] [default: "info"]
+  -h, --help     shows help message and exits
+  -v, --version  prints version information and exits
+  -o, --output   output directory for resulting files [nargs=0..1] [default: "."]
+  --log-level    verbosity of log output [nargs=0..1] [default: "info"]
 ```
 
 #### Running tests
-To run the tests after building with Clang, use:
+To run the tests after building with GCC, use:
 ```
 cmake --workflow test
 ```
-`test-gcc` is also available.
+`test-clang` is also available.
 
 #### Building documentation
 To build the project documentation via Doxygen, use:

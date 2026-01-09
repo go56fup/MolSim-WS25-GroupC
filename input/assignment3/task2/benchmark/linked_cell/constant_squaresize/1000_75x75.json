@@ -1,0 +1,45 @@
+{
+  "configuration": {
+    "delta_t": 0.0005,
+    "cutoff_radius": 3.0,
+    "sigma": 1,
+    "epsilon": 5,
+    "boundary_conditions": {
+      "x_min": "reflecting",
+      "y_min": "reflecting",
+      "z_min": "reflecting",
+      "x_max": "reflecting",
+      "y_max": "reflecting",
+      "z_max": "reflecting"
+    },
+    "end_time": 20,
+    "write_frequency": 10,
+    "base_name": "MD_vtk",
+    "domain": [
+      75,
+      75,
+      3
+    ]
+  },
+  "bodies": [
+    {
+      "type": "cuboid_2d",
+      "parameters": {
+        "origin": [
+          1.1225,
+          1.1225
+        ],
+        "scale": [
+			32,
+          32
+        ],
+        "velocity": [
+          0,
+          0
+        ],
+        "brownian_mean": 0.1,
+        "particle_mass": 1
+      }
+    }
+  ]
+}

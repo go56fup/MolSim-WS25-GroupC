@@ -1,0 +1,35 @@
+{
+  "configuration": {
+    "delta_t": 0.001,
+    "cutoff_radius": 3.0,
+    "sigma": 1,
+    "epsilon": 5,
+    "boundary_conditions": {
+      "x_min": "reflecting",
+      "y_min": "reflecting",
+      "z_min": "reflecting",
+      "x_max": "reflecting",
+      "y_max": "reflecting",
+      "z_max": "reflecting"
+    },
+    "end_time": 10,
+    "write_frequency": 10,
+    "base_name": "MD_vtk",
+    "domain": [
+	  10,
+      10,
+      1
+    ]
+  },
+  "bodies": [
+    {
+      "type": "particle",
+		"parameters": {
+			"position": [9, 9, 0.5],
+			"velocity": [0, 0, 1],
+			"mass": 1,
+			"type": 15
+      }
+    }
+  ]
+}

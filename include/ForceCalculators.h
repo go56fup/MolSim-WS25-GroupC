@@ -3,8 +3,10 @@
 #include <cmath>
 #include <concepts>
 #include <functional>
+#include <stdexcept>
 
 #include "CompilerTraits.h"
+#include "FileReader.h"
 #include "Particle.h"
 
 /**
@@ -19,9 +21,11 @@
  * @return `true` @a iff the callable can be invoked as specified.
  */
 template <typename Candidate>
-concept force_calculator = requires(Candidate f, const Particle& p1, const Particle& p2) {
-	{ std::invoke(f, p1, p2) } -> std::same_as<vec>;
-};
+concept force_calculator =
+	requires(Candidate f, const Particle& p1, const Particle& p2) {
+		{ std::invoke(f, p1, p2) } -> std::same_as<vec>;
+	} && std::is_nothrow_invocable_v<Candidate, const Particle&, const Particle&> &&
+	std::is_trivially_copyable_v<Candidate>;
 
 /**
  * @brief Computes the gravitational force exerted on one particle by another.
@@ -41,6 +45,11 @@ CONSTEXPR_IF_GCC inline vec gravitational_force(const Particle& p1, const Partic
 	const auto& xi = p1.x;
 	const auto& xj = p2.x;
 	const double reciprocal = std::pow((xi - xj).euclidian_norm(), 3);
+	// TODO(tuna): the reciprocal logic does not work cleanly with particles that are on top of each other,
+	// which happens when initial positions of particles are exactly on the border so the ghost gets reflected
+	// to the same position. i'm not sure the boundary logic even applies with gravitation, since objects
+	// don't push each other away there. I'm staying away from touching this part of the codebase for now,
+	// until I can figure out what the correct interaction between gravitation-boundaries-ghost particles is.
 	const double scaling_factor = p1.m * p2.m / reciprocal;
 	return scaling_factor * (xj - xi);
 }
@@ -66,13 +75,16 @@ CONSTEXPR_IF_GCC inline vec gravitational_force(const Particle& p1, const Partic
  * @return A vector representing the force acted upon @p p1 by @p p2.
 
  **/
-CONSTEXPR_IF_GCC inline vec lennard_jones_force(const Particle& p1, const Particle& p2) noexcept {
+CONSTEXPR_IF_GCC inline vec
+lennard_jones_force(const Particle& p1, const Particle& p2, double sigma, double eps) noexcept {
+	SPDLOG_DEBUG("Calculating Lennard-Jones forces for:\n{}\n{}\n", p1, p2);
 	const auto& xi = p1.x;
 	const auto& xj = p2.x;
-	static constexpr int eps = 5;
-	static constexpr int sig = 1;
 	const double norm = (xi - xj).euclidian_norm();
+	assert(norm != 0 && "Two particles at the same position cannot interact.");
 	const double scaling_factor =
-		24 * eps / std::pow(norm, 2) * (std::pow(sig / norm, 6) - 2 * (std::pow(sig / norm, 12)));
-	return scaling_factor * (xj - xi);
+		24 * eps / std::pow(norm, 2) * (std::pow(sigma / norm, 6) - 2 * (std::pow(sigma / norm, 12)));
+	const auto result = scaling_factor * (xj - xi);
+	SPDLOG_TRACE("calculated f: {}", result);
+	return result;
 }

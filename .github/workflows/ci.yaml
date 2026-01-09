@@ -9,34 +9,64 @@ jobs:
   run_gtest_suite:
     name: Google Tests
     runs-on: ubuntu-latest
+
+    container:
+      image: ghcr.io/go56fup/molsim-ws25-groupc
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    
     steps:
       - uses: actions/checkout@v4
-      - uses: awalsh128/cache-apt-pkgs-action@latest
-        with:
-          packages: libvtk9-dev doxygen gcc-14 g++-14 clang-20 clang-tidy-20 clang-format-20 cmake-format
-          version: 1.0
-    
-      - name: Install Dependencies
-        run: |
-          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-14 60 \
-          --slave /usr/bin/g++ g++ /usr/bin/g++-14 && \
-          sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-20 1000 &&
-          sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-20 1000 && \
-          sudo update-alternatives --install /usr/bin/clang-tidy clang-tidy /usr/bin/clang-tidy-20 1000 && \
-          sudo update-alternatives --install /usr/bin/clang-format clang-format /usr/bin/clang-format-20 1000
-
-      - name: Check toolchain versions
-        run: |
-          sudo update-alternatives --display clang && clang++ --version && clang-tidy --version && \
-          g++ --version && cmake --version
 
       - name: Run test suite with GCC
-        run: cmake --workflow --preset test-gcc 
+        run: cmake --workflow --preset test
 
       - name: Run test suite with Clang
-        run: cmake --workflow --preset test
+        run: cmake --workflow --preset test-clang
 
       - name: Check formatting
         run: |
           clang-format --dry-run --Werror **/*.cpp **/*.h && \
           cmake-format --check **/CMakeLists.txt cmake/modules/*.cmake
+
+  check_mac_build:
+    name: Google Tests (macOS)
+    runs-on: macos-latest
+
+    steps:
+     - uses: actions/checkout@v4
+
+     - name: Install Dependencies via Homebrew
+       run: |
+         brew update && \
+         brew install gcc@14 llvm@20 doxygen vtk
+         echo 'export PATH="/opt/homebrew/opt/llvm@20/bin:$PATH"' >> /Users/runner/.bash_profile
+         export PATH="/opt/homebrew/opt/llvm@20/bin:$PATH"
+         export LDFLAGS="-L/opt/homebrew/opt/llvm@20/lib"
+         export CPPFLAGS="-I/opt/homebrew/opt/llvm@20/include"
+         export CMAKE_PREFIX_PATH="/opt/homebrew/opt/llvm@20"
+         source ~/.bash_profile
+
+
+     - name: Check toolchain versions
+       run: |
+         hash -r
+         echo $PATH
+         echo $LDFLAGS
+         echo $CPPFLAGS
+         echo $CMAKE_PREFIX_PATH
+         ls /opt/homebrew/opt/llvm@20/bin
+         which clang
+         clang --version
+         which clang++
+         clang++ --version
+         g++ --version
+         cmake --version
+         which g++-14
+
+     - name: Run test suite with GCC
+       run: cmake --workflow --preset test
+
+     - name: Run test suite with Clang
+       run: cmake --workflow --preset test-clang
