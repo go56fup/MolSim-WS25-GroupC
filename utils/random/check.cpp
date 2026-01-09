@@ -2,7 +2,7 @@
 #include <bit>
 #include <iostream>
 
-#include "Constants.h"
+#include "utility/constants.hpp"
 
 inline constexpr auto numbers = [] consteval {
 	const char data[random_table_size * sizeof(double)] {
