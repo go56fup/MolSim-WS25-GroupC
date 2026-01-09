@@ -165,7 +165,7 @@ constexpr void delete_ouflowing_particles(
 	}
 }
 
-#define reflect_via_ghost_particle reflect::macro
+#define reflect_via_ghost_particle reflect::lambda
 
 constexpr void periodic(
 	particle_container::cell& current_cell, boundary_type border_type,
