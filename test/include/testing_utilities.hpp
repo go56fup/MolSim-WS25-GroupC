@@ -5,7 +5,6 @@
 #include "utility/compiler_traits.hpp"
 #include "utility/debug.hpp"
 
-#include "physics/particle.hpp"
 #include "physics/vec_3d.hpp"
 
 // TODO(tuna): change the name of this file to something more descriptive along the lines of

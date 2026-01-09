@@ -1,10 +1,12 @@
 #pragma once
 
+#include <daw/json/daw_json_data_contract.h>
 #include <daw/json/daw_json_link.h>
 #include <daw/json/daw_json_link_types.h>
 
-#include "entities.hpp"
-#include "simulation/config/entities.hpp"
+#include "grid/particle_container/fwd.hpp"
+#include "physics/vec_3d.hpp"
+#include "simulation/entities.hpp"
 
 namespace daw::json {
 template <typename T>
@@ -41,57 +43,32 @@ struct json_data_contract<sim_configuration> {
 		json_number_null<"gravitational_constant", std::optional<double>>>;
 };
 
-template <>
-struct json_data_contract<unprocessed_config> {
-	using type =
-		json_member_list<json_class<"configuration", sim_configuration>, json_raw<"bodies">>;
-};
-
 template <std::size_t Dimensions>
 struct json_data_contract<cuboid_parameters<Dimensions>> {
 	using type = json_member_list<
 		json_class<"origin", vec_n<Dimensions, double>>,
-		json_class<"scale", vec_n<Dimensions, particle_container::size_type>>,
-		json_class<"velocity", vec_n<Dimensions, double>>, json_number<"meshwidth", double>,
-		json_number<"brownian_mean", double>, json_number<"particle_mass", double>,
-		json_number<"sigma", double>, json_number<"epsilon", double>>;
+		json_class<"scale", vec_n<Dimensions, particle_container::size_type>>>;
 };
 
 template <>
 struct json_data_contract<particle_parameters> {
-	using type = json_member_list<
-		json_class<"position", vec>, json_class<"velocity", vec>, json_number<"mass", double>,
-		json_number<"sigma", double>, json_number<"epsilon", double>>;
+	using type = json_member_list<json_class<"position", vec>>;
 };
 
 template <>
-struct json_data_contract<particle> {
+struct json_data_contract<particle_state_parameters> {
 	using type = json_member_list<
-		json_class<"position", vec>, json_class<"velocity", vec>, json_class<"force", vec>,
-		json_class<"old_force", vec>, json_number<"mass", double>, json_number<"sigma", double>,
-		json_number<"epsilon", double>, json_number<"type", decltype(particle::type)>>;
+		json_class<"position", vec>, json_class<"force", vec>, json_class<"old_force", vec>>;
 
-	static constexpr auto to_json_data(const particle& p) noexcept {
-		return std::forward_as_tuple(p.x, p.v, p.f, p.old_f, p.m, p.sigma, p.epsilon, p.type);
+	static constexpr auto to_json_data(const particle_state_parameters& p) noexcept {
+		return std::forward_as_tuple(p.position, p.force, p.old_force);
 	}
 };
 
 template <>
-struct json_data_contract<disc_parameters> {
-	using type = json_member_list<
-		json_class<"center", vec_2d<double>>, json_number<"radius", double>,
-		json_class<"velocity", vec_2d<double>>, json_number<"meshwidth", double>,
-		json_number<"brownian_mean", double>, json_number<"particle_mass", double>,
-		json_number<"sigma", double>, json_number<"epsilon", double>>;
-};
-
-template <typename Body>
-struct json_data_contract<serialization_view<Body>> {
-	using type = json_member_list<json_string<"type">, json_class<"parameters", Body>>;
-
-	static constexpr auto to_json_data(const serialization_view<Body>& body) {
-		return std::forward_as_tuple(body.type, body.parameters);
-	}
+struct json_data_contract<disc_parameters<2>> {
+	using type =
+		json_member_list<json_class<"center", vec_2d<double>>, json_number<"radius", double>>;
 };
 
 template <>
@@ -103,7 +80,41 @@ struct json_data_contract<thermostat_parameters> {
 		// TODO(tuna): can you also just say double?
 		json_number_null<"target_temperature", std::optional<double>>,
 		json_number_null<"max_temperature_difference", std::optional<double>>,
-		json_bool<"enforce_initial_temperature">
-		>;
+		json_bool<"enforce_initial_temperature">>;
+};
+
+template <>
+struct json_data_contract<body_common_parameters> {
+	using constructor_t = body_common_parameters_constructor;
+	using type = json_member_list<
+		json_number<"meshwidth", double>, json_number_null<"brownian_mean", std::optional<double>>>;
+
+	static constexpr auto to_json_data(const body_common_parameters& params) noexcept {
+		return std::forward_as_tuple(params.meshwidth, params.brownian_mean);
+	};
+};
+
+template <>
+struct json_data_contract<material_description> {
+	using type = json_member_list<
+		json_number<"mass", double>, json_number<"sigma", double>, json_number<"epsilon", double>>;
+
+	static constexpr auto to_json_data(const material_description& material) noexcept {
+		return std::forward_as_tuple(material.mass, material.sigma, material.epsilon);
+	};
+};
+
+template <>
+struct json_data_contract<body_entry> {
+	using type = json_member_list<
+		json_string<"type">, json_raw<"geometry">,
+		json_class_null<"parameters", std::optional<body_common_parameters>>,
+		json_class<"velocity", vec>, json_class<"material", material_description>>;
+
+	static constexpr auto to_json_data(const body_entry& body) noexcept {
+		return std::forward_as_tuple(
+			body.type, body.geometry, body.parameters, body.velocity, body.material
+		);
+	}
 };
 }  // namespace daw::json

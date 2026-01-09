@@ -9,7 +9,6 @@
 				"CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
 				"BUILD_TESTING": "ON",
 				"CMAKE_COMPILE_WARNING_AS_ERROR": "ON",
-				"ENABLE_VTK_OUTPUT": "ON",
 				"LOG_LEVEL": "INFO"
 			}
 		},
@@ -28,13 +27,24 @@
 			}
 		},
 		{
-			"name": "test-lite-base",
+			"name": "novtk",
 			"hidden": true,
-			"description": "Runtime tests only, no VTK output, no static analysis",
-			"inherits": "debug-base",
 			"cacheVariables": {
 				"ENABLE_VTK_OUTPUT": "OFF"
 			}
+		},
+		{
+			"name": "singlethreaded",
+			"hidden": true,
+			"cacheVariables": {
+				"SINGLETHREADED": "ON"
+			}
+		},
+		{
+			"name": "test-lite-base",
+			"hidden": true,
+			"description": "Runtime tests only, no VTK output, no static analysis",
+			"inherits": ["debug-base", "novtk", "singlethreaded"]
 		},
 		{
 			"name": "test-base",
@@ -69,10 +79,32 @@
 			}
 		},
 		{
+			"name": "native-arch",
+			"hidden": true,
+			"cacheVariables": {
+				"CMAKE_CXX_FLAGS": "-march=native"
+			}
+		},
+		{
 			"name": "release",
-			"inherits": ["release-base", "gcc"],
+			"inherits": ["release-base", "gcc", "native-arch"],
 			"displayName": "Release (GCC)",
 			"description": "Configure Release build with GCC"
+		},
+		{
+			"name": "benchmarking",
+			"inherits": ["release-base", "gcc", "native-arch", "novtk"],
+			"displayName": "Release (performance testing)",
+			"description": "Configure Release build with GCC and no VTK output"
+		},
+		{
+			"name": "muc",
+			"inherits": ["release-base", "gcc", "novtk"],
+			"displayName": "Release (GCC, optimized for MUC)",
+			"description": "Configure Release build with GCC, with tuning flags set for the CM4 cluster",
+			"cacheVariables": {
+				"CMAKE_TOOLCHAIN_FILE": "${sourceDir}/cmake/toolchain/muc.cmake"
+			}
 		},
 		{
 			"name": "debug",
@@ -94,7 +126,7 @@
 		},
 		{
 			"name": "release-clang",
-			"inherits": ["release-base", "clang"],
+			"inherits": ["release-base", "clang", "native-arch"],
 			"displayName": "Release (Clang)",
 			"description": "Configure Release build with Clang"
 		},
@@ -158,7 +190,11 @@
 			"inherits": "base",
 			"configurePreset": "test-lite-clang"
 		},
-
+		{
+			"name": "muc-build",
+			"inherits": "base",
+			"configurePreset": "muc"
+		},
 		{
 			"name": "test-clang-build",
 			"inherits": "base",
@@ -208,6 +244,14 @@
 			"steps": [
 				{ "type": "configure", "name": "release" },
 				{ "type": "build",     "name": "release-build" }
+			]
+		},
+		{
+			"name": "muc",
+			"description": "Configure and build for the MUC",
+			"steps": [
+				{ "type": "configure", "name": "muc" },
+				{ "type": "build",     "name": "muc-build" }
 			]
 		},
 		{

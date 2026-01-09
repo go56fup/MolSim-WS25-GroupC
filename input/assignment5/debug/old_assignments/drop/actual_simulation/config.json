@@ -1,0 +1,22 @@
+{
+  "delta_t": 0.0005,
+  "cutoff_radius": 3,
+  "boundary_conditions": {
+    "x_min": "reflecting",
+    "y_min": "reflecting",
+    "z_min": "reflecting",
+    "x_max": "reflecting",
+    "y_max": "reflecting",
+    "z_max": "reflecting"
+  },
+  "end_time": 40,
+  "write_frequency": 10,
+  "base_name": "MD_vtk",
+  "domain": [
+    303,
+    180,
+    3
+  ],
+  "gravitational_constant": -12.44,
+  "create_checkpoint": false
+}

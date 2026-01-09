@@ -13,17 +13,25 @@
 #include "utility/compiler_traits.hpp"
 #include "utility/constants.hpp"
 
+#define USE_EMBED 0
+
 namespace detail {
-#if IS_GCC && !HAS_EMBED
+#if !USE_EMBED
+#if IS_GCC
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wnarrowing"
 #pragma GCC diagnostic ignored "-Woverflow"
+#elif IS_CLANG
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wc++11-narrowing"
+#pragma clang diagnostic ignored "-Wconstant-conversion"
+#endif
 #endif
 inline constexpr auto random_numbers = [] consteval {
 	// C arrays are how #embed is meant to be used.
 	// NOLINTNEXTLINE(*avoid-c-arrays)
 	const std::uint8_t data[]{
-#if HAS_EMBED
+#if USE_EMBED
 #embed "random.bin"
 #else
 #include "utility/random_preprocessed.hpp"
@@ -31,8 +39,12 @@ inline constexpr auto random_numbers = [] consteval {
 	};
 	return std::bit_cast<std::array<double, random_table_size>>(data);
 }();
+#if !USE_EMBED
 #if IS_GCC
 #pragma GCC diagnostic pop
+#elif IS_CLANG
+#pragma clang diagnostic pop
+#endif
 #endif
 
 inline double get_random_runtime() {
@@ -51,9 +63,13 @@ inline double get_random_runtime() {
 
 constexpr double get_random([[maybe_unused]] std::size_t no) {
 	if not consteval {
-		return get_random_runtime();
+		const double result = get_random_runtime();
+		TRACE_RANDOM("Got random number {} at {}", result, no);
+		return result;
 	} else {
-		return random_numbers[no];
+		const double result = random_numbers[no];
+		TRACE_RANDOM("Got random number {} at {}", result, no);
+		return result;
 	}
 }
 

@@ -38,13 +38,9 @@ function(create_test_target)
 	# Disable warnings from inside GTest.
 	target_include_directories("${tests_TARGET}" SYSTEM PRIVATE "${googletest_SOURCE_DIR}/include")
 
-	target_include_directories(
-		"${tests_TARGET}" PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include"
-	)
-	
-	if(CXX_COMPILER_ID STREQUAL Clang)
-		target_compile_options("${tests_TARGET}" PRIVATE -fmacro-backtrace-limit=0)
-	endif()
+	target_include_directories("${tests_TARGET}" PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include")
+	target_compile_definitions("${tests_TARGET}" PRIVATE "IS_TESTING")
+
 	gtest_discover_tests("${tests_TARGET}" TEST_PREFIX "${tests_PREFIX}")
 endfunction()
 
@@ -60,6 +56,7 @@ if(ENABLE_STATIC_TESTING)
 		${TEST_SRC}
 	)
 	target_compile_definitions(MolSim_Test_static PRIVATE "SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_OFF")
+
 	if(CMAKE_CXX_COMPILER_ID STREQUAL GNU)
 		target_compile_options(
 			MolSim_Test_static PRIVATE "-fconstexpr-loop-limit=2147483647"

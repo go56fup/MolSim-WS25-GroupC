@@ -5,62 +5,12 @@
 #include "grid/particle_container/fwd.hpp"
 #include "iterators/periodic.hpp"
 #include "physics/forces.hpp"
-#include "simulation/config/entities.hpp"
+#include "simulation/entities.hpp"
+#include "utility/constants.hpp"
+#include "utility/macros.hpp"
+#include "utility/tracing/macros.hpp"
 
-// The wrapping in do-while increases this metric dramatically. Otherwise, the rest of the logic is
-// impossible to express in more granular functions without having to recompute information. The
-// template-for facility from C++26 would have come in useful here.
-// NOLINTBEGIN(*cognitive-complexity)
-// NOLINTBEGIN(*avoid-do-while)
-
-namespace reflect {
-constexpr void macro(
-	particle_container::cell& current_cell, const vec& domain, boundary_type border_type,
-	force_calculator auto calculator
-) noexcept {
-#define REFLECT_IF(check, x_mod, y_mod, z_mod)                                                     \
-	do {                                                                                           \
-		for (auto& p : current_cell) {                                                             \
-			const double ghost_particle_threshold = p.sigma * sixth_root_of_2;                     \
-			if (p.x.check) {                                                                       \
-				const particle ghost{                                                              \
-					{p.x.x_mod, p.x.y_mod, p.x.z_mod}, {}, p.m, p.sigma, p.epsilon                 \
-				};                                                                                 \
-				TRACE_GRID("Reflecting {} with ghost: {}", p, ghost);                              \
-				p.f += std::invoke(calculator, p, ghost);                                          \
-			}                                                                                      \
-		}                                                                                          \
-	} while (0)
-
-	using enum boundary_type;
-
-	switch (border_type) {
-	case x_min:
-		REFLECT_IF(x <= ghost_particle_threshold, x * -1, y, z);
-		return;
-	case y_min:
-		REFLECT_IF(y <= ghost_particle_threshold, x, y * -1, z);
-		return;
-	case z_min:
-		REFLECT_IF(z <= ghost_particle_threshold, x, y, z * -1);
-		return;
-	case x_max:
-		REFLECT_IF(x >= domain.x - ghost_particle_threshold, x * -1 + (2 * domain.x), y, z);
-		return;
-	case y_max:
-		REFLECT_IF(y >= domain.y - ghost_particle_threshold, x, y * -1 + (2 * domain.y), z);
-		return;
-	case z_max:
-		REFLECT_IF(z >= domain.z - ghost_particle_threshold, x, y, z * -1 + (2 * domain.z));
-		return;
-	}
-	assert(!"This should never be called with a non-border, the iterator is wrong.");
-#undef REFLECT_IF
-}
-
-// NOLINTEND(*avoid-do-while)
-// NOLINTEND(*cognitive-complexity)
-
+namespace detail {
 constexpr vec x_min_f(const vec& x) noexcept {
 	return {-x.x, x.y, x.z};
 }
@@ -72,46 +22,55 @@ constexpr vec y_min_f(const vec& x) noexcept {
 constexpr vec z_min_f(const vec& x) {
 	return {x.x, x.y, -x.z};
 }
+}  // namespace detail
 
-constexpr void lambda(
-	std::vector<particle>& current_cell, const vec& domain, boundary_type border_type,
-	force_calculator auto calculator
+template <boundary_type Boundary>
+constexpr void reflect_via_ghost_particle(
+	particle_container& container, const sim_configuration& config,
+	const particle_container::index& cell_idx
 ) noexcept {
 	using enum boundary_type;
 
+	auto& current_cell = container[cell_idx];
+	auto& system = container.system();
+	const auto& domain = container.domain();
+
 	auto reflect = [&]<boundary_type b>(const auto& make_ghost_pos) {
-		for (auto& p : current_cell) {
-			const double ghost_particle_threshold = p.sigma * sixth_root_of_2;
+		for (auto p : current_cell) {
+			const double ghost_particle_threshold = system.sigma[p] * sixth_root_of_2;
 			const vec min{
 				ghost_particle_threshold, ghost_particle_threshold, ghost_particle_threshold
 			};
 			const auto max = domain - min;
-			const bool check = out_of_bounds<b>(p.x, max, min);
-			if (check) {
-				const particle ghost{make_ghost_pos(p.x), {}, p.m, p.sigma, p.epsilon};
-				p.f += std::invoke(calculator, p, ghost);
+			if (out_of_bounds_soa<b>(system, p, max, min)) {
+				const vec current_pos{system.x[p], system.y[p], system.z[p]};
+				const auto resulting_force = force_calculator::single(
+					config, {.p1_position = current_pos,
+				             .p2_position = make_ghost_pos(current_pos),
+				             .constants{.sigma = system.sigma[p], .epsilon = system.epsilon[p]}}
+				);
+				system.fx[p] += resulting_force.x;
+				system.fy[p] += resulting_force.y;
+				system.fz[p] += resulting_force.z;
 			}
 		}
 	};
 
-	const auto x_max_f = [&](const vec& x) {
-		return vec{-x.x + 2 * domain.x, x.y, x.z}; };
-	const auto y_max_f = [&](const vec& x) {
-		return vec{x.x, -x.y + 2 * domain.y, x.z}; };
-	const auto z_max_f = [&](const vec& x) {
-		return vec{x.x, x.y, -x.z + 2 * domain.z}; };
+	const auto x_max_f = [&](const vec& x) { return vec{-x.x + 2 * domain.x, x.y, x.z}; };
+	const auto y_max_f = [&](const vec& x) { return vec{x.x, -x.y + 2 * domain.y, x.z}; };
+	const auto z_max_f = [&](const vec& x) { return vec{x.x, x.y, -x.z + 2 * domain.z}; };
 
-	switch (border_type) {
+	switch (Boundary) {
 	case x_min:
-		reflect.template operator()<x_min>(x_min_f);
+		reflect.template operator()<x_min>(detail::x_min_f);
 		return;
 
 	case y_min:
-		reflect.template operator()<y_min>(y_min_f);
+		reflect.template operator()<y_min>(detail::y_min_f);
 		return;
 
 	case z_min:
-		reflect.template operator()<z_min>(z_min_f);
+		reflect.template operator()<z_min>(detail::z_min_f);
 		return;
 
 	case x_max:
@@ -128,135 +87,274 @@ constexpr void lambda(
 	}
 }
 
-}  // namespace reflect
-
+template <boundary_type Boundary>
 constexpr void delete_ouflowing_particles(
-	particle_container::cell& cell, const vec& domain, boundary_type border
+	particle_container& container, const particle_container::index& cell_idx
 ) {
 	using enum boundary_type;
-	auto erase_if = [&](bool oob, std::size_t i) {
-		if (oob)
-			cell.erase(
-				std::next(cell.begin(), static_cast<particle_container::cell::difference_type>(i))
-			);
+	auto& cell = container[cell_idx];
+	auto& system = container.system();
+	const auto& domain = container.domain();
+
+	auto erase_if = [&]<boundary_type b>(std::size_t cell_idx) {
+		if (out_of_bounds_soa<b>(system, cell[cell_idx], domain)) {
+			cell.erase(std::next(
+				cell.begin(), static_cast<particle_container::cell::difference_type>(cell_idx)
+			));
+		}
 	};
-	for (std::size_t i = 0; i < cell.size(); ++i) {
-		const auto& particle_coords = cell[i].x;
-		switch (border) {
+	for (std::size_t cell_idx = 0; cell_idx < cell.size(); ++cell_idx) {
+		switch (Boundary) {
 		case x_min:
-			erase_if(out_of_bounds<x_min>(particle_coords, domain), i);
+			erase_if.template operator()<x_min>(cell_idx);
 			break;
 		case x_max:
-			erase_if(out_of_bounds<x_max>(particle_coords, domain), i);
+			erase_if.template operator()<x_max>(cell_idx);
 			break;
 		case y_min:
-			erase_if(out_of_bounds<y_min>(particle_coords, domain), i);
+			erase_if.template operator()<y_min>(cell_idx);
 			break;
 		case y_max:
-			erase_if(out_of_bounds<y_max>(particle_coords, domain), i);
+			erase_if.template operator()<y_max>(cell_idx);
 			break;
 		case z_min:
-			erase_if(out_of_bounds<z_min>(particle_coords, domain), i);
+			erase_if.template operator()<z_min>(cell_idx);
 			break;
 		case z_max:
-			erase_if(out_of_bounds<z_max>(particle_coords, domain), i);
+			erase_if.template operator()<z_max>(cell_idx);
 			break;
 		}
 	}
 }
 
-#define reflect_via_ghost_particle reflect::macro
-
-constexpr void periodic(
-	particle_container::cell& current_cell, boundary_type border_type,
-	force_calculator auto calculator, const particle_container::index& idx,
-	particle_container& particles
+template <boundary_type Boundary>
+constexpr void periodic_particle_interactions(
+	particle_container& container, const sim_configuration& config,
+	const particle_container::index& cell_idx
 ) {
-
 	using enum boundary_type;
-	using difference_type = particle_container::difference_type;
-	using signed_index = vec_3d<difference_type>;
-	signed_index current_virtual_idx{};
+	using signed_ = particle_container::difference_type;
 
-	const auto& grid = particles.grid_size();
-	signed_index signed_grid = {
-		static_cast<difference_type>(grid.x), static_cast<difference_type>(grid.y),
-		static_cast<difference_type>(grid.z)
+	particle_container::signed_index current_virtual_idx{};
+	const auto& grid = container.grid_size();
+
+	particle_container::signed_index signed_grid{
+		static_cast<signed_>(grid.x), static_cast<signed_>(grid.y), static_cast<signed_>(grid.z)
 	};
-	const vec_3d<difference_type> signed_idx = {
-		static_cast<difference_type>(idx.x), static_cast<difference_type>(idx.y),
-		static_cast<difference_type>(idx.z)
+
+	// TODO(tuna): is this used anywhere but to initialize current_virtual_idx?
+	const particle_container::signed_index signed_idx{
+		static_cast<signed_>(cell_idx.x), static_cast<signed_>(cell_idx.y),
+		static_cast<signed_>(cell_idx.z)
 	};
 
 	current_virtual_idx = signed_idx;
-	vec particle_mirror{};
-	const double cell_width = particles.cutoff_radius();
 
-	// TODO(tuna): fold into axis and lambda
-	if ((border_type & x_min) == x_min) {
-		particle_mirror.x = signed_grid.x * cell_width;
-		current_virtual_idx.x = signed_grid.x;
+	vec particle_mirror{};
+	const double cell_width = container.cutoff_radius();
+
+	auto handle_boundary = [&]<boundary_type BoundaryChecked> {
+		if constexpr ((Boundary & BoundaryChecked) != BoundaryChecked) {
+			return;
+		}
+		static constexpr auto axis_ = boundary_type_to_axis(BoundaryChecked);
+		static constexpr bool is_min = boundary_type_to_extremum(BoundaryChecked) == extremum::min;
+		static constexpr int sign = is_min ? 1 : -1;
+
+		particle_mirror[axis_] = signed_grid[axis_] * cell_width * sign;
+		current_virtual_idx[axis_] = is_min ? signed_grid[axis_] : -1;
+	};
+
+	handle_boundary.template operator()<x_min>();
+	handle_boundary.template operator()<x_max>();
+	handle_boundary.template operator()<y_min>();
+	handle_boundary.template operator()<y_max>();
+	handle_boundary.template operator()<z_min>();
+	handle_boundary.template operator()<z_max>();
+
+	// TODO(tuna): refactor into common batch prep routine
+#if 0
+	auto use_batch_piecewise = [&](particle_batch batch_p1, particle_batch batch_p2,
+	                               std::size_t up_to = batch_size) {
+		for (std::size_t i = 0; i < up_to; ++i) {
+			force_calculator::soa(
+				container.system(), config, batch_p1[i], batch_p2[i], particle_mirror
+			);
+		}
+	};
+
+	auto use_batch = [&](particle_batch batch_p1, particle_batch batch_p2) {
+		force_calculator::batch(container.system(), config, batch_p1, batch_p2, particle_mirror);
+	};
+#endif
+	TRACE_PERIODIC("current={}, virtual={}, Boundary={}", cell_idx, current_virtual_idx, Boundary);
+	for (const auto& periodic_target : periodic_range(container, current_virtual_idx)) {
+		TRACE_PERIODIC(
+			"Calculating periodic interactions for {} at {} via virtual index: {}, mirror={} => {}", cell_idx,
+			Boundary, current_virtual_idx, particle_mirror, periodic_target
+		);
+
+#if !SINGLETHREADED && !DETERMINISTIC
+#pragma omp parallel for schedule(dynamic)
+#endif
+#if 0
+		for (auto current_p : container[cell_idx]) {
+			std::size_t count = 0;
+			particle_batch batch_p1{};
+			particle_batch batch_p2{};
+
+			for (auto periodic_p : container[periodic_target]) {
+				batch_p1[count] = current_p;
+				batch_p2[count] = periodic_p;
+				++count;
+
+				if (count == batch_size) {
+					use_batch(batch_p1, batch_p2);
+					count = 0;
+				}
+			}
+			use_batch_piecewise(batch_p1, batch_p2, count);
+		}
 	}
-	if ((border_type & x_max) == x_max) {
-		particle_mirror.x = -signed_grid.x * cell_width;
-		current_virtual_idx.x = -1;
-	}
-	if ((border_type & y_min) == y_min) {
-		particle_mirror.y = signed_grid.y * cell_width;
-		current_virtual_idx.y = signed_grid.y;
-	}
-	if ((border_type & y_max) == y_max) {
-		particle_mirror.y = -signed_grid.y * cell_width;
-		current_virtual_idx.y = -1;
-	}
-	if ((border_type & z_min) == z_min) {
-		particle_mirror.z = signed_grid.z * cell_width;
-		current_virtual_idx.z = signed_grid.z;
-	}
-	if ((border_type & z_max) == z_max) {
-		particle_mirror.z = -signed_grid.z * cell_width;
-		current_virtual_idx.z = -1;
-	}
-	TRACE_GRID("Calculating periodic interactions via virtual index: {}", current_virtual_idx);
-	for (const auto& periodic_target : periodic_range(particles, current_virtual_idx)) {
-		for (auto& p1 : current_cell) {
-			for (auto& p2 : particles[periodic_target]) {
-				// TODO(tuna): is this actually the best way of doing this?
-				p1.x += particle_mirror;
-				apply_force_interaction(calculator, p1, p2);
-				p1.x -= particle_mirror;
+#endif
+		for (auto current_p : container[cell_idx]) {
+			for (auto periodic_p : container[periodic_target]) {
+				force_calculator::soa(
+					container.system(), config, current_p, periodic_p, particle_mirror
+				);
 			}
 		}
 	}
 }
 
-constexpr void handle_boundary_condition(
-	particle_container::cell& cell, boundary_type border, const vec& domain,
-	force_calculator auto force_calc, const sim_configuration& config
-) noexcept {
+namespace detail {
+constexpr bool has_periodic(const sim_configuration& config) {
 	using enum boundary_type;
-	auto exercise_boundary_condition = [&](boundary_type border) {
-		switch (config.boundary_behavior[border]) {
-		case boundary_condition::reflecting:
-			reflect_via_ghost_particle(cell, domain, border, force_calc);
-			break;
-		case boundary_condition::outflow:
-			delete_ouflowing_particles(cell, domain, border);
-			break;
-		case boundary_condition::periodic:
-			// TODO(gabriel): implement this
-			throw std::logic_error("Not implemented");
-		}
-	};
+	STATIC_IF_NOT_TESTING const bool result =
+		config.boundary_behavior[x_min] == boundary_condition::periodic ||
+		config.boundary_behavior[y_min] == boundary_condition::periodic ||
+		config.boundary_behavior[z_min] == boundary_condition::periodic;
+	return result;
+}
 
-	for (auto [min, max] : border_pairs) {
-		const bool on_min = (border & min) == min;
-		const bool on_max = (border & max) == max;
-		if (on_min) {
-			exercise_boundary_condition(min);
-		}
-		if (on_max) {
-			exercise_boundary_condition(max);
-		}
+template <boundary_type... Boundaries>
+constexpr bool is_periodic(const sim_configuration& config) {
+	// TODO(tuna): see if making the result of this check static actually results in different
+	// static bools across the templates
+	return (... && (config.boundary_behavior[Boundaries] == boundary_condition::periodic));
+}
+}  // namespace detail
+
+template <boundary_type Boundary>
+constexpr void handle_boundary_condition(
+	particle_container& container, const sim_configuration& config,
+	const particle_container::index& cell_idx
+) {
+	using enum boundary_type;
+
+	TRACE_BORDER_CELL_ITER("Checking boundary conditions for index: {}", cell_idx);
+	const auto behavior = config.boundary_behavior[Boundary];
+	switch (behavior) {
+	case boundary_condition::reflecting:
+		reflect_via_ghost_particle<Boundary>(container, config, cell_idx);
+		break;
+	case boundary_condition::outflow:
+		delete_ouflowing_particles<Boundary>(container, cell_idx);
+		break;
+	case boundary_condition::periodic:
+		periodic_particle_interactions<Boundary>(container, config, cell_idx);
+		break;
 	}
 }
+
+constexpr void handle_boundaries(particle_container& container, const sim_configuration& config) {
+	const auto& grid = container.grid_size();
+	const particle_container::index max_valid{grid.x - 1, grid.y - 1, grid.z - 1};
+	using enum boundary_type;
+
+	// TODO(gabriel):parallelis this (Attention corners need to be done atomically)
+	for (particle_container::size_type i = 0; i < grid.y; ++i) {
+		for (particle_container::size_type j = 0; j < grid.z; ++j) {
+			handle_boundary_condition<x_min>(container, config, {0, i, j});
+			handle_boundary_condition<x_max>(container, config, {max_valid.x, i, j});
+		}
+	}
+
+	for (particle_container::size_type i = 0; i < grid.x; ++i) {
+		for (particle_container::size_type j = 0; j < grid.z; ++j) {
+			handle_boundary_condition<y_min>(container, config, {i, 0, j});
+			handle_boundary_condition<y_max>(container, config, {i, max_valid.y, j});
+		}
+	}
+
+	for (particle_container::size_type i = 0; i < grid.x; ++i) {
+		for (particle_container::size_type j = 0; j < grid.y; ++j) {
+			handle_boundary_condition<z_min>(container, config, {i, j, 0});
+			handle_boundary_condition<z_max>(container, config, {i, j, max_valid.z});
+		}
+	}
+
+	if (!detail::has_periodic(config)) return;
+
+	if (detail::is_periodic<x_min, y_min>(config)) {
+		for (particle_container::size_type i = 0; i < grid.z; ++i) {
+			periodic_particle_interactions<x_min | y_min>(container, config, {0, 0, i});
+			periodic_particle_interactions<x_min | y_max>(container, config, {0, max_valid.y, i});
+			periodic_particle_interactions<x_max | y_min>(container, config, {max_valid.x, 0, i});
+			periodic_particle_interactions<x_max | y_max>(
+				container, config, {max_valid.x, max_valid.y, i}
+			);
+		}
+	}
+
+	if (detail::is_periodic<x_min, z_min>(config)) {
+		for (particle_container::size_type i = 0; i < grid.y; ++i) {
+			periodic_particle_interactions<x_min | z_min>(container, config, {0, i, 0});
+			periodic_particle_interactions<x_min | z_max>(container, config, {0, i, max_valid.z});
+			periodic_particle_interactions<x_max | z_min>(container, config, {max_valid.x, i, 0});
+			periodic_particle_interactions<x_max | z_max>(
+				container, config, {max_valid.x, i, max_valid.z}
+			);
+		}
+	}
+
+	if (detail::is_periodic<y_min, z_min>(config)) {
+		for (particle_container::size_type i = 0; i < grid.x; ++i) {
+			periodic_particle_interactions<y_min | z_min>(container, config, {i, 0, 0});
+			periodic_particle_interactions<y_min | z_max>(container, config, {i, 0, max_valid.z});
+			periodic_particle_interactions<y_max | z_min>(container, config, {i, max_valid.y, 0});
+			periodic_particle_interactions<y_max | z_max>(
+				container, config, {i, max_valid.y, max_valid.z}
+			);
+		}
+	}
+
+	if (detail::is_periodic<x_min, y_min, z_min>(config)) {
+		periodic_particle_interactions<x_min | y_min | z_min>(container, config, {0, 0, 0});
+
+		periodic_particle_interactions<x_max | y_min | z_min>(
+			container, config, {max_valid.x, 0, 0}
+		);
+		periodic_particle_interactions<x_min | y_max | z_min>(
+			container, config, {0, max_valid.y, 0}
+		);
+		periodic_particle_interactions<x_min | y_min | z_max>(
+			container, config, {0, 0, max_valid.z}
+		);
+
+		periodic_particle_interactions<x_max | y_max | z_min>(
+			container, config, {max_valid.x, max_valid.y, 0}
+		);
+		periodic_particle_interactions<x_min | y_max | z_max>(
+			container, config, {0, max_valid.y, max_valid.z}
+		);
+		periodic_particle_interactions<x_max | y_min | z_max>(
+			container, config, {max_valid.x, 0, max_valid.z}
+		);
+
+		periodic_particle_interactions<x_max | y_max | z_max>(
+			container, config, {max_valid.x, max_valid.y, max_valid.z}
+		);
+	}
+}
+

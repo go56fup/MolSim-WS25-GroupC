@@ -42,4 +42,3 @@ consteval std::span<const ValueT> constexpr_two_step(Builder&& builder) {
 	});
 	return static_data;
 }
-

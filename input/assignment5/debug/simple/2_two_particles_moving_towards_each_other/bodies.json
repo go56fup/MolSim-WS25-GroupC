@@ -1,0 +1,42 @@
+[
+  {
+    "type": "particle",
+    "geometry": {
+      "position": [
+        2,
+        1,
+        1
+      ]
+    },
+    "velocity": [
+      1,
+      0,
+      0
+    ],
+    "material": {
+      "mass": 1,
+      "sigma": 1,
+      "epsilon": 5
+    }
+  },
+  {
+    "type": "particle",
+    "geometry": {
+      "position": [
+        5,
+        1,
+        1
+      ]
+    },
+    "velocity": [
+      -1,
+      0,
+      0
+    ],
+    "material": {
+      "mass": 1,
+      "sigma": 1,
+      "epsilon": 5
+    }
+  }
+]

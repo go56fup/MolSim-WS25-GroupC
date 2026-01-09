@@ -8,7 +8,6 @@
 #pragma once
 #ifdef ENABLE_VTK_OUTPUT
 #include <iomanip>
-#include <span>
 #include <sstream>
 #include <string_view>
 
@@ -22,8 +21,6 @@
 #include <vtkXMLUnstructuredGridWriter.h>
 
 #include "grid/particle_container/fwd.hpp"
-#include "physics/particle.hpp"
-#include "utility/concepts.hpp"
 
 namespace output_writer::vtk {
 /**
@@ -50,18 +47,12 @@ plot_particles(particle_container& particles, std::string_view filename, unsigne
 	forceArray->SetName("force");
 	forceArray->SetNumberOfComponents(3);
 
-	const vtkNew<vtkIntArray> typeArray;
-	typeArray->SetName("type");
-	typeArray->SetNumberOfComponents(1);
-
-	for (const auto& cell : particles.cells()) {
-		for (const auto& p : cell) {
-			points->InsertNextPoint(p.x.data());
-			massArray->InsertNextValue(static_cast<float>(p.m));
-			velocityArray->InsertNextTuple(p.v.data());
-			forceArray->InsertNextTuple(p.f.data());
-			typeArray->InsertNextValue(p.type);
-		}
+	const auto& system = particles.system();
+	for (particle_system::particle_id i = 0; i < system.size(); ++i) {
+		points->InsertNextPoint(system.serialize_position(i).data());
+		massArray->InsertNextValue(static_cast<float>(system.mass[i]));
+		velocityArray->InsertNextTuple(system.serialize_velocity(i).data());
+		forceArray->InsertNextTuple(system.serialize_force(i).data());
 	}
 
 	// Set up the grid
@@ -72,7 +63,6 @@ plot_particles(particle_container& particles, std::string_view filename, unsigne
 	grid->GetPointData()->AddArray(massArray);
 	grid->GetPointData()->AddArray(velocityArray);
 	grid->GetPointData()->AddArray(forceArray);
-	grid->GetPointData()->AddArray(typeArray);
 
 	// Create filename with iteration number
 	std::stringstream strstr;

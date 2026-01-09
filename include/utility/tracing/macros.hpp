@@ -40,6 +40,12 @@
 #define TRACE_SIM(...) (void)0
 #endif
 
+#if LOG_SIM_STATE
+#define TRACE_SIM_STATE(...) SPDLOG_TRACE(__VA_ARGS__)
+#else
+#define TRACE_SIM_STATE(...) (void)0
+#endif
+
 #if LOG_GRID
 #define TRACE_GRID(...) SPDLOG_TRACE(__VA_ARGS__)
 #else
@@ -62,4 +68,16 @@
 #define TRACE_THERMOSTAT(...) SPDLOG_TRACE(__VA_ARGS__)
 #else
 #define TRACE_THERMOSTAT(...) (void)0
+#endif
+
+#if LOG_CHECKPOINT
+#define TRACE_CHECKPOINT(...) SPDLOG_TRACE(__VA_ARGS__)
+#else
+#define TRACE_CHECKPOINT(...) (void)0
+#endif
+
+#if LOG_RANDOM
+#define TRACE_RANDOM(...) SPDLOG_TRACE(__VA_ARGS__)
+#else
+#define TRACE_RANDOM(...) (void)0
 #endif

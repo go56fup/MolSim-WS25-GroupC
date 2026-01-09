@@ -23,22 +23,21 @@ for every run from then on.
 
 #### Running the simulation
 ```
-Usage: MolSim [--help] [--version] [--output VAR] [--log-level VAR] file
-
-Positional arguments:
-  file           input file to read simulation parameters and initial condition of bodies from
+Usage: MolSim [--help] [--version] [--output VAR] [--log-level VAR] [--config VAR] [--bodies VAR]...
 
 Optional arguments:
   -h, --help     shows help message and exits
   -v, --version  prints version information and exits
   -o, --output   output directory for resulting files [nargs=0..1] [default: "."]
   --log-level    verbosity of log output [nargs=0..1] [default: "info"]
+  -c, --config   input file to read global simulation parameters from
+  -b, --bodies   input file to read initial configuration of particles and bodies from [may be repeated]
 ```
 
 #### Running tests
 To run the tests after building with GCC, use:
 ```
-cmake --workflow test
+cmake --workflow test-lite
 ```
 `test-clang` is also available.
 

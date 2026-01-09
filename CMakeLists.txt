@@ -36,13 +36,29 @@ file(
 add_executable(MolSim ${MY_SRC})
 add_library(project_options INTERFACE)
 
-target_include_directories(
-	project_options INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/include
-)
+target_include_directories(project_options INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/modules)
 
 include(embed)
+
+option(SINGLETHREADED "Do not use OpenMP to parallelize simulation" OFF)
+target_compile_definitions(
+	project_options INTERFACE SINGLETHREADED=$<IF:$<BOOL:${SINGLETHREADED}>,1,0>
+)
+option(
+	DETERMINISTIC
+	"Use deterministic functions: will result in a slower but consistent simulation across runs"
+	OFF
+)
+target_compile_definitions(
+	project_options INTERFACE DETERMINISTIC=$<IF:$<BOOL:${DETERMINISTIC}>,1,0>
+)
+
+if(NOT SINGLETHREADED)
+	find_package(OpenMP)
+	target_link_libraries(project_options INTERFACE OpenMP::OpenMP_CXX)
+endif()
 
 if(HAS_EMBED)
 	target_compile_options(
@@ -69,16 +85,18 @@ target_compile_options(
 				-Wconversion
 				-Wno-c23-extensions
 				>
-				$<$<CONFIG:Release>:-march=native>
 )
 
 if(ENABLE_SANITIZERS)
-	target_compile_options(project_options INTERFACE "-fsanitize=undefined,address")
-	target_link_options(project_options INTERFACE "-fsanitize=undefined,address")
-endif()
-
-if(ENABLE_VTK_OUTPUT)
-	target_compile_definitions(project_options INTERFACE "ENABLE_VTK_OUTPUT")
+	if(ENABLE_TSAN)
+		target_compile_options(project_options INTERFACE "-fsanitize=thread")
+		target_link_options(project_options INTERFACE "-fsanitize=thread")
+	else()
+		target_compile_options(project_options INTERFACE "-fsanitize=address")
+		target_link_options(project_options INTERFACE "-fsanitize=address")
+	endif()
+	target_compile_options(project_options INTERFACE "-fsanitize=undefined")
+	target_link_options(project_options INTERFACE "-fsanitize=undefined")
 endif()
 
 if(BENCHMARK_PRESET)
@@ -87,13 +105,16 @@ endif()
 
 target_compile_definitions(MolSim PRIVATE "SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_${LOG_LEVEL}")
 
-
 include(vtk)
 include(clang-format)
 include(doxygen)
 include(clang-tidy)
-include(third-party)
 
+if(ENABLE_VTK_OUTPUT)
+	target_compile_definitions(project_options INTERFACE "ENABLE_VTK_OUTPUT")
+endif()
+
+include(third-party)
 get_third_party(TARGET third_party)
 target_link_libraries(project_options INTERFACE third_party)
 

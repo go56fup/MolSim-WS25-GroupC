@@ -27,7 +27,7 @@ private:
 	/// Pointer to container which the iterator obtains the border cells from.
 	particle_container* container = nullptr;
 	/// Index of the current cell of iteration.
-	particle_container::index idx{};
+	particle_container::index idx;
 	/// Boundary type of current cell.
 	boundary_type type{};
 
@@ -36,8 +36,8 @@ private:
 	   @param current Index to cell to query.
 	   @return Enum representing the cell's neighbourship to the grid borders.
 	 */
-	constexpr boundary_type
-	determine_border_type(const particle_container::index& current) const noexcept {
+	constexpr boundary_type determine_border_type(const particle_container::index& current
+	) const noexcept {
 		const auto& boundaries = container->grid_size();
 		// TODO(tuna): find a way to elide these checks:
 		// for the 1-cell thick case, the cell becomes both *_min and *_max; which only
@@ -119,7 +119,6 @@ public:
 		return tmp;
 	}
 
-
 	/**
 	 * @brief Compares two border cell iterators for equality.
 	 * @param other Iterator to compare to.
@@ -182,4 +181,5 @@ public:
 		return 2 * x * z + 2 * y * z - 4 * x - 4 * y - 4 * z + 8;
 	}
 };
+
 static_assert(std::ranges::range<border_cell_range>);

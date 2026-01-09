@@ -15,21 +15,40 @@ public:
 	using reference = value_type;
 
 private:
-	using signed_index = vec_3d<difference_type>;
-
 	particle_container* container = nullptr;
-	signed_index current_virtual_idx{};
-	signed_index target_cell_idx{};
+	particle_container::signed_index current_virtual_idx;
+	particle_container::signed_index target_cell_idx;
 	std::uint8_t displacement_idx = 0;
-	signed_index signed_grid{};
+	particle_container::signed_index signed_grid;
+	static constexpr std::array<particle_container::signed_index, 13> displacements = {
+		{{0, 0, +1},    // i,     j,     k + 1
+	     {0, +1, -1},   // i,     j + 1, k - 1
+	     {0, +1, 0},    // i,     j + 1, k
+	     {0, +1, +1},   // i,     j + 1, k + 1
+	     {1, -1, -1},   // i + 1, j - 1, k - 1
+	     {+1, -1, 0},   // i + 1, j - 1, k
+	     {+1, -1, +1},  // i + 1, j - 1, k + 1
+	     {+1, 0, -1},   // i + 1, j,     k - 1
+	     {+1, 0, 0},    // i + 1, j,     k
+	     {+1, 0, +1},   // i + 1, j,     k + 1
+	     {+1, +1, -1},  // i + 1, j + 1, k - 1
+	     {+1, +1, 0},   // i + 1, j + 1, k
+	     {+1, +1, +1}}  // i + 1, j + 1, k + 1
+	};
 
-	static constexpr std::uint8_t displacement_count = 13;
+	/// Number of registered displacements.
+	static constexpr std::size_t displacement_count = std::tuple_size_v<decltype(displacements)>;
 
 public:
+	/// Tag type used to directly obtain the end iterator of a container.
+	struct get_end_tag {};
+
 	constexpr periodic_iterator() noexcept = default;
 
 	// Start Constructor
-	constexpr periodic_iterator(particle_container& c, const signed_index& v_idx)
+	constexpr periodic_iterator(
+		particle_container& c, const particle_container::signed_index& v_idx
+	)
 		: container(&c)
 		, current_virtual_idx(v_idx)
 		, target_cell_idx(v_idx)
@@ -41,16 +60,16 @@ public:
 		++*this;
 	}
 
-	constexpr periodic_iterator(particle_container& c, interactions_iterator::get_end_tag)
+	constexpr periodic_iterator(particle_container& c, periodic_iterator::get_end_tag)
 		: container(&c)
 		, displacement_idx(displacement_count) {}
 
 	template <axis Axis>
-	constexpr bool do_displacement(const signed_index& displacement) noexcept {
+	constexpr bool do_displacement(const particle_container::signed_index& displacement) noexcept {
 		TRACE_INTERACTION_ITER("Doing displacement {} on {}", displacement, current_virtual_idx);
 
 		// We do not need to use __builtin_add_overflow() here, because:
-		assert(displacement[Axis] >= -1 || displacement[Axis] <= 1);
+		assert(displacement[Axis] == -1 || displacement[Axis] == 1 || displacement[Axis] == 0);
 		target_cell_idx[Axis] = current_virtual_idx[Axis] + displacement[Axis];
 
 		// If we are moving backwards, don't go beyond the first ghost layer
@@ -82,7 +101,8 @@ public:
 				return *this;
 			}
 		}
-		// TRACE_GRID("end = virtual: {}, target: {}, signed_grid: {}", current_virtual_idx, target_cell_idx, signed_grid);
+		// TRACE_GRID("end = virtual: {}, target: {}, signed_grid: {}", current_virtual_idx,
+		// target_cell_idx, signed_grid);
 		return *this;
 	}
 
@@ -103,22 +123,6 @@ public:
 			static_cast<size_type>(target_cell_idx.z)
 		};
 	}
-
-	static constexpr std::array<signed_index, 13> displacements = {
-		{{0, 0, +1},    // i,     j,     k + 1
-	     {0, +1, -1},   // i,     j + 1, k - 1
-	     {0, +1, 0},    // i,     j + 1, k
-	     {0, +1, +1},   // i,     j + 1, k + 1
-	     {1, -1, -1},   // i + 1, j - 1, k - 1
-	     {+1, -1, 0},   // i + 1, j - 1, k
-	     {+1, -1, +1},  // i + 1, j - 1, k + 1
-	     {+1, 0, -1},   // i + 1, j,     k - 1
-	     {+1, 0, 0},    // i + 1, j,     k
-	     {+1, 0, +1},   // i + 1, j,     k + 1
-	     {+1, +1, -1},  // i + 1, j + 1, k - 1
-	     {+1, +1, 0},   // i + 1, j + 1, k
-	     {+1, +1, +1}}  // i + 1, j + 1, k + 1
-	};
 };
 }  // namespace detail
 
@@ -143,7 +147,7 @@ public:
 	}
 
 	constexpr detail::periodic_iterator end() noexcept {
-		return {container, detail::interactions_iterator::get_end_tag{}};
+		return {container, detail::periodic_iterator::get_end_tag{}};
 	}
 };
 
