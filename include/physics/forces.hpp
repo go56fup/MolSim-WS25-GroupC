@@ -4,6 +4,7 @@
 #include <concepts>
 #include <functional>
 #include <stdexcept>
+#include <numbers>
 
 #include "physics/particle.hpp"
 #include "utility/compiler_traits.hpp"
@@ -94,6 +95,75 @@ CONSTEXPR_IF_GCC inline vec lennard_jones_force(const particle& p1, const partic
 	return result;
 }
 
+/**
+ * @brief Computes the harmonic force exerted on one particle by one of its horizontal or vertical neighbours in a membrane.
+ *
+\f[
+ *   \vec{F}_{ij}
+ *   = k
+ *       \left(r_{ij} - r_0 \right)
+ *     \frac{(\vec{x}_j - \vec{x}_i)}{r_{ij}}
+ * \f]
+ *
+ * @param p1 The particle being acted upon (particle i).
+ * @param p2 The particle exerting the force (particle j).
+ * @param average_bond_length The average bond length of a particle pair.
+ * @param k Stiffness constant.
+ * @return A vector representing the force acted upon @p p1 by @p p2.
+ */
+CONSTEXPR_IF_GCC inline vec harmonic_force_orthogonal(const particle& p1, const particle& p2, const double average_bond_length, const double k) {
+	const auto& xi = p1.x;
+	const auto& xj = p2.x;
+	const double norm = (xi - xj).euclidian_norm();
+	const double scaling_factor = k * (norm - average_bond_length) / norm;
+	const auto result = scaling_factor * (xj - xi);
+	return result;
+}
+
+/**
+ * @brief Computes the harmonic force exerted on one particle by one of its diagonal neighbours in a membrane.
+ *
+ \f[
+ *   \vec{F}_{ij}
+ *   = k
+ *       \left(r_{ij} - \sqrt{2} r_0\right)
+ *     \frac{(\vec{x}_j - \vec{x}_i)}{r_{ij}}
+ * \f]
+ *
+ * @param p1 The particle being acted upon (particle i).
+ * @param p2 The particle exerting the force (particle j).
+ * @param average_bond_length The average bond length of a particle pair.
+ * @param k Stiffness constant.
+ * @return A vector representing the force acted upon @p p1 by @p p2.
+ */
+CONSTEXPR_IF_GCC inline vec harmonic_force_diagonal(const particle& p1, const particle& p2, const double average_bond_length, const double k) {
+	const auto& xi = p1.x;
+	const auto& xj = p2.x;
+	const double norm = (xi - xj).euclidian_norm();
+	const double scaling_factor = k * (norm  - std::numbers::sqrt2 * average_bond_length) / norm;
+	const auto result = scaling_factor * (xj - xi);
+	return result;
+}
+
+/**
+ * @brief Computes an external force in the z-direction acting on certain particles in a membrane.
+ *
+ * @param particles Particles on which the force is applied.
+ * @param upward_force The magnitude of the force.
+ */
+constexpr void apply_upward_force(range_of<particle> auto&& particles, const double upward_force) noexcept {
+	for (particle& p : particles) {
+		p.f += {0, 0, upward_force};
+	}
+}
+
+
+/**
+ * @brief Computes an external gravitational force in the y-direction acting on particles.
+ *
+ * @param particles Particles on which gravity is applied.
+ * @param gravity Gravitational constant.
+ */
 constexpr void apply_gravity(range_of<particle> auto&& particles, double gravity) noexcept {
 	for (particle& p : particles) {
 		p.f += {0, p.m * gravity, 0};
