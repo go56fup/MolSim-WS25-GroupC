@@ -36,6 +36,7 @@ concept force_calculator =
 	return x * x * x * x * x * x;
 }
 
+
 /**
  * @brief Computes the gravitational force exerted on one particle by another.
  *
@@ -92,6 +93,43 @@ CONSTEXPR_IF_GCC inline vec lennard_jones_force(const particle& p1, const partic
 		(24 * eps / (norm * norm)) * (normalized_sigma - 2 * normalized_sigma * normalized_sigma);
 	const auto result = scaling_factor * (xj - xi);
 	TRACE_FORCES("Resulting force: {}", result);
+	return result;
+}
+
+
+/**
+ * @brief Calculates the force resulting from the smoothed Lennard-Jones potential.
+ *
+ * The force acted upon particle `p1` by particle `p2` is calculated according to the
+ * negative gradient of the smoothed Lennard-Jones potential:
+ *
+ *
+ * @param p1 The particle being acted upon (particle i).
+ * @param p2 The particle exerting the force (particle j).
+ * @param cutoff_radius Cutoff radius in the simulation.
+ * @param lower_radius Radius resulting in the regular lennard jones force calculation.
+ * @return A vector representing the force acted upon @p p1 by @p p2.
+ */
+CONSTEXPR_IF_GCC inline vec smoothed_lennard_jones_force(const particle& p1, const particle& p2, const double cutoff_radius, const double lower_radius) noexcept {
+	const auto& xi = p1.x;
+	const auto& xj = p2.x;
+	const double norm = (xi - xj).euclidian_norm();
+	if (norm >= cutoff_radius) {
+		return {0,0,0};
+	}
+	if (norm <= lower_radius) {
+		return lennard_jones_force(p1, p2);
+	}
+	const double eps = std::sqrt(p1.epsilon * p2.epsilon);
+	const double sigma_sixth_power = sixth_power((p1.sigma + p2.sigma) / 2);
+	const double norm_sixth_power = sixth_power(norm);
+	const double norm_seventh_power = norm * norm_sixth_power;
+	const double norm_fourteen_power = norm_seventh_power * norm_seventh_power;
+	const double scaling_factor = -24 * sigma_sixth_power * eps/ (norm_fourteen_power * cubed(cutoff_radius - lower_radius)) * (cutoff_radius - norm)
+	* ((cutoff_radius * cutoff_radius) * (2 * sigma_sixth_power - norm_sixth_power)
+	+ cutoff_radius *  (3 * lower_radius - norm) * (norm_sixth_power - 2 * sigma_sixth_power)
+	+ norm * (5 * lower_radius * sigma_sixth_power - 2 * lower_radius * norm_sixth_power - 3* sigma_sixth_power * norm + norm_seventh_power));
+	const auto result = scaling_factor * (xj - xi);
 	return result;
 }
 
