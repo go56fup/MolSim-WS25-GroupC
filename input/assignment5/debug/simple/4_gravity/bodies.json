@@ -1,0 +1,29 @@
+[
+  {
+    "type": "rectangle",
+    "geometry": {
+      "origin": [
+        20,
+        20
+      ],
+      "scale": [
+        100,
+        20
+      ]
+    },
+    "velocity": [
+      0,
+      0,
+      0
+    ],
+    "parameters": {
+      "brownian_mean": 0.1,
+      "meshwidth": 1.12
+    },
+    "material": {
+      "mass": 1,
+      "sigma": 1,
+      "epsilon": 5
+    }
+  }
+]

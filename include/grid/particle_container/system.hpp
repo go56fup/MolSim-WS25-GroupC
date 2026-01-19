@@ -1,0 +1,110 @@
+#pragma once
+
+#include <utility>
+#include <vector>
+
+#include "physics/vec_3d.hpp"
+
+#define system_arithmetic(op, idx, value, x_comp, y_comp, z_comp)                                  \
+	do {                                                                                           \
+		(x_comp)[idx] op value.x;                                                                  \
+		(y_comp)[idx] op value.y;                                                                  \
+		(z_comp)[idx] op value.z;                                                                  \
+	} while (0)
+
+class particle_system {
+public:
+	using particle_id = std::vector<double>::size_type;
+	using particle_type_t = std::uint8_t;
+
+private:
+	constexpr void destructure_push_back(
+		const vec& value, std::vector<double>& x, std::vector<double>& y, std::vector<double>& z
+	) {
+		x.push_back(value.x);
+		y.push_back(value.y);
+		z.push_back(value.z);
+	}
+
+public:
+	std::vector<double> x, y, z;
+	std::vector<double> vx, vy, vz;
+	std::vector<double> fx, fy, fz;
+	std::vector<double> old_fx, old_fy, old_fz;
+	std::vector<particle_type_t> type;
+	enum class property : std::uint8_t { position, velocity, force, old_force };
+
+	constexpr void add_particle(const vec& pos, const vec& velocity, particle_type_t type_) {
+		destructure_push_back(pos, x, y, z);
+		destructure_push_back(velocity, vx, vy, vz);
+		
+		fx.push_back(0);
+		fy.push_back(0);
+		fz.push_back(0);
+
+		old_fx.push_back(0);
+		old_fy.push_back(0);
+		old_fz.push_back(0);
+
+		type.push_back(type_);
+	}
+
+	constexpr void add_particle(
+		const vec& pos, const vec& velocity, const vec& force, const vec& old_force,
+		particle_type_t type
+	) {
+		destructure_push_back(force, fx, fy, fz);
+		destructure_push_back(old_force, old_fx, old_fy, old_fz);
+		add_particle(pos, velocity, type);
+	}
+
+	constexpr vec serialize_force(particle_id i) const noexcept {
+		return {fx[i], fy[i], fz[i]};
+	}
+
+	constexpr vec serialize_velocity(particle_id i) const noexcept {
+		return {vx[i], vy[i], vz[i]};
+	}
+
+	constexpr vec serialize_old_force(particle_id i) const noexcept {
+		return {old_fx[i], old_fy[i], old_fz[i]};
+	}
+
+	constexpr vec serialize_position(particle_id i) const noexcept {
+		return {x[i], y[i], z[i]};
+	}
+
+	constexpr std::span<const double> position_component(axis a) const noexcept {
+		switch (a) {
+		case axis::x:
+			return x;
+		case axis::y:
+			return y;
+		case axis::z:
+			return z;
+		}
+		std::unreachable();
+	}
+
+	constexpr std::span<double> position_component(axis a) noexcept {
+		switch (a) {
+		case axis::x:
+			return x;
+		case axis::y:
+			return y;
+		case axis::z:
+			return z;
+		}
+		std::unreachable();
+	}
+
+	constexpr std::size_t size() const noexcept {
+		assert(
+			x.size() == y.size() && y.size() == z.size() && z.size() == fx.size() &&
+			fx.size() == fy.size() && fy.size() == fz.size() && fz.size() == old_fx.size() &&
+			old_fx.size() == old_fy.size() && old_fy.size() == old_fz.size() &&
+			old_fz.size() == type.size()
+		);
+		return x.size();
+	}
+};
