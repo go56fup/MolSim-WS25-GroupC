@@ -5,6 +5,7 @@
 #include <ranges>
 #include <span>
 #include <string_view>
+#include <omp.h>
 
 #include <fmt/compile.h>
 #include <spdlog/spdlog.h>
@@ -91,8 +92,8 @@ constexpr void loop(
 ) {
 	const auto& grid = particles.grid_size();
 	using enum boundary_type;
-	// TODO: Map to function
 
+	//TODO(gabriel):parallelis this (Attention corners need to be done atomically)
 	// x faces
 	BoundaryFunc func = funcDefiner(particles, config, calculator, x_min);
 	for (unsigned i = 0; i < grid.y; ++i) {
@@ -252,9 +253,35 @@ constexpr void loop(
 constexpr void calculate_forces(
 	force_calculator auto calculator, particle_container& container, const sim_configuration& config
 ) noexcept {
+	const int BATCH_SIZE = 8;
+
+	#pragma omp parallel for schedule(dynamic)
 	for (auto& cell : container.cells()) {
+
+		// Create small fixed-size buffers for a "batch" of pairs
+		size_t batch_p1[BATCH_SIZE];
+		size_t batch_p2[BATCH_SIZE];
+		int count = 0;
+
 		for (auto [p1_idx, p2_idx] : unique_pairs(cell)) {
-			std::invoke(calculator, container, p1_idx, p2_idx);
+
+			batch_p1[count] = p1_idx;
+			batch_p2[count] = p2_idx;
+			count++;
+
+			if (count == BATCH_SIZE){
+				//TODO(gabriel): does it rly need to be an invoke do we ever use this not as lennard jones forces?
+				for (int i = 0; i < BATCH_SIZE; ++i) { //TODO(gabriel): Also we must fully remove Newtons Axiom from our code.
+					std::invoke(calculator, container, batch_p1[i], batch_p2[i]); //TODO(gabriel): Call batched version instead to simd this operation
+				}
+				count = 0;
+			}
+		}
+
+		if (count > 0) {
+			for (int i = 0; i < BATCH_SIZE; ++i) {
+				std::invoke(calculator, container, batch_p1[i], batch_p2[i]);
+			}
 		}
 	}
 
@@ -264,10 +291,24 @@ constexpr void calculate_forces(
 		const auto& current_cell = container[current_cell_idx];
 		const auto& target_cell = container[target_cell_idx];
 
+		size_t batch_p1[BATCH_SIZE];
+		size_t batch_p2[BATCH_SIZE];
+		int count = 0;
+
 		for (auto p1_idx : current_cell) {
 			for (auto p2_idx : target_cell) {
-				std::invoke(calculator, container, p1_idx, p2_idx);
+				batch_p1[count] = p1_idx;
+				batch_p2[count] = p2_idx;
+				count++;
 			}
+		}
+
+		if (count == BATCH_SIZE){
+			//TODO(gabriel): does it rly need to be an invoke do we ever use this not as lennard jones forces?
+			for (int i = 0; i < BATCH_SIZE; ++i) { //TODO(gabriel): Also we must fully remove Newtons Axiom from our code.
+				std::invoke(calculator, container, batch_p1[i], batch_p2[i]); //TODO(gabriel): Call batched version instead to simd this operation
+			}
+			count = 0;
 		}
 	}
 	loop(container, config, calculator);
@@ -302,6 +343,7 @@ calculate_x(particle_container& container, const sim_configuration& config) noex
 	const auto& grid = container.grid_size();
 	auto& system = container.system();
 
+	#pragma omp parallel for schedule(dynamic)
 	for (auto&& [cell_idx, cell] : container.enumerate_cells()) {
 		const vec cell_origin{
 			cell_idx.x * cell_width, cell_idx.y * cell_width, cell_idx.z * cell_width
@@ -403,7 +445,9 @@ calculate_x(particle_container& container, const sim_configuration& config) noex
 constexpr void calculate_v(particle_container& container, double delta_t) noexcept {
 	auto& system = container.system();
 
+	#pragma omp parallel for simd schedule(static)
 	for (particle_system::particle_id i = 0; i < container.system().size(); ++i) {
+		//TODO(gabriel): Maybe add a invM array and * 0.5 instead of / 2 to remove all these costly divisions
 		const auto velocity_scalar = delta_t / (2 * container.material_for_particle(i).mass);
 		system.vx[i] += velocity_scalar * (system.old_fx[i] + system.fx[i]);
 		system.vy[i] += velocity_scalar * (system.old_fy[i] + system.fy[i]);

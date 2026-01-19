@@ -144,9 +144,81 @@ CONSTEXPR_IF_GCC inline void lennard_jones_force_soa(
 	system.fy[p2] -= y_delta;
 	system.fz[p2] -= z_delta;
 }
+constexpr int BATCH_SIZE = 8;
+
+CONSTEXPR_IF_GCC inline void lennard_jones_force_soa_batchwise(
+		particle_container& container, std::array<particle_system::particle_id, BATCH_SIZE> p1_batch, std::array<particle_system::particle_id, BATCH_SIZE> p2_batch
+) noexcept {
+
+auto &system = container.system();
+
+double pos_diff_x_batch[BATCH_SIZE];
+double pos_diff_y_batch[BATCH_SIZE];
+double pos_diff_z_batch[BATCH_SIZE];
+
+double scaling_factor_batch[BATCH_SIZE];
+
+#pragma omp simd
+for(int i = 0; i < BATCH_SIZE; i++) {
+	auto p1 = p1_batch[i];
+	auto p2 = p2_batch[i];
+
+	pos_diff_x_batch[i] = system.x[p1] - system.x[p2];
+	pos_diff_y_batch[i] = system.y[p1] - system.y[p2];
+	pos_diff_z_batch[i] = system.z[p1] - system.z[p2];
+}
+
+for(int i = 0; i < 8; i++) {
+	auto p1 = p1_batch[i];
+	auto p2 = p2_batch[i];
+	TRACE_FORCES("Calculating Lennard-Jones forces for:\n{}\n{}\n", p1, p2);
+	const double pos_diff_x = pos_diff_x_batch[i];
+	const double pos_diff_y = pos_diff_y_batch[i];
+	const double pos_diff_z = pos_diff_z_batch[i];
+	const double norm =
+			std::sqrt(pos_diff_x * pos_diff_x + pos_diff_y * pos_diff_y + pos_diff_z * pos_diff_z);
+	assert(norm != 0 && "Two particles at the same position cannot interact.");
+	const auto &p1_material = container.material_for_particle(p1);
+	const auto &p2_material = container.material_for_particle(p2);
+
+	const double sigma = p1_material.sigma == p2_material.sigma
+						 ? p1_material.sigma
+						 : (p1_material.sigma + p2_material.sigma) / 2;
+	const double eps = p1_material.epsilon == p2_material.epsilon
+					   ? p1_material.epsilon
+					   : std::sqrt(p1_material.epsilon * p2_material.epsilon);
+	const double normalized_sigma = sixth_power(sigma / norm);
+	scaling_factor_batch[i] =
+			(24 * eps / (norm * norm)) * (normalized_sigma - 2 * normalized_sigma * normalized_sigma);
+}
+
+double x_delta[BATCH_SIZE];
+double y_delta[BATCH_SIZE];
+double z_delta[BATCH_SIZE];
+
+#pragma omp simd
+for(int i = 0; i < BATCH_SIZE; i++) {
+	x_delta[i] = -scaling_factor_batch[i] * pos_diff_x_batch[i];
+	y_delta[i] = -scaling_factor_batch[i] * pos_diff_y_batch[i];
+	z_delta[i] = -scaling_factor_batch[i] * pos_diff_z_batch[i];
+}
+
+for(int i = 0; i < BATCH_SIZE; i++) {
+	auto p1 = p1_batch[i];
+	auto p2 = p2_batch[i];
+
+	system.fx[p1] += x_delta[i];
+	system.fy[p1] += y_delta[i];
+	system.fz[p1] += z_delta[i];
+
+	//NO 3rd law of Newton opt.
+}
+
+}
 
 constexpr void apply_gravity(particle_container& container, double gravity) noexcept {
 	auto& system = container.system();
+	#pragma omp parallel for simd schedule(static)
 	for (particle_system::particle_id p = 0; p < system.size(); ++p) {
 		system.fy[p] += container.material_for_particle(p).mass * gravity;
 	}

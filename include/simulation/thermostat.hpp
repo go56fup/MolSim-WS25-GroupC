@@ -13,10 +13,11 @@ CONSTEXPR_IF_GCC inline double
 get_temperature(particle_container& container, decltype(sim_configuration::dimensions) dimensions) {
 	double result = 0;
 	const auto& system = container.system();
+	#pragma omp parallel for simd schedule(static) reduction(+ : result)
 	for (particle_system::particle_id p = 0; p < system.size(); ++p) {
 		const double squared_norm = (system.vx[p] * system.vx[p]) + (system.vy[p] * system.vy[p]) +
 		                            (system.vz[p] * system.vz[p]);
-		result += container.material_for_particle(p).mass * squared_norm;
+		result += container.material_for_particle(p).mass * squared_norm; //TODO(gabriel): make mass vectorisable
 	}
 	result /= dimensions * static_cast<double>(system.size());
 	return result;
@@ -45,6 +46,8 @@ CONSTEXPR_IF_GCC inline void run_thermostat(
 	TRACE_THERMOSTAT("Current temperature: {},  new temperature: {}", current_temp, new_temp);
 	if (const double beta = std::sqrt(new_temp / current_temp); beta != 1) {
 		auto& system = container.system();
+
+		#pragma omp parallel for simd schedule(static)
 		for (particle_system::particle_id p = 0; p < system.size(); ++p) {
 			system.vx[p] *= beta;
 			system.vy[p] *= beta;
