@@ -30,7 +30,9 @@ TEST(ThermostatTests, Cooling) {
 		std::size_t seq = 0;
 
 		container.add_cuboid<2>(
-			{0, 0, 0}, {1, 1, 1}, 1.1225, {0, 0, 0}, mass, 1.0, 5.0, brownian_mean, seq
+			cuboid_parameters<2>{.origin{0, 0}, .scale{1, 1}}.extend_to_3d(domain),
+			{.meshwidth = 1.1225, .brownian_mean = brownian_mean}, {0, 0, 0},
+			{.mass = mass, .sigma = 1, .epsilon = 5}, seq
 		);
 
 		run_thermostat(container, therm, dims);
@@ -53,7 +55,6 @@ TEST(ThermostatTests, Heating) {
 		.initial_temperature = init_temp,
 		.application_frequency = 1,
 		.target_temperature = target_temp,
-		.max_temperature_difference = std::numeric_limits<double>::infinity(),
 		.enforce_initial_temperature = true
 	};
 	GTEST_CXP_GCC double resulting_temp = std::invoke([&] {
@@ -61,7 +62,9 @@ TEST(ThermostatTests, Heating) {
 		std::size_t seq = 0;
 
 		container.add_cuboid<2>(
-			{0, 0, 0}, {1, 1, 1}, 1.1225, {0, 0, 0}, mass, 1.0, 5.0, brownian_mean, seq
+			cuboid_parameters<2>{.origin{0, 0}, .scale{1, 1}}.extend_to_3d(domain),
+			{.meshwidth = 1.1225, .brownian_mean = brownian_mean}, {},
+			{.mass = mass, .sigma = 1.0, .epsilon = 5.0}, seq
 		);
 
 		run_thermostat(container, therm, dims);
@@ -92,22 +95,22 @@ TEST(ThermostatTests, Holding) {
 		.boundary_behavior = boundary_conditions_descriptor::all(boundary_condition::reflecting),
 		.thermostat = therm,
 		.end_time = 10,
-		.write_frequency = 1,
-		.base_name{std::from_range, "unused"},
 		.domain{5, 5, 5},
-		.create_checkpoint = false,
 		.dimensions = 3,
-		.gravitational_constant = 0
 	};
 
 	GTEST_CXP_GCC double resulting_temp = std::invoke([&] {
 		particle_container container(config.domain, config.cutoff_radius);
 		std::size_t seq = 0;
 		container.add_cuboid<3>(
-			{3, 3, 3}, {1, 1, 1}, 1.1225, {0, 0, 0}, 2.0, 1.0, 5.0, brownian_mean, seq
+			{.origin{3, 3, 3}, .scale{1, 1, 1}},
+			{.meshwidth = 1.1225, .brownian_mean = brownian_mean}, {},
+			{.mass = 2.0, .sigma = 1.0, .epsilon = 5.0}, seq
 		);
-		for (sim_iteration_t i = 0; i < 10; i++) {
-			run_sim_iteration(lennard_jones_force, container, config, i);
+
+		static constexpr sim_iteration_t hold_temperature_over_n_iterations = 10;
+		for (sim_iteration_t i = 0; i < hold_temperature_over_n_iterations; ++i) {
+			run_sim_iteration(lennard_jones_force_soa, container, config, i);
 		}
 		return get_temperature(container, config.dimensions);
 	});

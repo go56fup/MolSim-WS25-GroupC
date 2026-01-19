@@ -1,10 +1,8 @@
 #pragma once
-#include <cstdint>
 
 #include "grid/enums.hpp"
-#include "grid/particle_container/fwd.hpp"
-#include "physics/forces.hpp"
-#include "physics/particle.hpp"
+#include "grid/particle_container/system.hpp"
+#include "physics/vec_3d.hpp"
 
 template <boundary_type border, typename IndexT>
 constexpr bool out_of_bounds(
@@ -14,6 +12,19 @@ constexpr bool out_of_bounds(
 	static constexpr bool is_min = boundary_type_to_extremum(border) == extremum::min;
 	static constexpr axis ax = boundary_type_to_axis(border);
 	const auto oob = is_min ? pos[ax] <= min[ax] : pos[ax] >= bounds[ax];
+	return oob;
+}
+
+template <boundary_type border, typename IndexT>
+constexpr bool out_of_bounds_soa(
+	const particle_system& system, particle_system::particle_id p, const vec_3d<IndexT>& bounds,
+	const vec_3d<IndexT>& min = {0, 0, 0}
+) noexcept {
+	using enum boundary_type;
+	static constexpr bool is_min = boundary_type_to_extremum(border) == extremum::min;
+	static constexpr axis ax = boundary_type_to_axis(border);
+	const auto oob = is_min ? system.position_component(ax)[p] <= min[ax]
+	                        : system.position_component(ax)[p] >= bounds[ax];
 	return oob;
 }
 

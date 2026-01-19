@@ -5,62 +5,9 @@
 #include "grid/particle_container/fwd.hpp"
 #include "iterators/periodic.hpp"
 #include "physics/forces.hpp"
-#include "simulation/config/entities.hpp"
+#include "utility/constants.hpp"
 
-// The wrapping in do-while increases this metric dramatically. Otherwise, the rest of the logic is
-// impossible to express in more granular functions without having to recompute information. The
-// template-for facility from C++26 would have come in useful here.
-// NOLINTBEGIN(*cognitive-complexity)
-// NOLINTBEGIN(*avoid-do-while)
-
-namespace reflect {
-constexpr void macro(
-	particle_container::cell& current_cell, const vec& domain, boundary_type border_type,
-	force_calculator auto calculator
-) noexcept {
-#define REFLECT_IF(check, x_mod, y_mod, z_mod)                                                     \
-	do {                                                                                           \
-		for (auto& p : current_cell) {                                                             \
-			const double ghost_particle_threshold = p.sigma * sixth_root_of_2;                     \
-			if (p.x.check) {                                                                       \
-				const particle ghost{                                                              \
-					{p.x.x_mod, p.x.y_mod, p.x.z_mod}, {}, p.m, p.sigma, p.epsilon                 \
-				};                                                                                 \
-				TRACE_GRID("Reflecting {} with ghost: {}", p, ghost);                              \
-				p.f += std::invoke(calculator, p, ghost);                                          \
-			}                                                                                      \
-		}                                                                                          \
-	} while (0)
-
-	using enum boundary_type;
-
-	switch (border_type) {
-	case x_min:
-		REFLECT_IF(x <= ghost_particle_threshold, x * -1, y, z);
-		return;
-	case y_min:
-		REFLECT_IF(y <= ghost_particle_threshold, x, y * -1, z);
-		return;
-	case z_min:
-		REFLECT_IF(z <= ghost_particle_threshold, x, y, z * -1);
-		return;
-	case x_max:
-		REFLECT_IF(x >= domain.x - ghost_particle_threshold, x * -1 + (2 * domain.x), y, z);
-		return;
-	case y_max:
-		REFLECT_IF(y >= domain.y - ghost_particle_threshold, x, y * -1 + (2 * domain.y), z);
-		return;
-	case z_max:
-		REFLECT_IF(z >= domain.z - ghost_particle_threshold, x, y, z * -1 + (2 * domain.z));
-		return;
-	}
-	assert(!"This should never be called with a non-border, the iterator is wrong.");
-#undef REFLECT_IF
-}
-
-// NOLINTEND(*avoid-do-while)
-// NOLINTEND(*cognitive-complexity)
-
+namespace detail {
 constexpr vec x_min_f(const vec& x) noexcept {
 	return {-x.x, x.y, x.z};
 }
@@ -72,46 +19,57 @@ constexpr vec y_min_f(const vec& x) noexcept {
 constexpr vec z_min_f(const vec& x) {
 	return {x.x, x.y, -x.z};
 }
+}  // namespace detail
 
-constexpr void lambda(
-	std::vector<particle>& current_cell, const vec& domain, boundary_type border_type,
-	force_calculator auto calculator
+constexpr void reflect_via_ghost_particle(
+	particle_container::cell& current_cell, particle_container& container, boundary_type border_type
 ) noexcept {
 	using enum boundary_type;
 
+	auto& system = container.system();
+	const auto& domain = container.domain();
+
 	auto reflect = [&]<boundary_type b>(const auto& make_ghost_pos) {
-		for (auto& p : current_cell) {
-			const double ghost_particle_threshold = p.sigma * sixth_root_of_2;
+		for (auto p : current_cell) {
+			const auto& material = container.material_for_particle(p);
+			const double ghost_particle_threshold = material.sigma * sixth_root_of_2;
 			const vec min{
 				ghost_particle_threshold, ghost_particle_threshold, ghost_particle_threshold
 			};
 			const auto max = domain - min;
-			const bool check = out_of_bounds<b>(p.x, max, min);
+			const bool check = out_of_bounds_soa<b>(system, p, max, min);
+
 			if (check) {
-				const particle ghost{make_ghost_pos(p.x), {}, p.m, p.sigma, p.epsilon};
-				p.f += std::invoke(calculator, p, ghost);
+				const vec current_pos{system.x[p], system.y[p], system.z[p]};
+				const auto& material = container.material_for_particle(p);
+				const auto resulting_force = lennard_jones_force(
+					{.p1_position = current_pos,
+				     .p2_position = make_ghost_pos(current_pos),
+				     .sigma = material.sigma,
+				     .epsilon = material.epsilon}
+				);
+				system.fx[p] += resulting_force.x;
+				system.fy[p] += resulting_force.y;
+				system.fz[p] += resulting_force.z;
 			}
 		}
 	};
 
-	const auto x_max_f = [&](const vec& x) {
-		return vec{-x.x + 2 * domain.x, x.y, x.z}; };
-	const auto y_max_f = [&](const vec& x) {
-		return vec{x.x, -x.y + 2 * domain.y, x.z}; };
-	const auto z_max_f = [&](const vec& x) {
-		return vec{x.x, x.y, -x.z + 2 * domain.z}; };
+	const auto x_max_f = [&](const vec& x) { return vec{-x.x + 2 * domain.x, x.y, x.z}; };
+	const auto y_max_f = [&](const vec& x) { return vec{x.x, -x.y + 2 * domain.y, x.z}; };
+	const auto z_max_f = [&](const vec& x) { return vec{x.x, x.y, -x.z + 2 * domain.z}; };
 
 	switch (border_type) {
 	case x_min:
-		reflect.template operator()<x_min>(x_min_f);
+		reflect.template operator()<x_min>(detail::x_min_f);
 		return;
 
 	case y_min:
-		reflect.template operator()<y_min>(y_min_f);
+		reflect.template operator()<y_min>(detail::y_min_f);
 		return;
 
 	case z_min:
-		reflect.template operator()<z_min>(z_min_f);
+		reflect.template operator()<z_min>(detail::z_min_f);
 		return;
 
 	case x_max:
@@ -128,49 +86,48 @@ constexpr void lambda(
 	}
 }
 
-}  // namespace reflect
-
 constexpr void delete_ouflowing_particles(
-	particle_container::cell& cell, const vec& domain, boundary_type border
+	particle_container::cell& cell, particle_container& container, boundary_type border
 ) {
 	using enum boundary_type;
-	auto erase_if = [&](bool oob, std::size_t i) {
-		if (oob)
-			cell.erase(
-				std::next(cell.begin(), static_cast<particle_container::cell::difference_type>(i))
-			);
+	auto& system = container.system();
+	const auto& domain = container.domain();
+
+	auto erase_if = [&]<boundary_type b>(std::size_t cell_idx) {
+		if (out_of_bounds_soa<b>(system, cell[cell_idx], domain)) {
+			cell.erase(std::next(
+				cell.begin(), static_cast<particle_container::cell::difference_type>(cell_idx)
+			));
+		}
 	};
-	for (std::size_t i = 0; i < cell.size(); ++i) {
-		const auto& particle_coords = cell[i].x;
+	for (std::size_t cell_idx = 0; cell_idx < cell.size(); ++cell_idx) {
 		switch (border) {
 		case x_min:
-			erase_if(out_of_bounds<x_min>(particle_coords, domain), i);
+			erase_if.template operator()<x_min>(cell_idx);
 			break;
 		case x_max:
-			erase_if(out_of_bounds<x_max>(particle_coords, domain), i);
+			erase_if.template operator()<x_max>(cell_idx);
 			break;
 		case y_min:
-			erase_if(out_of_bounds<y_min>(particle_coords, domain), i);
+			erase_if.template operator()<y_min>(cell_idx);
 			break;
 		case y_max:
-			erase_if(out_of_bounds<y_max>(particle_coords, domain), i);
+			erase_if.template operator()<y_max>(cell_idx);
 			break;
 		case z_min:
-			erase_if(out_of_bounds<z_min>(particle_coords, domain), i);
+			erase_if.template operator()<z_min>(cell_idx);
 			break;
 		case z_max:
-			erase_if(out_of_bounds<z_max>(particle_coords, domain), i);
+			erase_if.template operator()<z_max>(cell_idx);
 			break;
 		}
 	}
 }
 
-#define reflect_via_ghost_particle reflect::lambda
-
 constexpr void periodic(
 	particle_container::cell& current_cell, boundary_type border_type,
 	force_calculator auto calculator, const particle_container::index& idx,
-	particle_container& particles
+	particle_container& container
 ) {
 
 	using enum boundary_type;
@@ -178,7 +135,7 @@ constexpr void periodic(
 	using signed_index = vec_3d<difference_type>;
 	signed_index current_virtual_idx{};
 
-	const auto& grid = particles.grid_size();
+	const auto& grid = container.grid_size();
 	signed_index signed_grid = {
 		static_cast<difference_type>(grid.x), static_cast<difference_type>(grid.y),
 		static_cast<difference_type>(grid.z)
@@ -190,7 +147,7 @@ constexpr void periodic(
 
 	current_virtual_idx = signed_idx;
 	vec particle_mirror{};
-	const double cell_width = particles.cutoff_radius();
+	const double cell_width = container.cutoff_radius();
 
 	// TODO(tuna): fold into axis and lambda
 	if ((border_type & x_min) == x_min) {
@@ -217,46 +174,20 @@ constexpr void periodic(
 		particle_mirror.z = -signed_grid.z * cell_width;
 		current_virtual_idx.z = -1;
 	}
+	auto& system = container.system();
 	TRACE_GRID("Calculating periodic interactions via virtual index: {}", current_virtual_idx);
-	for (const auto& periodic_target : periodic_range(particles, current_virtual_idx)) {
-		for (auto& p1 : current_cell) {
-			for (auto& p2 : particles[periodic_target]) {
+	for (const auto& periodic_target : periodic_range(container, current_virtual_idx)) {
+		for (auto current_p : current_cell) {
+			for (auto periodic_p : container[periodic_target]) {
 				// TODO(tuna): is this actually the best way of doing this?
-				p1.x += particle_mirror;
-				apply_force_interaction(calculator, p1, p2);
-				p1.x -= particle_mirror;
+				system.x[current_p] += particle_mirror.x;
+				system.y[current_p] += particle_mirror.y;
+				system.z[current_p] += particle_mirror.z;
+				std::invoke(calculator, container, current_p, periodic_p);
+				system.x[current_p] -= particle_mirror.x;
+				system.y[current_p] -= particle_mirror.y;
+				system.z[current_p] -= particle_mirror.z;
 			}
-		}
-	}
-}
-
-constexpr void handle_boundary_condition(
-	particle_container::cell& cell, boundary_type border, const vec& domain,
-	force_calculator auto force_calc, const sim_configuration& config
-) noexcept {
-	using enum boundary_type;
-	auto exercise_boundary_condition = [&](boundary_type border) {
-		switch (config.boundary_behavior[border]) {
-		case boundary_condition::reflecting:
-			reflect_via_ghost_particle(cell, domain, border, force_calc);
-			break;
-		case boundary_condition::outflow:
-			delete_ouflowing_particles(cell, domain, border);
-			break;
-		case boundary_condition::periodic:
-			// TODO(gabriel): implement this
-			throw std::logic_error("Not implemented");
-		}
-	};
-
-	for (auto [min, max] : border_pairs) {
-		const bool on_min = (border & min) == min;
-		const bool on_max = (border & max) == max;
-		if (on_min) {
-			exercise_boundary_condition(min);
-		}
-		if (on_max) {
-			exercise_boundary_condition(max);
 		}
 	}
 }

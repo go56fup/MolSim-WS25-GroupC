@@ -31,4 +31,4 @@ else()
 	message(WARNING "#embed not supported - some tests will not be run")
 endif()
 
-target_compile_definitions(project_options INTERFACE "HAS_EMBED=${HAS_EMBED}")
+target_compile_definitions(project_options INTERFACE HAS_EMBED=$<IF:$<BOOL:${HAS_EMBED}>,1,0>)

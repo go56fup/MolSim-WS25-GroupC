@@ -11,7 +11,9 @@
 
 #include "entities.hpp"
 #include "grid/enums.hpp"
+#include "grid/particle_container/fwd.hpp"
 #include "grid/particle_container/particle_container.hpp"
+#include "grid/particle_container/system.hpp"
 #include "physics/vec_3d.hpp"
 #include "simulation/config/entities.hpp"
 #include "simulation/config/json_schema.hpp"
@@ -32,12 +34,12 @@ constexpr void check_for_2d_domain(const sim_configuration& config) noexcept(fal
 }  // namespace detail
 
 namespace config {
-constexpr unprocessed_config parse(std::string_view json_data) noexcept(false) {
-	TRACE_INPUT_PARSING("Running from input content: {}", json_data);
-	auto cfg = daw::json::from_json<
-		unprocessed_config>(json_data, daw::json::options::parse_flags<daw::json::options::UseExactMappingsByDefault::yes>);
+constexpr sim_configuration parse_config(std::string_view json_data) noexcept(false) {
+	TRACE_INPUT_PARSING("Using config: {}", json_data);
+	const auto cfg = daw::json::from_json<
+		sim_configuration>(json_data, daw::json::options::parse_flags<daw::json::options::UseExactMappingsByDefault::yes>);
 	auto is_periodic = [&](boundary_type border) {
-		return cfg.config.boundary_behavior[border] == boundary_condition::periodic;
+		return cfg.boundary_behavior[border] == boundary_condition::periodic;
 	};
 	for (auto [min, max] : border_pairs) {
 		// TODO(tuna): add test that checks for this being covered
@@ -50,72 +52,111 @@ constexpr unprocessed_config parse(std::string_view json_data) noexcept(false) {
 	return cfg;
 }
 
-// TODO(tuna): split the configuration into global and body files, so the checkpointing basically
-// becomes a body file generator
-constexpr void populate_simulation(
-	particle_container& particles, const sim_configuration& config,
-	const daw::json::json_value& bodies
-) noexcept(false) {
-	std::once_flag two_d_domain_check;
-	std::size_t seq_no = 0;
-	auto decide_brownian = [&](const auto& params) {
-		static const bool initial_temp_enforced = config.thermostat.has_value() && config.thermostat->enforce_initial_temperature;
-		if (initial_temp_enforced) {
-			return std::sqrt(config.thermostat->initial_temperature / params.particle_mass);
-		}
-		return params.brownian_mean;
-	};
+constexpr std::vector<body_entry> parse_bodies(std::string_view json_data) {
+	TRACE_INPUT_PARSING("Using bodies: {}", json_data);
+	return daw::json::from_json_array<body_entry>(json_data);
+}
 
-	for (const auto& [_, body] : bodies) {
-		const std::string type = body["type"].as<std::string>();
-		if (type == "cuboid") {
-			const auto params = body["parameters"].as<cuboid_parameters<3>>();
-			particles.add_cuboid<3>(
-				params.origin, params.scale, params.meshwidth, params.velocity,
-				params.particle_mass, params.sigma, params.epsilon, decide_brownian(params), seq_no
-			);
-		} else if (type == "rectangle") {
-			std::call_once(two_d_domain_check, detail::check_for_2d_domain, config);
-			const auto params = body["parameters"].as<cuboid_parameters<2>>();
-			particles.add_cuboid<2>(
-				{params.origin.x, params.origin.y, config.domain.z / 2},
-				{params.scale.x, params.scale.y, 1}, params.meshwidth, params.velocity,
-				params.particle_mass, params.sigma, params.epsilon, decide_brownian(params), seq_no
-			);
-		} else if (type == "particle") {
-			const auto params = body["parameters"].as<particle_parameters>();
-			particles.emplace(
-				params.position, params.velocity, params.mass, params.sigma, params.epsilon
-			);
-		} else if (type == "disc") {
-			std::call_once(two_d_domain_check, detail::check_for_2d_domain, config);
-			const auto params = body["parameters"].as<disc_parameters>();
-			particles.add_disc(
-				{params.center.x, params.center.y, config.domain.z / 2}, params.radius,
-				params.meshwidth, params.velocity, params.particle_mass, params.sigma,
-				params.epsilon, decide_brownian(params), seq_no
-			);
-		} else if (type == "particle_state") {
-			particles.place(body["parameters"].as<particle>());
-		} else {
-			throw std::invalid_argument(fmt::format("Unknown body type: {}", type));
+constexpr void populate_simulation(
+	particle_container& particles, sim_configuration& config, std::span<body_entry> bodies
+) noexcept(false) {
+	std::once_flag two_d_domain_check_flag;
+	std::size_t seq_no = 0;
+	auto two_d_domain_check = [&] {
+		std::call_once(two_d_domain_check_flag, detail::check_for_2d_domain, config);
+	};
+	auto decide_brownian = [&](body_entry& body) {
+		static const bool initial_temp_enforced =
+			config.thermostat.has_value() && config.thermostat->enforce_initial_temperature;
+		if (initial_temp_enforced) {
+			assert(body.parameters->brownian_mean == 0.0);
+			body.parameters->brownian_mean =
+				std::sqrt(config.thermostat->initial_temperature / body.material.mass);
 		}
+	};
+	for (auto& body : bodies) {
+		TRACE_INPUT_PARSING("Parsing body with geometry: {}", daw::json::to_json(body.geometry));
+		if (body.type == "particle") {
+			particles.add_particle(
+				body.geometry.as<particle_parameters>().position, body.velocity,
+				particles.register_material(body.material)
+			);
+			continue;
+		}
+		if (body.type == "particle_state") {
+			particles.reload_particle_state(
+				body.geometry.as<particle_state_parameters>(), body.velocity,
+				particles.register_material(body.material)
+			);
+			continue;
+		}
+
+		decide_brownian(body);
+
+		if (body.type == "cuboid") {
+			particles.add_cuboid<3>(
+				body.geometry.as<cuboid_parameters<3>>(), body.parameters.value(), body.velocity,
+				body.material, seq_no
+			);
+			continue;
+		}
+		if (body.type == "rectangle") {
+			two_d_domain_check();
+			particles.add_cuboid<2>(
+				body.geometry.as<cuboid_parameters<2>>().extend_to_3d(config.domain),
+				body.parameters.value(), body.velocity, body.material, seq_no
+			);
+			continue;
+		}
+		if (body.type == "disc") {
+			two_d_domain_check();
+			particles.add_disc(
+				body.geometry.as<disc_parameters<2>>().extend_to_3d(config.domain),
+				body.parameters.value(), body.velocity, body.material, seq_no
+			);
+			continue;
+		}
+		throw std::invalid_argument(fmt::format("Unknown body type: {}", body.type));
 	}
 }
 
 // TODO(tuna): move to output part of the codebase
 constexpr std::string dump_state(particle_container& container) {
-	std::string out = "[\n";
-	for (const particle& p : container.particles()) {
-		const auto view = serialization_view<particle>{.type = "particle_state", .parameters = p};
-		const auto json = daw::json::
-			to_json(view, daw::json::options::output_flags<daw::json::options::SerializationFormat::Pretty>);
-		fmt::format_to(std::back_inserter(out), "{},\n", json);
+	const auto& system = container.system();
+
+	// daw::json::json_value is non-owning, so the underlying string has to persist until the final
+	// serialization.
+	std::vector<std::string> geometries;
+	geometries.resize(system.size());
+
+	std::vector<body_entry> out;
+	out.resize(system.size());
+
+	for (particle_system::particle_id i = 0; i < system.size(); ++i) {
+		const particle_state_parameters state{
+			.position = system.serialize_position(i),
+			.force = system.serialize_force(i),
+			.old_force = system.serialize_old_force(i)
+		};
+		TRACE_CHECKPOINT(
+			"Serializing particle state: position={}, force={}, old_force={}", state.position,
+			state.force, state.old_force
+		);
+		// TODO(tuna): the below deserializes to "", fix
+		geometries.push_back(daw::json::to_json(state));
+		TRACE_CHECKPOINT("Serialized particle state: {}", geometries[i]);
+		body_entry particle_entry{
+			.type = "particle_state",
+			// TODO(tuna): check if this is a view over a string that gets destructed at the end of
+		    // the loop or is owning
+			.geometry = daw::json::json_value(geometries[i]),
+			.velocity = system.serialize_velocity(i),
+			.material = container.material_for_particle(i)
+		};
+		out.push_back(particle_entry);
 	}
-	out.pop_back();
-	out.pop_back();
-	out += ']';
-	return out;
+	return daw::json::
+		to_json_array(out, daw::json::options::output_flags<daw::json::options::SerializationFormat::Pretty>);
 };
 
 inline void write_state_to_file(std::string_view state, std::string_view output_path) {

@@ -2,6 +2,7 @@
 
 #include "grid/particle_container/fwd.hpp"
 #include "gtest_constexpr/macros.hpp"
+#include "simulation/config/entities.hpp"
 #include "testing_utilities.hpp"
 
 #include "grid/particle_container/particle_container.hpp"
@@ -19,12 +20,9 @@ TEST(ForceTests, BasicGravitation) {
 		auto config = sim_configuration{
 			.delta_t = 0.0014,
 			.cutoff_radius = 1.5,
-			.sigma = 1,
 			.end_time = 0.0014,
 			.write_frequency = 1000,
-			.base_name = "unused",
 			.domain{2, 2, 2},
-			.meshwidth = 1.225,
 		};
 		// TODO(tuna): make the constructor one arged, and the tests always gotta use this config first idiom
 		ParticleContainer particles(config.domain.x, config.domain.y, config.domain.z, config.cutoff_radius);
@@ -38,37 +36,36 @@ TEST(ForceTests, BasicGravitation) {
 }
 #endif
 
-template <fwd_reference_to<particle_container> Container>
-constexpr auto& particle_from_type(Container&& container, decltype(particle::type) type) {
-	auto flat = std::forward<Container>(container).particles();
-	return *std::ranges::find_if(flat, [type](const particle& p) { return p.type == type; });
-}
-
 // Check that the Lennard-Jones force is calculated correctly
 TEST(ForceTests, LennardJones) {
-	GTEST_CXP particle first(vec{4, 4, 4}, vec{}, 1, 1.0, 5.0, 10);
-	GTEST_CXP particle second(vec{5, 6, 4}, vec{}, 1, 1.0, 5.0, 15);
 	GTEST_CXP auto config = sim_configuration{
 		.delta_t = 0.0014,
 		.cutoff_radius = 5,
 		.boundary_behavior = boundary_conditions_descriptor::all(boundary_condition::reflecting),
 		.end_time = 0.0014,
 		.write_frequency = 1000,
-		.base_name{std::from_range, "unused"},
 		.domain{10, 10, 10},
-		.create_checkpoint = false,
-		.dimensions = 3,
-		.gravitational_constant = 0
+		.dimensions = 3
 	};
+	GTEST_CXP auto material = material_description{.mass = 1, .sigma = 1, .epsilon = 5};
+	GTEST_CXP vec first_pos{4, 4, 4};
+	GTEST_CXP vec second_pos{5, 6, 4};
+
 	auto first_force = std::invoke([&] -> vec {
 		particle_container particles(config.domain, config.cutoff_radius);
-		particles.place(first);
-		particles.place(second);
-		run_simulation(particles, config, lennard_jones_force, "unused");
-		return particle_from_type(particles, 10).f;
+		const auto type = particles.register_material(material);
+		particles.add_particle(first_pos, {}, type);
+		particles.add_particle(second_pos, {}, type);
+		run_simulation(particles, config, lennard_jones_force_soa, "unused");
+		return particles.system().serialize_force(0);
 	});
 
-	GTEST_CXP auto direct_calc = lennard_jones_force(first, second);
+	GTEST_CXP auto direct_calc = lennard_jones_force(
+		{.p1_position = first_pos,
+	     .p2_position = second_pos,
+	     .sigma = material.sigma,
+	     .epsilon = material.epsilon}
+	);
 	STATIC_EXPECT_VEC_DOUBLE_EQ(first_force, direct_calc);
 	static constexpr auto hand_calculated_result = vec(2952, 5904, 0);
 	GTEST_CXP auto scaled_force = 15625 * first_force;
@@ -79,19 +76,25 @@ TEST(ForceTests, LennardJones) {
 // Check that two particles colliding works
 TEST(ConfigTest, GridTest) {
 	// NOLINTNEXTLINE(*avoid-c-arrays)
-	static constexpr char data[]{
-#embed "assignment3/debug/two_particles_moving_towards_each_other.json"
+	static constexpr char config_data[]{
+#embed "assignment5/debug/simple/2_two_particles_moving_towards_each_other/config.json"
 		, 0
 	};
-	constexpr auto json_data = std::string_view(data);
-	GTEST_CXP auto parse_result = config::parse(json_data);
-	GTEST_CXP const auto& config = parse_result.config;
-	GTEST_CXP_SIM auto particle_result = std::invoke([&] -> std::pair<particle, particle> {
-		particle_container particles(config.domain, config.cutoff_radius);
-		config::populate_simulation(container, parse_result);
-		run_simulation(particles, config, calc, "unused");
-		return {particle_from_type(particles, 10), particle_from_type(particles, 15)};
+		static constexpr char bodies_data[]{
+#embed "assignment5/debug/simple/2_two_particles_moving_towards_each_other/bodies.json"
+		, 0
+		};
+	constexpr auto config_json_data = std::string_view(config_data);
+	constexpr auto bodies_json_data = std::string_view(bodies_data);
+	GTEST_CXP auto config = config::parse_config(json_data);
+	GTEST_CXP_SIM auto particle_result = std::invoke([&] {
+		particle_container container(config.domain, config.cutoff_radius);
+		config::populate_simulation(container, config, config::parse_bodies(bodies_json_data));
+		run_simulation(container, config, lennard_jones_force_soa, "unused");
+		const auto& system = container.system();
+		return std::pair{system.serialize_position(0), system.serialize_position(1)};
 	});
+	(void)particle_result;
 	// TODO(tuna): test that the two particles actually collide at iteration ~400
 }
 #endif
@@ -123,8 +126,8 @@ TEST(SimTests, HalleysComet) {
     GTEST_CXP_GCC const vec& earth_coords = earth_sighting[earth_i].x;
     GTEST_CXP_GCC const vec& comet_coords = earth_sighting[comet_i].x;
 
-    // "During its 1986 appearance, Halley's nearest approach to Earth occurred (...) at a distance
-of
+    // "During its 1986 appearance, Halley's nearest approach to Earth occurred (...) at a
+distance of
     // 0.42 AU (...)"
     // source: https://science.nasa.gov/solar-system/comets/1p-halley/
     GCC_STATIC_EXPECT_VEC_NEAR(earth_coords, comet_coords, 0.16);
@@ -145,8 +148,8 @@ constexpr void nothing_io(std::span<const Particle>, std::string_view, int) {}
 TEST(SimTests, PlottingTest) {
     GTEST_CXP_GCC auto result = std::invoke([] {
         std::array<Particle, 2> particles = {Particle{vec{}, vec{}, 1}, Particle{vec{1, 0, 0},
-vec{}, 1}}; GTEST_CXP double delta_t = 0.014; run_simulation<{.force = gravitational_force, .io =
-nothing_io}>( particles, {.delta_t = delta_t, .end_time = delta_t}, "unused"
+vec{}, 1}}; GTEST_CXP double delta_t = 0.014; run_simulation<{.force = gravitational_force, .io
+= nothing_io}>( particles, {.delta_t = delta_t, .end_time = delta_t}, "unused"
         );
         return particles;
     });

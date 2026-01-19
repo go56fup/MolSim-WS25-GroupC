@@ -1,5 +1,6 @@
 {
   description = "Dev shell for MolSim Praktikum";
+  
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";

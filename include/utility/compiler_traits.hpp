@@ -25,3 +25,9 @@
 #if __cpp_pp_embed && !HAS_EMBED
 #error "#embed support is claimed by the compiler but was not detected by CMake."
 #endif
+
+#if defined(__clang__)
+#define IS_CLANG 1
+#else
+#define IS_CLANG 0
+#endif

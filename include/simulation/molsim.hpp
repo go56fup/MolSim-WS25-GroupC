@@ -15,6 +15,7 @@
 #include "grid/enums.hpp"
 #include "grid/particle_container/fwd.hpp"
 #include "grid/particle_container/particle_container.hpp"
+#include "grid/particle_container/system.hpp"
 #include "iterators/pairwise.hpp"
 #include "iterators/periodic.hpp"
 #include "output_writers/io.hpp"
@@ -33,13 +34,6 @@
  * @param p1 The particle being acted upon.
  * @param p2 The particle exerting the force.
  */
-constexpr void
-apply_force_interaction(force_calculator auto calculator, particle& p1, particle& p2) noexcept {
-	const auto f_ij = std::invoke(calculator, p1, p2);
-	p1.f += f_ij;
-	p2.f -= f_ij;
-}
-
 constexpr bool hasPeriodic(const sim_configuration& config) {
 	using enum boundary_type;
 	return config.boundary_behavior[x_min] == boundary_condition::periodic ||
@@ -47,6 +41,7 @@ constexpr bool hasPeriodic(const sim_configuration& config) {
 	       config.boundary_behavior[z_min] == boundary_condition::periodic;
 }
 
+// TODO(tuna): reimplement this in terms of a std algorithm
 constexpr bool
 isPeriodic(const sim_configuration& config, const std::vector<boundary_type>& bt_array) {
 	bool result = true;
@@ -65,7 +60,7 @@ using BoundaryFunc = std::function<
 // Capture 'particles' and 'config' by reference (they live outside the function)
 // Capture 'calculator' by VALUE (since it's a template/auto param that might be local)
 BoundaryFunc funcDefiner(
-	particle_container& particles, const sim_configuration& config,
+	particle_container& container, const sim_configuration& config,
 	force_calculator auto calculator, boundary_type bType
 ) {
 
@@ -73,21 +68,21 @@ BoundaryFunc funcDefiner(
 
 	if (behavior == boundary_condition::reflecting) {
 		return
-			[&particles, calculator,
-		     &config](particle_container::cell& cell, boundary_type b, const particle_container::index&) {
-				reflect_via_ghost_particle(cell, particles.domain(), b, calculator);
+			[&container,
+		     calculator](particle_container::cell& cell, boundary_type b, const particle_container::index&) {
+				reflect_via_ghost_particle(cell, container, b);
 			};
 	} else if (behavior == boundary_condition::outflow) {
 		return
-			[&particles](particle_container::cell& cell, boundary_type b, const particle_container::index&) {
-				delete_ouflowing_particles(cell, particles.domain(), b);
+			[&container](particle_container::cell& cell, boundary_type b, const particle_container::index&) {
+				delete_ouflowing_particles(cell, container, b);
 			};
 	} else {
 		assert(behavior == boundary_condition::periodic);
-		return [&particles, calculator, &config](
+		return [&container, calculator](
 				   particle_container::cell& cell, boundary_type b,
 				   const particle_container::index& idx
-			   ) { periodic(cell, b, calculator, idx, particles); };
+			   ) { periodic(cell, b, calculator, idx, container); };
 	}
 }
 
@@ -258,20 +253,20 @@ constexpr void calculate_forces(
 	force_calculator auto calculator, particle_container& container, const sim_configuration& config
 ) noexcept {
 	for (auto& cell : container.cells()) {
-		for (auto&& [p1, p2] : unique_pairs(cell)) {
-			apply_force_interaction(calculator, p1, p2);
+		for (auto [p1_idx, p2_idx] : unique_pairs(cell)) {
+			std::invoke(calculator, container, p1_idx, p2_idx);
 		}
 	}
 
 	for (const auto& [current_cell_idx, target_cell_idx] : container.directional_interactions()) {
 		// TODO(tuna): see if after the implementation of the border iterator whether we still
 		// need the indices
-		auto& current_cell = container[current_cell_idx];
-		auto& target_cell = container[target_cell_idx];
+		const auto& current_cell = container[current_cell_idx];
+		const auto& target_cell = container[target_cell_idx];
 
-		for (auto& p1 : current_cell) {
-			for (auto& p2 : target_cell) {
-				apply_force_interaction(calculator, p1, p2);
+		for (auto p1_idx : current_cell) {
+			for (auto p2_idx : target_cell) {
+				std::invoke(calculator, container, p1_idx, p2_idx);
 			}
 		}
 	}
@@ -291,38 +286,40 @@ constexpr void calculate_forces(
  * @param delta_t The time step for integration.
  */
 constexpr void
-calculate_x(particle_container& particles, const sim_configuration& config) noexcept(false) {
-	// TODO(tuna): rewrite in terms of a common Bounds.h that has this displacement logic,
-	// switch over a boundary_type and set new i, j, k -> at the end of the loop do the
-	// index, push_back, erase.
-
-	const double cell_width = particles.cutoff_radius();
+calculate_x(particle_container& container, const sim_configuration& config) noexcept(false) {
+	const double cell_width = container.cutoff_radius();
 	auto move_to_cell = [&](const particle_container::index& new_cell_idx,
 	                        particle_container::cell& current_cell,
 	                        particle_container::cell::size_type i) noexcept {
 		const auto& particle = current_cell[i];
 		TRACE_GRID("Moving {} to {}", particle, new_cell_idx);
-		particle_container::cell& new_cell = particles[new_cell_idx];
+		particle_container::cell& new_cell = container[new_cell_idx];
 		new_cell.push_back(particle);
 		current_cell.erase(std::next(
 			current_cell.begin(), static_cast<particle_container::cell::difference_type>(i)
 		));
 	};
-	const auto& grid = particles.grid_size();
+	const auto& grid = container.grid_size();
+	auto& system = container.system();
 
-	for (auto&& [cell_idx, cell] : particles.enumerate_cells()) {
+	for (auto&& [cell_idx, cell] : container.enumerate_cells()) {
 		const vec cell_origin{
 			cell_idx.x * cell_width, cell_idx.y * cell_width, cell_idx.z * cell_width
 		};
 
 		for (std::size_t particle_idx = 0; particle_idx < cell.size(); ++particle_idx) {
 			particle_container::index_diff displacement{};
-			auto& p = cell[particle_idx];
+			auto p_idx = cell[particle_idx];
+			TRACE_GRID("Moving particle {}", p_idx);
 
-			const auto force_scalar = (config.delta_t * config.delta_t) / (2 * p.m);
-			// TODO(tuna): check if expression templates are needed here
-			p.x = p.x + config.delta_t * p.v + p.old_f * force_scalar;
-			auto& pos = p.x;
+			const auto force_scalar = (config.delta_t * config.delta_t) /
+			                          (2 * container.material_for_particle(p_idx).mass);
+			system.x[p_idx] +=
+				config.delta_t * system.vx[p_idx] + system.old_fx[p_idx] * force_scalar;
+			system.y[p_idx] +=
+				config.delta_t * system.vy[p_idx] + system.old_fy[p_idx] * force_scalar;
+			system.z[p_idx] +=
+				config.delta_t * system.vz[p_idx] + system.old_fz[p_idx] * force_scalar;
 			auto new_cell_idx = cell_idx;
 
 			// TODO(tuna): see if reformulating interactions' do_displacement via something common
@@ -334,7 +331,7 @@ calculate_x(particle_container& particles, const sim_configuration& config) noex
 				displacement[axis_] = increment;
 				const bool becomes_illegal = cell_idx[axis_] == (is_min ? 0 : grid[axis_] - 1);
 				TRACE_GRID(
-					"{}, illegality={}, current: {}, displacement: {}, origin: {}", p,
+					"{}, illegality={}, current: {}, displacement: {}, origin: {}", p_idx,
 					becomes_illegal, cell_idx, displacement, cell_origin
 				);
 				if (becomes_illegal) {
@@ -342,17 +339,18 @@ calculate_x(particle_container& particles, const sim_configuration& config) noex
 						// Zero out the current position first, teleport to 0 if overflowing, to end
 						// of grid if underflowing.
 						TRACE_PERIODIC(
-							"Performing periodic teleport on {}, currently stored in {}", p,
+							"Performing periodic teleport on {}, currently stored in {}", p_idx,
 							cell_idx
 						);
-						displacement[axis_] = -cell_idx[axis_];
+						displacement[axis_] =
+							-static_cast<particle_container::difference_type>(cell_idx[axis_]);
 						displacement[axis_] += is_min ? grid[axis_] - 1 : 0;
 						const double update =
 							increment * static_cast<double>(grid[axis_]) * cell_width;
-						pos[axis_] -= update;
+						system.position_component(axis_)[p_idx] -= update;
 						TRACE_PERIODIC(
 							"Periodic displacement: {}, pos update: -{}, new position {}",
-							displacement, update, pos
+							displacement, update, system.serialize_position(p_idx)
 						);
 					} else {
 						// TODO(tuna): see if putting a std::unreachable here and only throwing on
@@ -360,7 +358,7 @@ calculate_x(particle_container& particles, const sim_configuration& config) noex
 						throw std::out_of_range(fmt::format(
 							"Trying to move {} to non-existant cell with index {} + {} on "
 							"grid {}",
-							p, cell_idx, displacement, grid
+							p_idx, cell_idx, displacement, grid
 						));
 					}
 				}
@@ -369,17 +367,17 @@ calculate_x(particle_container& particles, const sim_configuration& config) noex
 
 			using enum boundary_type;
 
-			if (pos.x < cell_origin.x) {
+			if (system.x[p_idx] < cell_origin.x) {
 				update_displacement.template operator()<x_min>();
-			} else if (pos.x >= cell_origin.x + cell_width) {
+			} else if (system.x[p_idx] >= cell_origin.x + cell_width) {
 				update_displacement.template operator()<x_max>();
-			} else if (pos.y < cell_origin.y) {
+			} else if (system.y[p_idx] < cell_origin.y) {
 				update_displacement.template operator()<y_min>();
-			} else if (pos.y >= cell_origin.y + cell_width) {
+			} else if (system.y[p_idx] >= cell_origin.y + cell_width) {
 				update_displacement.template operator()<y_max>();
-			} else if (pos.z < cell_origin.z) {
+			} else if (system.z[p_idx] < cell_origin.z) {
 				update_displacement.template operator()<z_min>();
-			} else if (pos.z >= cell_origin.z + cell_width) {
+			} else if (system.z[p_idx] >= cell_origin.z + cell_width) {
 				update_displacement.template operator()<z_max>();
 			} else {
 				// Skip moving if all checks succeed
@@ -402,12 +400,14 @@ calculate_x(particle_container& particles, const sim_configuration& config) noex
  * @param particles Mutable span over particles to update.
  * @param delta_t The time step for integration.
  */
-constexpr void calculate_v(range_of<particle> auto&& particles, double delta_t) noexcept {
-	for (auto& p : particles) {
-		TRACE_SIM("Old V: {}", p);
-		const auto velocity_scalar = delta_t / (2 * p.m);
-		p.v = p.v + velocity_scalar * (p.old_f + p.f);
-		TRACE_SIM("New V: {}", p);
+constexpr void calculate_v(particle_container& container, double delta_t) noexcept {
+	auto& system = container.system();
+
+	for (particle_system::particle_id i = 0; i < container.system().size(); ++i) {
+		const auto velocity_scalar = delta_t / (2 * container.material_for_particle(i).mass);
+		system.vx[i] += velocity_scalar * (system.old_fx[i] + system.fx[i]);
+		system.vy[i] += velocity_scalar * (system.old_fy[i] + system.fy[i]);
+		system.vz[i] += velocity_scalar * (system.old_fz[i] + system.fz[i]);
 	}
 }
 
@@ -439,10 +439,14 @@ constexpr void plot_particles(
  *
  * @param particles Mutable span over particles to update.
  */
-constexpr void update_values(range_of<particle> auto&& particles) noexcept {
-	for (auto& p : particles) {
-		p.old_f = p.f;
-		p.f = {};
+constexpr void update_values(particle_system& system) noexcept {
+	for (particle_system::particle_id p = 0; p < system.size(); ++p) {
+		system.old_fx[p] = system.fx[p];
+		system.old_fy[p] = system.fy[p];
+		system.old_fz[p] = system.fz[p];
+		system.fx[p] = 0;
+		system.fy[p] = 0;
+		system.fz[p] = 0;
 	}
 }
 
@@ -461,7 +465,7 @@ constexpr void run_sim_iteration(
 	const sim_configuration& config, sim_iteration_t iteration
 ) noexcept {
 	if constexpr (!IsFirstIteration) {
-		update_values(container.particles());
+		update_values(container.system());
 	}
 
 	static const bool has_thermostat = config.thermostat.has_value();
@@ -474,10 +478,19 @@ constexpr void run_sim_iteration(
 	}
 
 	if (has_gravity) {
-		apply_gravity(container.particles(), config.gravitational_constant);
+		apply_gravity(container, config.gravitational_constant);
 	}
 
-	calculate_v(container.particles(), config.delta_t);
+	calculate_v(container, config.delta_t);
+#if LOG_SIM
+	const auto& system = container.system();
+	for (particle_system::particle_id i = 0; i < system.size(); ++i) {
+		TRACE_SIM(
+			"End of iteration, particle {}: pos={}, v={}, f={}, old_f={}", i, system.serialize_position(i),
+			system.serialize_velocity(i), system.serialize_force(i), system.serialize_old_force(i)
+		);
+	}
+#endif
 }
 
 // TODO(anyone): update span references
@@ -524,8 +537,8 @@ constexpr void run_simulation(
 	std::chrono::duration<double, std::milli> elapsed = finish - start;
 
 	SPDLOG_INFO(
-		"Runtime: {} ms, iterations: {}, tick length: {} ms, MUPS/s: {}", elapsed.count(), iteration,
-		elapsed.count() / iteration, (iteration / elapsed.count()) * 1000
+		"Runtime: {} ms, iterations: {}, tick length: {} ms", elapsed.count(), iteration,
+		elapsed.count() / iteration
 	);
 
 	if (config.create_checkpoint) {

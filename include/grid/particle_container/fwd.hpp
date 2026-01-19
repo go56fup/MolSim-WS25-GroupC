@@ -1,29 +1,29 @@
 #pragma once
+
 #include <cassert>
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
-#include <ranges>
 #include <vector>
 
-#include "grid/bounds/operations.hpp"
-#include "grid/enums.hpp"
-#include "physics/maxwell_boltzmann.hpp"
+#include "grid/particle_container/system.hpp"
 #include "physics/particle.hpp"
 #include "physics/vec_3d.hpp"
-#include "utility/compiler_traits.hpp"
+#include "simulation/config/entities.hpp"
 #include "utility/concepts.hpp"
 
+// TODO(tuna): add particle_system related docs
 /**
  * @brief The container type used to hold particles.
  *
  * This type is used throughout the simulation to store all particle objects.
  */
 class particle_container {
+private:
+	static constexpr auto max_particle_type_count = 8;
 public:
-	/// The fundamental element of the grid structure of the simulation. All particles of the
-	/// simulation are contained in exactly one cell.
-	using cell = std::vector<particle>;
+	/// The fundamental element of the grid structure of the simulation.
+	using cell = std::vector<particle_system::particle_id>;
 	using value_type = cell;
 	/// The type representing the index of a cell on an axis.
 	// Not std::size_t because this type needs to operate nicely with positions of doubles, and
@@ -36,6 +36,7 @@ public:
 	/// The type used to represent differences between indices.
 	// TODO(tuna): move the codebase over to this type
 	using index_diff = vec_3d<difference_type>;
+	using material_table = std::array<material_description, max_particle_type_count>;
 
 private:
 	/**
@@ -45,7 +46,7 @@ private:
 	 * @param z Z coordinate.
 	 * @return Index into the 1D representation of the grid.
 	 */
-	constexpr size_type linear_index(size_type x, size_type y, size_type z) const noexcept;
+	constexpr size_type linear_index(size_type x, size_type y, size_type z) const;
 
 	/**
 	 * @brief Determines the linear index of the cell of containing a position.
@@ -53,14 +54,6 @@ private:
 	 * @return Linear index of the cell containing the position.
 	 */
 	constexpr size_type pos_to_linear_index(const vec& pos) const noexcept;
-
-	/**
-	 * @brief Divides two doubles and rounds the result up to @ref size_type.
-	 * @param dividend Dividend.
-	 * @param divisor Divisor.
-	 * @return \f[ \left\lceil \frac{dividend}{divisor} \right\rceil \f]
-	 */
-	static CONSTEXPR_IF_GCC size_type div_round_up(double dividend, double divisor) noexcept;
 
 	/**
 	 * @brief Check if the given position runs afoul of domain maximum boundaries.
@@ -79,8 +72,10 @@ private:
 	/// Dimension of each cell (a cube). Forms the correspondence between the position and index
 	/// world.
 	double cutoff_radius_;
-	/// Number of particles in the simulation.
-	std::size_t size_ = 0;
+	particle_system system_;
+
+	material_table materials_;
+	std::uint8_t particle_type_count = 0;
 
 public:
 	// TODO(tuna): make all constructors specify the object they are constructing in their @brief
@@ -98,17 +93,6 @@ public:
 	constexpr particle_container(Vec&& domain_arg, double cutoff_radius_arg);
 
 	/**
-	 * @brief Places a particle inside the container.
-	 *
-	 * Takes a forwarding reference to an already existing particle.
-	 *
-	 * @tparam ParticleT Deduced forwarding reference type for `particle`.
-	 * @param particle Particle to place.
-	 */
-	template <fwd_reference_to<particle> ParticleT>
-	constexpr void place(ParticleT&& particle);
-
-	/**
 	 * @brief Constructs a particle inside the container.
 	 *
 	 * Takes a pack of arguments that can construct a particle, and constructs it inside its
@@ -120,9 +104,16 @@ public:
 	 * @param position Position to emplace particle at.
 	 * @param args Arguments to construct particle from.
 	 */
-	template <fwd_reference_to<vec> Vec, typename... Args>
-		requires std::constructible_from<particle, vec, Args...>
-	constexpr void emplace(Vec&& position, Args&&... args);
+	constexpr void
+	add_particle(const vec& position, const vec& velocity, particle_system::particle_type_t type);
+
+	template <fwd_reference_to<material_description> Desc>
+	constexpr std::uint8_t register_material(Desc&& desc) noexcept;
+
+	constexpr void reload_particle_state(
+		const particle_state_parameters& parameters, const vec& velocity,
+		particle_system::particle_type_t type
+	);
 
 	/**
 	 * @brief Add a mesh of particles, representing one body, into the container.
@@ -138,8 +129,8 @@ public:
 	 */
 	template <std::size_t N>
 	constexpr void add_cuboid(
-		const vec& origin, const index& scale, double meshwidth, const vec& velocity, double mass,
-		double sigma, double epsilon, double brownian_mean, std::size_t& seq_no
+		const cuboid_parameters<3>& cuboid, const body_common_parameters& body_parameters,
+		const vec& velocity, const material_description& material, std::size_t& seq_no
 	);
 
 	/**
@@ -154,9 +145,10 @@ public:
 	 * @param seq_no Mutable reference to a sequence number, used to achieve stateless random number
 	 * generation.
 	 */
+
 	constexpr void add_disc(
-		const vec& center, double radius, double meshwidth, const vec& velocity, double mass,
-		double sigma, double epsilon, double brownian_mean, std::size_t& seq_no
+		const disc_parameters<3>& disc, const body_common_parameters& body_parameters,
+		const vec& velocity, const material_description& material, std::size_t& seq_no
 	);
 
 	// TODO(tuna): see if the return type specified conflicts when the container is const
@@ -182,18 +174,6 @@ public:
 	 * @return Range of indices and corresponding cells.
 	 */
 	constexpr auto enumerate_cells() noexcept;
-
-	/**
-	 * @brief Get a range over all particles in the container.
-	 * @return Range to non-const over all particles in container.
-	 */
-	constexpr range_of<particle> auto particles() noexcept;
-
-	/**
-	 * @brief Get a range over all particles in the container.
-	 * @return Range to const over all particles in container.
-	 */
-	constexpr range_of<const particle> auto particles() const noexcept;
 
 	/**
 	 * @brief Get a range over all cells in the container.
@@ -271,9 +251,8 @@ public:
 	 */
 	constexpr double cutoff_radius() const noexcept;
 
-	/**
-	 * @brief Get the number of particles in the simulation.
-	 * @return Particle count in container.
-	 */
-	constexpr std::size_t size() const noexcept;
+	constexpr const material_description& material_for_particle(particle_system::particle_id i) const noexcept;
+
+	constexpr const particle_system& system() const noexcept;
+	constexpr particle_system& system() noexcept;
 };

@@ -63,3 +63,15 @@
 #else
 #define TRACE_THERMOSTAT(...) (void)0
 #endif
+
+#if LOG_CHECKPOINT
+#define TRACE_CHECKPOINT(...) SPDLOG_TRACE(__VA_ARGS__)
+#else
+#define TRACE_CHECKPOINT(...) (void)0
+#endif
+
+#if LOG_RANDOM
+#define TRACE_RANDOM(...) SPDLOG_TRACE(__VA_ARGS__)
+#else
+#define TRACE_RANDOM(...) (void)0
+#endif

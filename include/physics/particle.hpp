@@ -1,3 +1,4 @@
+#if 0
 /*
  * Particle.h
  *
@@ -184,4 +185,5 @@ struct fmt::formatter<particle> {
 
 #ifdef NDEBUG
 static_assert(std::is_trivially_copyable_v<particle>);
+#endif
 #endif

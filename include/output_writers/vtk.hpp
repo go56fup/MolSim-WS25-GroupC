@@ -54,14 +54,14 @@ plot_particles(particle_container& particles, std::string_view filename, unsigne
 	typeArray->SetName("type");
 	typeArray->SetNumberOfComponents(1);
 
-	for (const auto& cell : particles.cells()) {
-		for (const auto& p : cell) {
-			points->InsertNextPoint(p.x.data());
-			massArray->InsertNextValue(static_cast<float>(p.m));
-			velocityArray->InsertNextTuple(p.v.data());
-			forceArray->InsertNextTuple(p.f.data());
-			typeArray->InsertNextValue(p.type);
-		}
+	const auto& system = particles.system();
+	for (particle_system::particle_id i = 0; i < system.size(); ++i) {
+		const auto& material = particles.material_for_particle(i);
+		points->InsertNextPoint(system.serialize_position(i).data());
+		massArray->InsertNextValue(static_cast<float>(material.mass));
+		velocityArray->InsertNextTuple(system.serialize_velocity(i).data());
+		forceArray->InsertNextTuple(system.serialize_force(i).data());
+		typeArray->InsertNextValue(system.type[i]);
 	}
 
 	// Set up the grid

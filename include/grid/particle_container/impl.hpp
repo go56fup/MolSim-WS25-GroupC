@@ -1,4 +1,5 @@
 #pragma once
+
 #include <cassert>
 #include <concepts>
 #include <cstddef>
@@ -6,7 +7,6 @@
 #include <ranges>
 #include <vector>
 
-#include "fwd.hpp"
 #include "grid/bounds/operations.hpp"
 #include "grid/enums.hpp"
 #include "iterators/border_cells.hpp"
@@ -15,6 +15,7 @@
 #include "physics/maxwell_boltzmann.hpp"
 #include "physics/particle.hpp"
 #include "physics/vec_3d.hpp"
+#include "simulation/config/entities.hpp"
 #include "utility/compiler_traits.hpp"
 #include "utility/concepts.hpp"
 #include "utility/tracing/config.hpp"
@@ -23,19 +24,15 @@
 constexpr particle_container::size_type particle_container::linear_index(
 	particle_container::size_type x, particle_container::size_type y,
 	particle_container::size_type z
-) const noexcept {
+) const {
 	const auto result = (x * grid_size_.y * grid_size_.z) + (y * grid_size_.z) + z;
 #if LOG_GRID
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wterminate"
 	if (result >= grid_size_.x * grid_size_.y * grid_size_.z) {
 		throw std::out_of_range(
 			fmt::format("Out of bounds cell requested for grid {}: {}, {}, {}", grid_size_, x, y, z)
 		);
 	}
-#pragma GCC diagnostic pop
 #endif
-	assert(result < grid_size_.x * grid_size_.y * grid_size_.z && "Out of bounds cell requested");
 	return result;
 }
 
@@ -47,10 +44,19 @@ constexpr particle_container::size_type particle_container::pos_to_linear_index(
 	return linear_index(x, y, z);
 }
 
-CONSTEXPR_IF_GCC particle_container::size_type
-particle_container::div_round_up(double dividend, double divisor) noexcept {
+namespace detail {
+/**
+ * @brief Divides two doubles and rounds the result up to @ref size_type.
+ * @param dividend Dividend.
+ * @param divisor Divisor.
+ * @return \f[ \left\lceil \frac{dividend}{divisor} \right\rceil \f]
+ */
+
+CONSTEXPR_IF_GCC inline particle_container::size_type
+div_round_up(double dividend, double divisor) noexcept {
 	return static_cast<particle_container::size_type>(std::ceil(dividend / divisor));
 }
+}  // namespace detail
 
 constexpr void particle_container::check_if_out_of_domain_max(const vec& pos) const
 	noexcept(false) {
@@ -68,7 +74,10 @@ constexpr void particle_container::check_if_out_of_domain_max(const vec& pos) co
 template <fwd_reference_to<vec> Vec>
 constexpr particle_container::particle_container(Vec&& domain_arg, double cutoff_radius_arg)
 		: domain_{std::forward<Vec>(domain_arg)}
-		, grid_size_{div_round_up(domain_.x, cutoff_radius_arg), div_round_up(domain_.y, cutoff_radius_arg), div_round_up(domain_.z, cutoff_radius_arg)}
+		, grid_size_{
+				detail::div_round_up(domain_.x, cutoff_radius_arg),
+				detail::div_round_up(domain_.y, cutoff_radius_arg),
+				detail::div_round_up(domain_.z, cutoff_radius_arg)}
 		, cutoff_radius_{cutoff_radius_arg} {
 	// Prevent implicit widening later, if x * y * z overflows for uint32, this takes care of it
 	const auto grid_x = static_cast<std::size_t>(grid_size_.x);
@@ -78,38 +87,52 @@ constexpr particle_container::particle_container(Vec&& domain_arg, double cutoff
 	grid.resize(grid_x * grid_y * grid_z);
 }
 
-template <fwd_reference_to<particle> ParticleT>
-constexpr void particle_container::place(ParticleT&& particle) {
-	TRACE_PARTICLE_CONTAINER("Placing particle: {}", particle);
-	check_if_out_of_domain_max(particle.x);
-	grid[pos_to_linear_index(particle.x)].emplace_back(std::forward<ParticleT>(particle));
-	++size_;
+constexpr void particle_container::add_particle(
+	const vec& position, const vec& velocity, particle_system::particle_type_t type
+) {
+	system_.add_particle(position, velocity, type);
+	grid[pos_to_linear_index(position)].push_back(system_.size() - 1);
 }
 
-template <fwd_reference_to<vec> Vec, typename... Args>
-	requires std::constructible_from<particle, vec, Args...>
-constexpr void particle_container::emplace(Vec&& position, Args&&... args) {
-	TRACE_PARTICLE_CONTAINER("Emplacing particle at coordinates: {}", position);
-	check_if_out_of_domain_max(position);
-	grid[pos_to_linear_index(position)].emplace_back(
-		std::forward<Vec>(position), std::forward<Args>(args)...
+template <fwd_reference_to<material_description> Desc>
+constexpr std::uint8_t particle_container::register_material(Desc&& desc) noexcept {
+	auto it = std::ranges::find(materials_, desc);
+	if (it == materials_.end()) {
+		++particle_type_count;
+		assert(particle_type_count < materials_.size());
+		materials_[particle_type_count] = std::forward<Desc>(desc);
+		return particle_type_count;
+	}
+	return static_cast<std::uint8_t>(std::distance(materials_.begin(), it));
+}
+
+constexpr void particle_container::reload_particle_state(
+	const particle_state_parameters& parameters, const vec& velocity,
+	particle_system::particle_type_t type
+) {
+	system_.add_particle(
+		parameters.position, velocity, parameters.force, parameters.old_force, type
 	);
-	++size_;
+	grid[pos_to_linear_index(parameters.position)].push_back(system_.size() - 1);
 }
 
 template <std::size_t N>
 constexpr void particle_container::add_cuboid(
-	const vec& origin, const index& scale, double meshwidth, const vec& velocity, double mass,
-	double sigma, double epsilon, double brownian_mean, std::size_t& seq_no
+	const cuboid_parameters<3>& cuboid, const body_common_parameters& body_parameters,
+	const vec& velocity, const material_description& material, std::size_t& seq_no
 ) {
-	for (size_type i = 0; i < scale.x; ++i) {
-		for (size_type j = 0; j < scale.y; ++j) {
-			for (size_type k = 0; k < scale.z; ++k) {
-				emplace(
-					vec{origin.x + (i * meshwidth), origin.y + (j * meshwidth),
-				        origin.z + (k * meshwidth)},
-					maxwell_boltzmann_distributed_velocity<N>(brownian_mean, seq_no) + velocity,
-					mass, sigma, epsilon, LOG_PARTICLE_TYPE ? seq_no : 0
+	const auto type = register_material(material);
+	for (size_type x = 0; x < cuboid.scale.x; ++x) {
+		for (size_type y = 0; y < cuboid.scale.y; ++y) {
+			for (size_type z = 0; z < cuboid.scale.z; ++z) {
+				add_particle(
+					{cuboid.origin.x + (x * body_parameters.meshwidth),
+				     cuboid.origin.y + (y * body_parameters.meshwidth),
+				     cuboid.origin.z + (z * body_parameters.meshwidth)},
+					maxwell_boltzmann_distributed_velocity<N>(
+						body_parameters.brownian_mean, seq_no
+					) + velocity,
+					type
 				);
 			}
 		}
@@ -117,18 +140,22 @@ constexpr void particle_container::add_cuboid(
 }
 
 constexpr void particle_container::add_disc(
-	const vec& center, double radius, double meshwidth, const vec& velocity, double mass,
-	double sigma, double epsilon, double brownian_mean, std::size_t& seq_no
+	const disc_parameters<3>& disc, const body_common_parameters& body_parameters,
+	const vec& velocity, const material_description& material, std::size_t& seq_no
 ) {
-	for (int i = static_cast<int>(-radius); i <= radius; i++) {
-		for (int j = static_cast<int>(-radius); j <= radius; j++) {
-			if (i * i + j * j > radius * radius) {
+	const auto& r = disc.radius;
+	const auto type = register_material(material);
+	for (int i = static_cast<int>(-r); i <= r; i++) {
+		for (int j = static_cast<int>(-r); j <= r; j++) {
+			if (i * i + j * j > r * r) {
 				continue;
 			}
-			emplace(
-				vec{center.x + (i * meshwidth), center.y + (j * meshwidth), center.z},
-				maxwell_boltzmann_distributed_velocity<2>(brownian_mean, seq_no) + velocity, mass,
-				sigma, epsilon, LOG_PARTICLE_TYPE ? seq_no : 0
+			add_particle(
+				{disc.center.x + (i * body_parameters.meshwidth),
+			     disc.center.y + (j * body_parameters.meshwidth), disc.center.z},
+				maxwell_boltzmann_distributed_velocity<2>(body_parameters.brownian_mean, seq_no) +
+					velocity,
+				type
 			);
 		}
 	}
@@ -151,15 +178,6 @@ particle_container::border_cells() noexcept {
 // cannot be expressed in here: so we leave it as auto.
 constexpr auto particle_container::enumerate_cells() noexcept {
 	return enumerate_cells_range(*this);
-}
-
-constexpr range_of<particle> auto particle_container::particles() noexcept {
-	return grid | std::views::join;
-}
-
-constexpr range_of<const particle> auto particle_container::particles() const noexcept {
-	// TODO(tuna): i'm not sure as const is strictly necessary
-	return std::as_const(grid) | std::views::join;
 }
 
 constexpr range_of<particle_container::cell> auto& particle_container::cells() noexcept {
@@ -217,6 +235,15 @@ constexpr double particle_container::cutoff_radius() const noexcept {
 	return cutoff_radius_;
 }
 
-constexpr std::size_t particle_container::size() const noexcept {
-	return size_;
+constexpr const material_description&
+particle_container::material_for_particle(particle_system::particle_id i) const noexcept {
+	return materials_[system_.type[i]];
+}
+
+constexpr const particle_system& particle_container::system() const noexcept {
+	return system_;
+}
+
+constexpr particle_system& particle_container::system() noexcept {
+	return system_;
 }

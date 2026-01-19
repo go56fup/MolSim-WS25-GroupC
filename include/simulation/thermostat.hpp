@@ -9,14 +9,16 @@
 #include "utility/compiler_traits.hpp"
 #include "utility/concepts.hpp"
 
-CONSTEXPR_IF_GCC double
+CONSTEXPR_IF_GCC inline double
 get_temperature(particle_container& container, decltype(sim_configuration::dimensions) dimensions) {
 	double result = 0;
-	for (particle& p : container.particles()) {
-		const double squared_norm = (p.v.x * p.v.x) + (p.v.y * p.v.y) + (p.v.z * p.v.z);
-		result += p.m * squared_norm;
+	const auto& system = container.system();
+	for (particle_system::particle_id p = 0; p < system.size(); ++p) {
+		const double squared_norm = (system.vx[p] * system.vx[p]) + (system.vy[p] * system.vy[p]) +
+		                            (system.vz[p] * system.vz[p]);
+		result += container.material_for_particle(p).mass * squared_norm;
 	}
-	result /= dimensions * static_cast<double>(container.size());
+	result /= dimensions * static_cast<double>(system.size());
 	return result;
 }
 
@@ -29,7 +31,7 @@ get_temperature(particle_container& container, decltype(sim_configuration::dimen
  * velocity scaling.
  * @param dimensions Degrees of freedom in the simulation.
  */
-CONSTEXPR_IF_GCC void run_thermostat(
+CONSTEXPR_IF_GCC inline void run_thermostat(
 	particle_container& container, const thermostat_parameters& therm,
 	decltype(sim_configuration::dimensions) dimensions
 ) {
@@ -42,8 +44,11 @@ CONSTEXPR_IF_GCC void run_thermostat(
 		std::clamp(target, current_temp - max_change, current_temp + max_change);
 	TRACE_THERMOSTAT("Current temperature: {},  new temperature: {}", current_temp, new_temp);
 	if (const double beta = std::sqrt(new_temp / current_temp); beta != 1) {
-		for (particle& p : container.particles()) {
-			p.v *= beta;
+		auto& system = container.system();
+		for (particle_system::particle_id p = 0; p < system.size(); ++p) {
+			system.vx[p] *= beta;
+			system.vy[p] *= beta;
+			system.vz[p] *= beta;
 		}
 	}
 }

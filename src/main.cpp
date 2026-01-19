@@ -1,3 +1,4 @@
+#include <daw/json/daw_json_exception.h>
 #include <exception>
 #include <filesystem>
 #include <fstream>
@@ -21,7 +22,6 @@ inline constexpr use_formatting_t use_formatting{};
 
 // TODO(tuna): look into how spdlog implements its overloads for fmt and remove the tag type if
 // possible
-// TODO(tuna): grep for exit and replace with terminating_log -- look up docs for die
 template <typename... Args>
 [[noreturn]] void terminating_log(fmt::format_string<Args...> fmt_string, Args&&... args) {
 	SPDLOG_CRITICAL(fmt_string, std::forward<Args>(args)...);
@@ -31,6 +31,10 @@ template <typename... Args>
 [[noreturn]] void terminating_log(std::string_view msg) {
 	SPDLOG_CRITICAL(msg);
 	std::exit(1);  // NOLINT(*mt-unsafe)
+}
+
+[[noreturn]] void unhandled_json(const daw::json::json_exception& ex) {
+	terminating_log("Uncaught JSON exception: {}", ex.what());
 }
 
 /**
@@ -57,12 +61,12 @@ int usual_main(int argc, char* argv[]) {
 		.choices("off", "critcal", "err", "warn", "info", "debug", "trace")
 		.default_value("info");
 
-	program.add_argument("file").help(
-		"input file to read simulation parameters and initial condition of bodies from"
-	);
+	program.add_argument("-c", "--config")
+		.help("input file to read global simulation parameters from");
 
-	program.add_argument("-c", "--checkpoint")
-		.help("list of particle states to add to simulation, usually generated via a checkpoint");
+	program.add_argument("-b", "--bodies")
+		.help("input file to read initial configuration of particles and bodies from")
+		.append();
 
 	try {
 		program.parse_args(argc, argv);
@@ -80,30 +84,40 @@ int usual_main(int argc, char* argv[]) {
 		std::filesystem::create_directories(output_name);
 	}
 
-	const auto file = program.get<std::string>("file");
-	const std::ifstream t(file);
+	const auto config_filepath = program.get<std::string>("--config");
+	const std::ifstream t(config_filepath);
 	std::stringstream buffer;
 	buffer << t.rdbuf();
-	unprocessed_config parse_result = config::parse(buffer.view());
-	particle_container container(parse_result.config.domain, parse_result.config.cutoff_radius);
-	config::populate_simulation(container, parse_result.config, parse_result.bodies);
-	if (auto checkpoint = program.present("--checkpoint")) {
-		const std::ifstream t(*checkpoint);
-		std::stringstream buffer;
-		buffer << t.rdbuf();
-		config::populate_simulation(
-			container, parse_result.config,
-			daw::json::from_json<daw::json::json_value>(buffer.view())
-		);
+	const std::string_view config_file_contents = buffer.view();
+	sim_configuration config;
+
+	try {
+		config = config::parse_config(config_file_contents);
+	} catch (const daw::json::json_exception& ex) {
+		unhandled_json(ex);
 	}
 
-	// TODO(tuna): when we add gravitation as an alternative force, change this to not be hardcoded
-	// TODO(tuna): when we move to the lut approach for the epsilons, see if just comparing the type
-	// is faster than branchless compute
+	const auto body_file_paths = program.get<std::vector<std::string>>("--bodies");
 
-	run_simulation(container, parse_result.config, lennard_jones_force, output_name);
+	particle_container container(config.domain, config.cutoff_radius);
+
+	for (const auto& body_file : body_file_paths) {
+		const std::ifstream t(body_file);
+		std::stringstream body_buffer;
+		body_buffer << t.rdbuf();
+		const std::string_view body_file_contents = body_buffer.view();
+		try {
+			auto tail = config::parse_bodies(body_file_contents);
+			config::populate_simulation(container, config, tail);
+		} catch (const daw::json::json_exception& ex) {
+			unhandled_json(ex);
+		}
+	}
+
+	run_simulation(container, config, lennard_jones_force_soa, output_name);
 
 	SPDLOG_INFO("output written. Terminating...");
+
 	return 0;
 }
 
