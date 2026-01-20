@@ -21,6 +21,7 @@
 class particle_container {
 private:
 	static constexpr auto max_particle_type_count = 8;
+
 public:
 	/// The fundamental element of the grid structure of the simulation.
 	using cell = std::vector<particle_system::particle_id>;
@@ -34,20 +35,10 @@ public:
 	/// The type used to index into this container.
 	using index = vec_3d<size_type>;
 	/// The type used to represent differences between indices.
-	// TODO(tuna): move the codebase over to this type
-	using index_diff = vec_3d<difference_type>;
+	using signed_index = vec_3d<difference_type>;
 	using material_table = std::array<material_description, max_particle_type_count>;
 
 private:
-	/**
-	 * @brief Get linear index, associated with a cell's coordinates on the grid.
-	 * @param x X coordinate.
-	 * @param y Y coordinate.
-	 * @param z Z coordinate.
-	 * @return Index into the 1D representation of the grid.
-	 */
-	constexpr size_type linear_index(size_type x, size_type y, size_type z) const;
-
 	/**
 	 * @brief Determines the linear index of the cell of containing a position.
 	 * @param pos Position in domain.
@@ -78,6 +69,17 @@ private:
 	std::uint8_t particle_type_count = 0;
 
 public:
+	/**
+	 * @brief Get linear index, associated with a cell's coordinates on the grid.
+	 * @param x X coordinate.
+	 * @param y Y coordinate.
+	 * @param z Z coordinate.
+	 * @return Index into the 1D representation of the grid.
+	 */
+	constexpr size_type linear_index(size_type x, size_type y, size_type z) const;
+
+	constexpr particle_container::index index_from_linear(size_type linear) const;
+
 	// TODO(tuna): make all constructors specify the object they are constructing in their @brief
 	// docs
 	/**
@@ -251,7 +253,8 @@ public:
 	 */
 	constexpr double cutoff_radius() const noexcept;
 
-	constexpr const material_description& material_for_particle(particle_system::particle_id i) const noexcept;
+	constexpr const material_description& material_for_particle(particle_system::particle_id i
+	) const noexcept;
 
 	constexpr const particle_system& system() const noexcept;
 	constexpr particle_system& system() noexcept;

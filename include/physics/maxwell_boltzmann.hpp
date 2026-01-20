@@ -63,12 +63,12 @@ inline double get_random_runtime() {
 
 constexpr double get_random([[maybe_unused]] std::size_t no) {
 	if not consteval {
-		double result = get_random_runtime();
-		TRACE_RANDOM("{}: {}", no, result);
+		const double result = get_random_runtime();
+		TRACE_RANDOM("Got random number {} at {}", result, no);
 		return result;
 	} else {
-		double result = random_numbers[no];
-		TRACE_RANDOM("{}: {}", no, result);
+		const double result = random_numbers[no];
+		TRACE_RANDOM("Got random number {} at {}", result, no);
 		return result;
 	}
 }

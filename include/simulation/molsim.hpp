@@ -2,10 +2,10 @@
 
 #include <cmath>
 #include <functional>
+#include <omp.h>
 #include <ranges>
 #include <span>
 #include <string_view>
-#include <omp.h>
 
 #include <fmt/compile.h>
 #include <spdlog/spdlog.h>
@@ -35,210 +35,6 @@
  * @param p1 The particle being acted upon.
  * @param p2 The particle exerting the force.
  */
-constexpr bool hasPeriodic(const sim_configuration& config) {
-	using enum boundary_type;
-	return config.boundary_behavior[x_min] == boundary_condition::periodic ||
-	       config.boundary_behavior[y_min] == boundary_condition::periodic ||
-	       config.boundary_behavior[z_min] == boundary_condition::periodic;
-}
-
-// TODO(tuna): reimplement this in terms of a std algorithm
-constexpr bool
-isPeriodic(const sim_configuration& config, const std::vector<boundary_type>& bt_array) {
-	bool result = true;
-	for (auto boundary : bt_array) {
-		result = result && config.boundary_behavior[boundary] == boundary_condition::periodic;
-	}
-
-	return result;
-}
-
-// Define the signature: void return, taking (cell, boundary, config)
-using BoundaryFunc = std::function<
-	void(particle_container::cell&, boundary_type, const particle_container::index& idx)>;
-
-// TODO(tuna): move away from std::function
-// Capture 'particles' and 'config' by reference (they live outside the function)
-// Capture 'calculator' by VALUE (since it's a template/auto param that might be local)
-BoundaryFunc funcDefiner(
-	particle_container& container, const sim_configuration& config,
-	force_calculator auto calculator, boundary_type bType
-) {
-
-	auto behavior = config.boundary_behavior[bType];
-
-	if (behavior == boundary_condition::reflecting) {
-		return
-			[&container,
-		     calculator](particle_container::cell& cell, boundary_type b, const particle_container::index&) {
-				reflect_via_ghost_particle(cell, container, b);
-			};
-	} else if (behavior == boundary_condition::outflow) {
-		return
-			[&container](particle_container::cell& cell, boundary_type b, const particle_container::index&) {
-				delete_ouflowing_particles(cell, container, b);
-			};
-	} else {
-		assert(behavior == boundary_condition::periodic);
-		return [&container, calculator](
-				   particle_container::cell& cell, boundary_type b,
-				   const particle_container::index& idx
-			   ) { periodic(cell, b, calculator, idx, container); };
-	}
-}
-
-constexpr void loop(
-	particle_container& particles, const sim_configuration& config, force_calculator auto calculator
-) {
-	const auto& grid = particles.grid_size();
-	using enum boundary_type;
-
-	//TODO(gabriel):parallelis this (Attention corners need to be done atomically)
-	// x faces
-	BoundaryFunc func = funcDefiner(particles, config, calculator, x_min);
-	for (unsigned i = 0; i < grid.y; ++i) {
-		for (unsigned j = 0; j < grid.z; ++j) {
-			const particle_container::index min_coords{0, i, j};
-			const particle_container::index max_coords{grid.x - 1, i, j};
-			TRACE_BORDER_CELL_ITER("min: {}, max: {}", min_coords, max_coords);
-			std::invoke(func, particles[min_coords], x_min, max_coords);
-			std::invoke(func, particles[max_coords], x_max, max_coords);
-		}
-	}
-
-	// y faces
-	func = funcDefiner(particles, config, calculator, y_min);
-	for (unsigned i = 0; i < grid.x; ++i) {
-		for (unsigned j = 0; j < grid.z; ++j) {
-			const particle_container::index min_coords{i, 0, j};
-			const particle_container::index max_coords{i, grid.y - 1, j};
-			TRACE_BORDER_CELL_ITER("min: {}, max: {}", min_coords, max_coords);
-			std::invoke(func, particles[min_coords], y_min, min_coords);
-			std::invoke(func, particles[max_coords], y_max, max_coords);
-		}
-	}
-
-	// z faces
-	func = funcDefiner(particles, config, calculator, z_min);
-	for (unsigned i = 0; i < grid.x; ++i) {
-		for (unsigned j = 0; j < grid.y; ++j) {
-			const particle_container::index min_coords{i, j, 0};
-			const particle_container::index max_coords{i, j, grid.z - 1};
-			TRACE_BORDER_CELL_ITER("min: {}, max: {}", min_coords, max_coords);
-			std::invoke(func, particles[min_coords], z_min, max_coords);
-			std::invoke(func, particles[max_coords], z_max, max_coords);
-		}
-	}
-
-	if (!hasPeriodic(config)) {
-		return;
-	}
-	func = [&](particle_container::cell& cell, boundary_type b, const particle_container::index& idx
-	       ) { periodic(cell, b, calculator, idx, particles); };
-
-	// x-y edges
-	bool cond = isPeriodic(config, {x_min, y_min});
-	if (cond) {
-		for (unsigned i = 0; i < grid.z; ++i) {
-			std::invoke(
-				func, particles[{0, 0, i}], x_min | y_min, particle_container::index{0, 0, i}
-			);
-			std::invoke(
-				func, particles[{0, grid.y, i}], x_min | y_max,
-				particle_container::index{0, grid.y, i}
-			);
-			std::invoke(
-				func, particles[{grid.x, 0, i}], x_max | y_min,
-				particle_container::index{grid.x, 0, i}
-			);
-			std::invoke(
-				func, particles[{grid.x, grid.y, i}], x_max | y_max,
-				particle_container::index{grid.x, grid.y, i}
-			);
-		}
-	}
-
-	// x-z edges
-	cond = isPeriodic(config, {x_min, z_min});
-	if (cond) {
-		for (unsigned i = 0; i < grid.y; ++i) {
-			std::invoke(
-				func, particles[{0, i, 0}], x_min | z_min, particle_container::index{0, i, 0}
-			);
-			std::invoke(
-				func, particles[{0, i, grid.z}], x_min | z_max,
-				particle_container::index{0, i, grid.z}
-			);
-			std::invoke(
-				func, particles[{grid.x, i, 0}], x_max | z_min,
-				particle_container::index{grid.x, i, 0}
-			);
-			std::invoke(
-				func, particles[{grid.x, i, grid.z}], x_max | z_max,
-				particle_container::index{grid.x, i, grid.z}
-			);
-		}
-	}
-
-	// y-z edges
-	cond = isPeriodic(config, {y_min, z_min});
-	if (cond) {
-		for (unsigned i = 0; i < grid.y; ++i) {
-			std::invoke(
-				func, particles[{i, 0, 0}], y_min | z_min, particle_container::index{i, 0, 0}
-			);
-			std::invoke(
-				func, particles[{i, 0, grid.z}], y_min | z_max,
-				particle_container::index{i, 0, grid.z}
-			);
-			std::invoke(
-				func, particles[{i, grid.y, 0}], y_max | z_min,
-				particle_container::index{i, grid.y, 0}
-			);
-			std::invoke(
-				func, particles[{i, grid.y, grid.z}], y_max | z_max,
-				particle_container::index{i, grid.y, grid.z}
-			);
-		}
-	}
-
-	// x-y-z corners
-	cond = isPeriodic(config, {x_min, y_min, z_min});
-	if (cond) {
-		std::invoke(
-			func, particles[{0, 0, 0}], x_min | y_min | z_min, particle_container::index{0, 0, 0}
-		);
-		std::invoke(
-			func, particles[{0, 0, grid.z}], x_min | y_min | z_max,
-			particle_container::index{0, 0, grid.z}
-		);
-		std::invoke(
-			func, particles[{0, grid.y, 0}], x_min | y_max | z_min,
-			particle_container::index{0, grid.y, 0}
-		);
-		std::invoke(
-			func, particles[{0, grid.y, grid.z}], x_min | y_max | z_max,
-			particle_container::index{0, grid.y, grid.z}
-		);
-		std::invoke(
-			func, particles[{grid.x, 0, 0}], x_max | y_min | z_min,
-			particle_container::index{grid.x, 0, 0}
-		);
-		std::invoke(
-			func, particles[{grid.x, 0, grid.z}], x_max | y_min | z_max,
-			particle_container::index{grid.x, 0, grid.z}
-		);
-		std::invoke(
-			func, particles[{grid.x, grid.y, 0}], x_max | y_max | z_min,
-			particle_container::index{grid.x, grid.y, 0}
-		);
-		std::invoke(
-			func, particles[{grid.x, grid.y, grid.z}], x_max | y_max | z_max,
-			particle_container::index{grid.x, grid.y, grid.z}
-		);
-	}
-}
-
 /**
  * @brief Calculates forces on a collection of particles using the provided force calculator.
  *
@@ -250,39 +46,50 @@ constexpr void loop(
  * @param particles The span over particles on which forces will be calculated.
  *
  */
-constexpr void calculate_forces(
+template <std::size_t BatchSize>
+constexpr void calculate_forces_batched(
 	force_calculator auto calculator, particle_container& container, const sim_configuration& config
 ) noexcept {
-	const int BATCH_SIZE = 8;
+	using batch = std::array<particle_system::particle_id, BatchSize>;
 
-	#pragma omp parallel for schedule(dynamic)
+	auto use_batch = [&](batch& batch_p1, batch& batch_p2, std::size_t up_to = BatchSize) {
+		TRACE_FORCES(
+			"Using &batch_p1={}, &batch_p2={} on thread {}", static_cast<void*>(&batch_p1),
+			static_cast<void*>(&batch_p2), omp_get_thread_num()
+		);
+		for (std::size_t i = 0; i < up_to; ++i) {
+			// TODO(gabriel): Also we must fully Newtons Axiom from our code.
+			// TODO(gabriel): does it rly need to be an invoke do we ever use this not as
+			// lennard jones forces?
+			std::invoke(
+				calculator, container, batch_p1[i], batch_p2[i]
+			);  // TODO(gabriel): Call batched version instead to simd this operation
+		}
+	};
+
+#pragma omp parallel for schedule(dynamic)
 	for (auto& cell : container.cells()) {
+		TRACE_FORCES("Doing cell {} on thread {}", static_cast<void*>(&cell), omp_get_thread_num());
 
-		// Create small fixed-size buffers for a "batch" of pairs
-		size_t batch_p1[BATCH_SIZE];
-		size_t batch_p2[BATCH_SIZE];
-		int count = 0;
+		std::size_t count = 0;
+		batch batch_p1;
+		batch batch_p2;
 
 		for (auto [p1_idx, p2_idx] : unique_pairs(cell)) {
-
+			TRACE_FORCES(
+				"Putting {} {} into batch, count={} on thread {}", p1_idx, p2_idx, count,
+				omp_get_thread_num()
+			);
 			batch_p1[count] = p1_idx;
 			batch_p2[count] = p2_idx;
-			count++;
+			++count;
 
-			if (count == BATCH_SIZE){
-				//TODO(gabriel): does it rly need to be an invoke do we ever use this not as lennard jones forces?
-				for (int i = 0; i < BATCH_SIZE; ++i) { //TODO(gabriel): Also we must fully remove Newtons Axiom from our code.
-					std::invoke(calculator, container, batch_p1[i], batch_p2[i]); //TODO(gabriel): Call batched version instead to simd this operation
-				}
+			if (count == BatchSize) {
+				use_batch(batch_p1, batch_p2);
 				count = 0;
 			}
 		}
-
-		if (count > 0) {
-			for (int i = 0; i < BATCH_SIZE; ++i) {
-				std::invoke(calculator, container, batch_p1[i], batch_p2[i]);
-			}
-		}
+		use_batch(batch_p1, batch_p2, count);
 	}
 
 	for (const auto& [current_cell_idx, target_cell_idx] : container.directional_interactions()) {
@@ -291,27 +98,26 @@ constexpr void calculate_forces(
 		const auto& current_cell = container[current_cell_idx];
 		const auto& target_cell = container[target_cell_idx];
 
-		size_t batch_p1[BATCH_SIZE];
-		size_t batch_p2[BATCH_SIZE];
-		int count = 0;
+		std::size_t count = 0;
+		batch batch_p1;
+		batch batch_p2;
 
 		for (auto p1_idx : current_cell) {
 			for (auto p2_idx : target_cell) {
 				batch_p1[count] = p1_idx;
 				batch_p2[count] = p2_idx;
-				count++;
-			}
-		}
+				++count;
 
-		if (count == BATCH_SIZE){
-			//TODO(gabriel): does it rly need to be an invoke do we ever use this not as lennard jones forces?
-			for (int i = 0; i < BATCH_SIZE; ++i) { //TODO(gabriel): Also we must fully remove Newtons Axiom from our code.
-				std::invoke(calculator, container, batch_p1[i], batch_p2[i]); //TODO(gabriel): Call batched version instead to simd this operation
+				if (count == BatchSize) {
+					use_batch(batch_p1, batch_p2);
+					count = 0;
+				}
 			}
-			count = 0;
 		}
+		use_batch(batch_p1, batch_p2, count);
 	}
-	loop(container, config, calculator);
+
+	handle_boundaries(container, config);
 }
 
 /**
@@ -343,16 +149,15 @@ calculate_x(particle_container& container, const sim_configuration& config) noex
 	const auto& grid = container.grid_size();
 	auto& system = container.system();
 
-	#pragma omp parallel for schedule(dynamic)
+#pragma omp parallel for schedule(dynamic)
 	for (auto&& [cell_idx, cell] : container.enumerate_cells()) {
 		const vec cell_origin{
 			cell_idx.x * cell_width, cell_idx.y * cell_width, cell_idx.z * cell_width
 		};
 
 		for (std::size_t particle_idx = 0; particle_idx < cell.size(); ++particle_idx) {
-			particle_container::index_diff displacement{};
+			particle_container::signed_index displacement{};
 			auto p_idx = cell[particle_idx];
-			TRACE_GRID("Moving particle {}", p_idx);
 
 			const auto force_scalar = (config.delta_t * config.delta_t) /
 			                          (2 * container.material_for_particle(p_idx).mass);
@@ -445,9 +250,10 @@ calculate_x(particle_container& container, const sim_configuration& config) noex
 constexpr void calculate_v(particle_container& container, double delta_t) noexcept {
 	auto& system = container.system();
 
-	#pragma omp parallel for simd schedule(static)
+#pragma omp parallel for simd schedule(static)
 	for (particle_system::particle_id i = 0; i < container.system().size(); ++i) {
-		//TODO(gabriel): Maybe add a invM array and * 0.5 instead of / 2 to remove all these costly divisions
+		// TODO(gabriel): Maybe add a invM array and * 0.5 instead of / 2 to remove all these costly
+		// divisions
 		const auto velocity_scalar = delta_t / (2 * container.material_for_particle(i).mass);
 		system.vx[i] += velocity_scalar * (system.old_fx[i] + system.fx[i]);
 		system.vy[i] += velocity_scalar * (system.old_fy[i] + system.fy[i]);
@@ -484,6 +290,7 @@ constexpr void plot_particles(
  * @param particles Mutable span over particles to update.
  */
 constexpr void update_values(particle_system& system) noexcept {
+#pragma omp parallel for simd schedule(static)
 	for (particle_system::particle_id p = 0; p < system.size(); ++p) {
 		system.old_fx[p] = system.fx[p];
 		system.old_fy[p] = system.fy[p];
@@ -515,7 +322,7 @@ constexpr void run_sim_iteration(
 	static const bool has_thermostat = config.thermostat.has_value();
 	static const bool has_gravity = config.gravitational_constant != 0;
 	calculate_x(container, config);
-	calculate_forces(force_calc, container, config);
+	calculate_forces_batched<8>(force_calc, container, config);
 
 	if (has_thermostat && iteration % config.thermostat->application_frequency == 0) {
 		run_thermostat(container, *config.thermostat, config.dimensions);
@@ -530,8 +337,9 @@ constexpr void run_sim_iteration(
 	const auto& system = container.system();
 	for (particle_system::particle_id i = 0; i < system.size(); ++i) {
 		TRACE_SIM(
-			"End of iteration, particle {}: pos={}, v={}, f={}, old_f={}", i, system.serialize_position(i),
-			system.serialize_velocity(i), system.serialize_force(i), system.serialize_old_force(i)
+			"End of iteration, particle {}: pos={}, v={}, f={}, old_f={}", i,
+			system.serialize_position(i), system.serialize_velocity(i), system.serialize_force(i),
+			system.serialize_old_force(i)
 		);
 	}
 #endif

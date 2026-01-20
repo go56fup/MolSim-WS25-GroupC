@@ -8,8 +8,7 @@
 #define LOG_SIM 1
 #define LOG_GRID 1
 #define LOG_INPUT_PARSING 1
-#define LOG_PARTICLE_TYPE 1
-#define LOG_PERIODIC 1
+#define LOG_PERIODIC 0
 #define LOG_THERMOSTAT 1
 #define LOG_CHECKPOINT 1
 #define LOG_RANDOM 1

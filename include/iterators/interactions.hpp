@@ -42,7 +42,7 @@ private:
 
 	/// Incremental differences that cover all intercellular interactions in the least pairs by
 	/// scanning to the bottom-right.
-	static constexpr std::array<vec_3d<difference_type>, 13> displacements = {
+	static constexpr std::array<particle_container::signed_index, 13> displacements = {
 		{{0, 0, +1},    // i,     j,     k + 1
 	     {0, +1, -1},   // i,     j + 1, k - 1
 	     {0, +1, 0},    // i,     j + 1, k
@@ -110,7 +110,7 @@ public:
 	 * @return `true` @a iff the displacement resulted in a cell coordinate inside the domain.
 	 */
 	template <axis Axis>
-	constexpr bool do_displacement(const vec_3d<difference_type>& displacement) noexcept {
+	constexpr bool do_displacement(const particle_container::signed_index& displacement) noexcept {
 		if (displacement[Axis] == 0) return true;
 		TRACE_INTERACTION_ITER("Doing displacement {} on {}", displacement, current_cell_idx);
 

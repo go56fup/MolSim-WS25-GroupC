@@ -4,6 +4,7 @@
 
 namespace detail {
 
+	// TODO(tuna): upgrade to std::random_iterator_tag
 class enumerate_cells_iterator {
 private:
 	using inner = typename particle_container::value_type;
@@ -79,6 +80,24 @@ public:
 	constexpr bool operator==(const enumerate_cells_iterator& other) const noexcept {
 		assert(container == other.container);
 		return idx == other.idx;
+	}
+
+	constexpr difference_type operator-(const enumerate_cells_iterator& other) const noexcept {
+		assert(container == other.container);
+
+		return static_cast<difference_type>(container->linear_index(idx.x, idx.y, idx.z)) -
+		       static_cast<difference_type>(
+				   container->linear_index(other.idx.x, other.idx.y, other.idx.z)
+			   );
+	}
+
+	constexpr enumerate_cells_iterator& operator+=(difference_type advance) noexcept {
+		const auto linear =
+			static_cast<difference_type>(container->linear_index(idx.x, idx.y, idx.z)) + advance;
+
+		idx = container->index_from_linear(static_cast<size_type>(linear));
+
+		return *this;
 	}
 };
 

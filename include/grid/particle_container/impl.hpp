@@ -36,6 +36,26 @@ constexpr particle_container::size_type particle_container::linear_index(
 	return result;
 }
 
+constexpr particle_container::index particle_container::index_from_linear(size_type linear) const {
+	const size_type yz = grid_size_.y * grid_size_.z;
+
+	// TODO(tuna): move this check to its own macro that is empty when !LOG_GRID
+#if LOG_GRID
+	if (linear >= grid_size_.x * yz) {
+		throw std::out_of_range(
+			fmt::format("Out of bounds linear index {} for grid {}", linear, grid_size_)
+		);
+	}
+#endif
+
+	const size_type x = linear / yz;
+	const size_type rem = linear % yz;
+	const size_type y = rem / grid_size_.z;
+	const size_type z = rem % grid_size_.z;
+
+	return {x, y, z};
+}
+
 constexpr particle_container::size_type particle_container::pos_to_linear_index(const vec& pos
 ) const noexcept {
 	const auto x = static_cast<size_type>(pos.x / cutoff_radius_);
