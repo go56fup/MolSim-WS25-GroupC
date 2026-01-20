@@ -53,9 +53,8 @@ TEST(ForceTests, LennardJones) {
 
 	auto first_force = std::invoke([&] -> vec {
 		particle_container particles(config.domain, config.cutoff_radius);
-		const auto type = particles.register_material(material);
-		particles.add_particle(first_pos, {}, type);
-		particles.add_particle(second_pos, {}, type);
+		particles.add_particle(first_pos, {}, material);
+		particles.add_particle(second_pos, {}, material);
 		run_simulation(particles, config, lennard_jones_force_soa, "unused");
 		return particles.system().serialize_force(0);
 	});

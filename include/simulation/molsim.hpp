@@ -159,8 +159,7 @@ calculate_x(particle_container& container, const sim_configuration& config) noex
 			particle_container::signed_index displacement{};
 			auto p_idx = cell[particle_idx];
 
-			const auto force_scalar = (config.delta_t * config.delta_t) /
-			                          (2 * container.material_for_particle(p_idx).mass);
+			const auto force_scalar = (config.delta_t * config.delta_t) / (2 * system.mass[p_idx]);
 			system.x[p_idx] +=
 				config.delta_t * system.vx[p_idx] + system.old_fx[p_idx] * force_scalar;
 			system.y[p_idx] +=
@@ -254,7 +253,7 @@ constexpr void calculate_v(particle_container& container, double delta_t) noexce
 	for (particle_system::particle_id i = 0; i < container.system().size(); ++i) {
 		// TODO(gabriel): Maybe add a invM array and * 0.5 instead of / 2 to remove all these costly
 		// divisions
-		const auto velocity_scalar = delta_t / (2 * container.material_for_particle(i).mass);
+		const auto velocity_scalar = delta_t / (2 * system.mass[i]);
 		system.vx[i] += velocity_scalar * (system.old_fx[i] + system.fx[i]);
 		system.vy[i] += velocity_scalar * (system.old_fy[i] + system.fy[i]);
 		system.vz[i] += velocity_scalar * (system.old_fz[i] + system.fz[i]);

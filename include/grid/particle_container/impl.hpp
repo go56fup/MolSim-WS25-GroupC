@@ -108,30 +108,18 @@ constexpr particle_container::particle_container(Vec&& domain_arg, double cutoff
 }
 
 constexpr void particle_container::add_particle(
-	const vec& position, const vec& velocity, particle_system::particle_type_t type
+	const vec& position, const vec& velocity, const material_description& material
 ) {
-	system_.add_particle(position, velocity, type);
+	system_.add_particle(position, velocity, material);
 	grid[pos_to_linear_index(position)].push_back(system_.size() - 1);
-}
-
-template <fwd_reference_to<material_description> Desc>
-constexpr std::uint8_t particle_container::register_material(Desc&& desc) noexcept {
-	auto it = std::ranges::find(materials_, desc);
-	if (it == materials_.end()) {
-		++particle_type_count;
-		assert(particle_type_count < materials_.size());
-		materials_[particle_type_count] = std::forward<Desc>(desc);
-		return particle_type_count;
-	}
-	return static_cast<std::uint8_t>(std::distance(materials_.begin(), it));
 }
 
 constexpr void particle_container::reload_particle_state(
 	const particle_state_parameters& parameters, const vec& velocity,
-	particle_system::particle_type_t type
+	const material_description& material
 ) {
 	system_.add_particle(
-		parameters.position, velocity, parameters.force, parameters.old_force, type
+		parameters.position, velocity, parameters.force, parameters.old_force, material
 	);
 	grid[pos_to_linear_index(parameters.position)].push_back(system_.size() - 1);
 }
@@ -141,7 +129,6 @@ constexpr void particle_container::add_cuboid(
 	const cuboid_parameters<3>& cuboid, const body_common_parameters& body_parameters,
 	const vec& velocity, const material_description& material, std::size_t& seq_no
 ) {
-	const auto type = register_material(material);
 	for (size_type x = 0; x < cuboid.scale.x; ++x) {
 		for (size_type y = 0; y < cuboid.scale.y; ++y) {
 			for (size_type z = 0; z < cuboid.scale.z; ++z) {
@@ -152,7 +139,7 @@ constexpr void particle_container::add_cuboid(
 					maxwell_boltzmann_distributed_velocity<N>(
 						body_parameters.brownian_mean, seq_no
 					) + velocity,
-					type
+					material
 				);
 			}
 		}
@@ -164,7 +151,6 @@ constexpr void particle_container::add_disc(
 	const vec& velocity, const material_description& material, std::size_t& seq_no
 ) {
 	const auto& r = disc.radius;
-	const auto type = register_material(material);
 	for (int i = static_cast<int>(-r); i <= r; i++) {
 		for (int j = static_cast<int>(-r); j <= r; j++) {
 			if (i * i + j * j > r * r) {
@@ -175,7 +161,7 @@ constexpr void particle_container::add_disc(
 			     disc.center.y + (j * body_parameters.meshwidth), disc.center.z},
 				maxwell_boltzmann_distributed_velocity<2>(body_parameters.brownian_mean, seq_no) +
 					velocity,
-				type
+				material
 			);
 		}
 	}
@@ -253,11 +239,6 @@ constexpr const particle_container::index& particle_container::grid_size() const
 
 constexpr double particle_container::cutoff_radius() const noexcept {
 	return cutoff_radius_;
-}
-
-constexpr const material_description&
-particle_container::material_for_particle(particle_system::particle_id i) const noexcept {
-	return materials_[system_.type[i]];
 }
 
 constexpr const particle_system& particle_container::system() const noexcept {

@@ -17,8 +17,7 @@ get_temperature(particle_container& container, decltype(sim_configuration::dimen
 	for (particle_system::particle_id p = 0; p < system.size(); ++p) {
 		const double squared_norm = (system.vx[p] * system.vx[p]) + (system.vy[p] * system.vy[p]) +
 		                            (system.vz[p] * system.vz[p]);
-		result += container.material_for_particle(p).mass *
-		          squared_norm;  // TODO(gabriel): make mass vectorisable
+		result += system.mass[p] * squared_norm;
 	}
 	result /= dimensions * static_cast<double>(system.size());
 	return result;

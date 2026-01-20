@@ -25,10 +25,9 @@ TEST(particle_container, SquarePlacement) {
 		const auto first = container.cell_containing({5, 5, 5}).at(0);
 		const auto second = container.cell_containing({6, 6, 5}).at(0);
 		const auto third = container.cell_containing({6, 5, 5}).at(0);
+		const auto& system = container.system();
 		return std::array{
-			container.material_for_particle(first).mass == 100,
-			container.material_for_particle(second).mass == 100,
-			container.material_for_particle(third).mass == 100
+			system.mass[first] == 100, system.mass[second] == 100, system.mass[third] == 100
 		};
 	});
 	GCC_STATIC_EXPECT_ALL(ok);
@@ -46,11 +45,11 @@ TEST(particle_container, Cuboid3DPlacement) {
 		const auto first = container.cell_containing({5, 6, 5}).at(0);
 		const auto second = container.cell_containing({6, 6, 6}).at(0);
 		const auto third = container.cell_containing({6, 5, 6}).at(0);
+		const auto& system = container.system();
 
 		return std::array{
-			container.material_for_particle(first).mass == 100,
-			container.material_for_particle(second).mass == 100,
-			container.material_for_particle(third).mass == 100
+			system.mass[first] == 100, system.mass[second] == 100, system.mass[third] == 100
+
 		};
 	});
 	STATIC_EXPECT_ALL(ok);

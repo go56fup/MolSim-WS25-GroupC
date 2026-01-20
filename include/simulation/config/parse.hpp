@@ -78,15 +78,13 @@ constexpr void populate_simulation(
 		TRACE_INPUT_PARSING("Parsing body with geometry: {}", daw::json::to_json(body.geometry));
 		if (body.type == "particle") {
 			particles.add_particle(
-				body.geometry.as<particle_parameters>().position, body.velocity,
-				particles.register_material(body.material)
+				body.geometry.as<particle_parameters>().position, body.velocity, body.material
 			);
 			continue;
 		}
 		if (body.type == "particle_state") {
 			particles.reload_particle_state(
-				body.geometry.as<particle_state_parameters>(), body.velocity,
-				particles.register_material(body.material)
+				body.geometry.as<particle_state_parameters>(), body.velocity, body.material
 			);
 			continue;
 		}
@@ -151,7 +149,8 @@ constexpr std::string dump_state(particle_container& container) {
 		    // the loop or is owning
 			.geometry = daw::json::json_value(geometries[i]),
 			.velocity = system.serialize_velocity(i),
-			.material = container.material_for_particle(i)
+			.material =
+				{.mass = system.mass[i], .sigma = system.sigma[i], .epsilon = system.epsilon[i]}
 		};
 		out.push_back(particle_entry);
 	}

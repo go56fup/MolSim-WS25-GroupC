@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "physics/vec_3d.hpp"
+#include "simulation/config/entities.hpp"
 
 #define system_arithmetic(op, idx, value, x_comp, y_comp, z_comp)                                  \
 	do {                                                                                           \
@@ -15,7 +16,6 @@
 class particle_system {
 public:
 	using particle_id = std::vector<double>::size_type;
-	using particle_type_t = std::uint8_t;
 
 private:
 	constexpr void destructure_push_back(
@@ -31,13 +31,17 @@ public:
 	std::vector<double> vx, vy, vz;
 	std::vector<double> fx, fy, fz;
 	std::vector<double> old_fx, old_fy, old_fz;
-	std::vector<particle_type_t> type;
+	std::vector<double> mass;
+	std::vector<double> epsilon;
+	std::vector<double> sigma;
+
 	enum class property : std::uint8_t { position, velocity, force, old_force };
 
-	constexpr void add_particle(const vec& pos, const vec& velocity, particle_type_t type_) {
+	constexpr void
+	add_particle(const vec& pos, const vec& velocity, const material_description& material) {
 		destructure_push_back(pos, x, y, z);
 		destructure_push_back(velocity, vx, vy, vz);
-		
+
 		fx.push_back(0);
 		fy.push_back(0);
 		fz.push_back(0);
@@ -46,16 +50,18 @@ public:
 		old_fy.push_back(0);
 		old_fz.push_back(0);
 
-		type.push_back(type_);
+		mass.push_back(material.mass);
+		sigma.push_back(material.sigma);
+		epsilon.push_back(material.epsilon);
 	}
 
 	constexpr void add_particle(
 		const vec& pos, const vec& velocity, const vec& force, const vec& old_force,
-		particle_type_t type
+		const material_description& material
 	) {
 		destructure_push_back(force, fx, fy, fz);
 		destructure_push_back(old_force, old_fx, old_fy, old_fz);
-		add_particle(pos, velocity, type);
+		add_particle(pos, velocity, material);
 	}
 
 	constexpr vec serialize_force(particle_id i) const noexcept {

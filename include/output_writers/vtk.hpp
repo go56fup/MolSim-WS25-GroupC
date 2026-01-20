@@ -50,18 +50,12 @@ plot_particles(particle_container& particles, std::string_view filename, unsigne
 	forceArray->SetName("force");
 	forceArray->SetNumberOfComponents(3);
 
-	const vtkNew<vtkIntArray> typeArray;
-	typeArray->SetName("type");
-	typeArray->SetNumberOfComponents(1);
-
 	const auto& system = particles.system();
 	for (particle_system::particle_id i = 0; i < system.size(); ++i) {
-		const auto& material = particles.material_for_particle(i);
 		points->InsertNextPoint(system.serialize_position(i).data());
-		massArray->InsertNextValue(static_cast<float>(material.mass));
+		massArray->InsertNextValue(static_cast<float>(system.mass[i]));
 		velocityArray->InsertNextTuple(system.serialize_velocity(i).data());
 		forceArray->InsertNextTuple(system.serialize_force(i).data());
-		typeArray->InsertNextValue(system.type[i]);
 	}
 
 	// Set up the grid
@@ -72,7 +66,6 @@ plot_particles(particle_container& particles, std::string_view filename, unsigne
 	grid->GetPointData()->AddArray(massArray);
 	grid->GetPointData()->AddArray(velocityArray);
 	grid->GetPointData()->AddArray(forceArray);
-	grid->GetPointData()->AddArray(typeArray);
 
 	// Create filename with iteration number
 	std::stringstream strstr;

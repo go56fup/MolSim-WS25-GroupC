@@ -36,7 +36,6 @@ public:
 	using index = vec_3d<size_type>;
 	/// The type used to represent differences between indices.
 	using signed_index = vec_3d<difference_type>;
-	using material_table = std::array<material_description, max_particle_type_count>;
 
 private:
 	/**
@@ -64,9 +63,6 @@ private:
 	/// world.
 	double cutoff_radius_;
 	particle_system system_;
-
-	material_table materials_;
-	std::uint8_t particle_type_count = 0;
 
 public:
 	/**
@@ -107,14 +103,14 @@ public:
 	 * @param args Arguments to construct particle from.
 	 */
 	constexpr void
-	add_particle(const vec& position, const vec& velocity, particle_system::particle_type_t type);
+	add_particle(const vec& position, const vec& velocity, const material_description& material);
 
 	template <fwd_reference_to<material_description> Desc>
 	constexpr std::uint8_t register_material(Desc&& desc) noexcept;
 
 	constexpr void reload_particle_state(
 		const particle_state_parameters& parameters, const vec& velocity,
-		particle_system::particle_type_t type
+		const material_description& material
 	);
 
 	/**
@@ -252,9 +248,6 @@ public:
 	 * @return Cutoff radius, i.e. cell dimensions.
 	 */
 	constexpr double cutoff_radius() const noexcept;
-
-	constexpr const material_description& material_for_particle(particle_system::particle_id i
-	) const noexcept;
 
 	constexpr const particle_system& system() const noexcept;
 	constexpr particle_system& system() noexcept;

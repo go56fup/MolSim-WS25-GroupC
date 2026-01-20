@@ -263,11 +263,12 @@ TEST(ConfigTest, BasicConfig) {
 		const particle_system::particle_id particle =
 			container.cell_containing({0.2, 0.2, 0.2}).at(0);
 
+		const auto& system = container.system();
 		return std::array{
 			container.system().serialize_velocity(particle) == vec{0.2, 0.3, 0.4},
-			container.material_for_particle(particle).mass == 0.1,
+			system.mass[particle] == 0.1,
 			container.system().serialize_velocity(rectangle) == vec{0.1, 0.1, 0.1},
-			container.material_for_particle(rectangle).mass == 10
+			system.mass[rectangle] == 10
 		};
 	});
 	GCC_STATIC_EXPECT_ALL(ok);

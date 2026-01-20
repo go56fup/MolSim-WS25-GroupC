@@ -111,7 +111,9 @@ CONSTEXPR_IF_GCC inline vec lennard_jones_force(const lennard_jones_parameters& 
 CONSTEXPR_IF_GCC inline void lennard_jones_force_soa(
 	particle_container& container, particle_system::particle_id p1, particle_system::particle_id p2
 ) noexcept {
-	TRACE_FORCES("Calculating Lennard-Jones forces between {}, {} on thread {}", p1, p2, omp_get_thread_num());
+	TRACE_FORCES(
+		"Calculating Lennard-Jones forces between {}, {} on thread {}", p1, p2, omp_get_thread_num()
+	);
 	auto& system = container.system();
 	const double pos_diff_x = system.x[p1] - system.x[p2];
 	const double pos_diff_y = system.y[p1] - system.y[p2];
@@ -119,15 +121,12 @@ CONSTEXPR_IF_GCC inline void lennard_jones_force_soa(
 	const double norm =
 		std::sqrt(pos_diff_x * pos_diff_x + pos_diff_y * pos_diff_y + pos_diff_z * pos_diff_z);
 	assert(norm != 0 && "Two particles at the same position cannot interact.");
-	const auto& p1_material = container.material_for_particle(p1);
-	const auto& p2_material = container.material_for_particle(p2);
-
-	const double sigma = p1_material.sigma == p2_material.sigma
-	                         ? p1_material.sigma
-	                         : (p1_material.sigma + p2_material.sigma) / 2;
-	const double eps = p1_material.epsilon == p2_material.epsilon
-	                       ? p1_material.epsilon
-	                       : std::sqrt(p1_material.epsilon * p2_material.epsilon);
+	const double sigma = system.sigma[p1] == system.sigma[p2]
+	                         ? system.sigma[p1]
+	                         : (system.sigma[p1] + system.sigma[p2]) / 2;
+	const double eps = system.epsilon[p1] == system.epsilon[p2]
+	                       ? system.epsilon[p1]
+	                       : std::sqrt(system.epsilon[p1] * system.epsilon[p2]);
 	const double normalized_sigma = sixth_power(sigma / norm);
 	const double scaling_factor =
 		(24 * eps / (norm * norm)) * (normalized_sigma - 2 * normalized_sigma * normalized_sigma);
@@ -186,15 +185,14 @@ CONSTEXPR_IF_GCC inline void lennard_jones_force_soa_batchwise(
 		const double norm =
 			std::sqrt(pos_diff_x * pos_diff_x + pos_diff_y * pos_diff_y + pos_diff_z * pos_diff_z);
 		assert(norm != 0 && "Two particles at the same position cannot interact.");
-		const auto& p1_material = container.material_for_particle(p1);
-		const auto& p2_material = container.material_for_particle(p2);
 
-		const double sigma = p1_material.sigma == p2_material.sigma
-		                         ? p1_material.sigma
-		                         : (p1_material.sigma + p2_material.sigma) / 2;
-		const double eps = p1_material.epsilon == p2_material.epsilon
-		                       ? p1_material.epsilon
-		                       : std::sqrt(p1_material.epsilon * p2_material.epsilon);
+		const double sigma = system.sigma[p1] == system.sigma[p2]
+		                         ? system.sigma[p1]
+		                         : (system.sigma[p1] + system.sigma[p2]) / 2;
+		const double eps = system.epsilon[p1] == system.epsilon[p2]
+		                       ? system.epsilon[p1]
+		                       : std::sqrt(system.epsilon[p1] * system.epsilon[p2]);
+
 		const double normalized_sigma = sixth_power(sigma / norm);
 		scaling_factor_batch[i] = (24 * eps / (norm * norm)) *
 		                          (normalized_sigma - 2 * normalized_sigma * normalized_sigma);
@@ -227,6 +225,6 @@ constexpr void apply_gravity(particle_container& container, double gravity) noex
 	auto& system = container.system();
 #pragma omp parallel for simd schedule(static)
 	for (particle_system::particle_id p = 0; p < system.size(); ++p) {
-		system.fy[p] += container.material_for_particle(p).mass * gravity;
+		system.fy[p] += system.mass[p] * gravity;
 	}
 }

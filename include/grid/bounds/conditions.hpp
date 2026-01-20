@@ -34,20 +34,18 @@ constexpr void reflect_via_ghost_particle(
 
 	auto reflect = [&]<boundary_type b>(const auto& make_ghost_pos) {
 		for (auto p : current_cell) {
-			const auto& material = container.material_for_particle(p);
-			const double ghost_particle_threshold = material.sigma * sixth_root_of_2;
+			const double ghost_particle_threshold = system.sigma[p] * sixth_root_of_2;
 			const vec min{
 				ghost_particle_threshold, ghost_particle_threshold, ghost_particle_threshold
 			};
 			const auto max = domain - min;
 			if (out_of_bounds_soa<b>(system, p, max, min)) {
 				const vec current_pos{system.x[p], system.y[p], system.z[p]};
-				const auto& material = container.material_for_particle(p);
 				const auto resulting_force = lennard_jones_force(
 					{.p1_position = current_pos,
 				     .p2_position = make_ghost_pos(current_pos),
-				     .sigma = material.sigma,
-				     .epsilon = material.epsilon}
+				     .sigma = system.sigma[p],
+				     .epsilon = system.epsilon[p]}
 				);
 				system.fx[p] += resulting_force.x;
 				system.fy[p] += resulting_force.y;
