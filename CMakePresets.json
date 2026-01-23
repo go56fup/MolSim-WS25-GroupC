@@ -69,10 +69,27 @@
 			}
 		},
 		{
+			"name": "native-arch",
+			"hidden": true,
+			"cacheVariables": {
+				"CMAKE_CXX_FLAGS": "-march=native"
+			}
+		},
+		{
 			"name": "release",
-			"inherits": ["release-base", "gcc"],
+			"inherits": ["release-base", "gcc", "native-arch"],
 			"displayName": "Release (GCC)",
 			"description": "Configure Release build with GCC"
+		},
+		{
+			"name": "muc",
+			"inherits": ["release-base", "gcc"],
+			"displayName": "Release (GCC, optimized for MUC)",
+			"description": "Configure Release build with GCC, with tuning flags set for the CM4 cluster",
+			"cacheVariables": {
+				"CMAKE_TOOLCHAIN_FILE": "${sourceDir}/cmake/toolchain/muc.cmake",
+				"ENABLE_VTK_OUTPUT": "OFF"
+			}
 		},
 		{
 			"name": "debug",
@@ -94,7 +111,7 @@
 		},
 		{
 			"name": "release-clang",
-			"inherits": ["release-base", "clang"],
+			"inherits": ["release-base", "clang", "native-arch"],
 			"displayName": "Release (Clang)",
 			"description": "Configure Release build with Clang"
 		},
@@ -158,7 +175,11 @@
 			"inherits": "base",
 			"configurePreset": "test-lite-clang"
 		},
-
+		{
+			"name": "muc-build",
+			"inherits": "base",
+			"configurePreset": "muc"
+		},
 		{
 			"name": "test-clang-build",
 			"inherits": "base",
@@ -208,6 +229,14 @@
 			"steps": [
 				{ "type": "configure", "name": "release" },
 				{ "type": "build",     "name": "release-build" }
+			]
+		},
+		{
+			"name": "muc",
+			"description": "Configure and build for the MUC",
+			"steps": [
+				{ "type": "configure", "name": "muc" },
+				{ "type": "build",     "name": "muc-build" }
 			]
 		},
 		{
