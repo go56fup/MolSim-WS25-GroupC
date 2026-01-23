@@ -124,8 +124,7 @@ constexpr void delete_ouflowing_particles(
 		}
 	}
 }
-
-template <boundary_type Boundary>
+template <boundary_type Boundary, std::size_t BatchSize>
 constexpr void periodic_particle_interactions(
 	particle_container& container, const particle_container::index& cell_idx
 ) {
@@ -168,15 +167,36 @@ constexpr void periodic_particle_interactions(
 	TRACE_PERIODIC("Calculating periodic interactions via virtual index: {}", current_virtual_idx);
 	for (const auto& periodic_target : periodic_range(container, current_virtual_idx)) {
 		for (auto current_p : container[cell_idx]) {
+
+			using batch = std::array<particle_system::particle_id, BatchSize>;
+			std::size_t count = 0;
+			batch batch_p1;
+			batch batch_p2;
+
+		#pragma parallel for schedule(dynamic)
 			for (auto periodic_p : container[periodic_target]) {
+				batch_p1[count] = current_p;
+				batch_p2[count] = periodic_p;
+				++count;
+
 				// TODO(tuna): is this actually the best way of doing this?
 				system.x[current_p] += particle_mirror.x;
 				system.y[current_p] += particle_mirror.y;
 				system.z[current_p] += particle_mirror.z;
-				std::invoke(lennard_jones_force_soa, container, current_p, periodic_p);
-				system.x[current_p] -= particle_mirror.x;
-				system.y[current_p] -= particle_mirror.y;
-				system.z[current_p] -= particle_mirror.z;
+
+				if (count == BatchSize) {
+					for (int i = 0; i < BatchSize; ++i) {
+						std::invoke(lennard_jones_force_soa, container, batch_p1[i], batch_p2[i]);
+						system.x[current_p] -= particle_mirror.x;
+						system.y[current_p] -= particle_mirror.y;
+						system.z[current_p] -= particle_mirror.z;
+					}
+					count = 0;
+				}
+			}
+
+			for (int i = 0; i < count; ++i) {
+				std::invoke(lennard_jones_force_soa, container, batch_p1[i], batch_p2[i]);
 			}
 		}
 	}
