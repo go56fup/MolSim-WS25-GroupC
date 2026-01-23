@@ -58,12 +58,12 @@ constexpr void calculate_forces_batched(
 			static_cast<void*>(&batch_p2), omp_get_thread_num()
 		);
 		for (std::size_t i = 0; i < up_to; ++i) {
-			// TODO(gabriel): Also we must fully Newtons Axiom from our code.
+			// TODO(gabriel): Also we must fully remove Newtons Axiom from our code.
 			// TODO(gabriel): does it rly need to be an invoke do we ever use this not as
 			// lennard jones forces?
 			std::invoke(
 				calculator, container, batch_p1[i], batch_p2[i]
-			);  // TODO(gabriel): Call batched version instead to simd this operation
+			);
 		}
 	};
 

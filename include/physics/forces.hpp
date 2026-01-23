@@ -221,6 +221,69 @@ CONSTEXPR_IF_GCC inline void lennard_jones_force_soa_batchwise(
 	}
 }
 
+CONSTEXPR_IF_GCC inline void lennard_jones_force_soa_batchwise_v2(
+		particle_container& container, std::array<particle_system::particle_id, BATCH_SIZE> p1_batch,
+		std::array<particle_system::particle_id, BATCH_SIZE> p2_batch
+) noexcept {
+
+	auto& system = container.system();
+
+	double pos_diff_x_batch[BATCH_SIZE];
+	double pos_diff_y_batch[BATCH_SIZE];
+	double pos_diff_z_batch[BATCH_SIZE];
+
+	double scaling_factor_batch[BATCH_SIZE];
+
+	double x_delta[BATCH_SIZE];
+	double y_delta[BATCH_SIZE];
+	double z_delta[BATCH_SIZE];
+
+#pragma omp simd
+	for (std::size_t i = 0; i < BATCH_SIZE; i++) {
+		auto p1 = p1_batch[i];
+		auto p2 = p2_batch[i];
+
+		const double dx = pos_diff_x_batch[i];
+		const double dy = pos_diff_y_batch[i];
+		const double dz = pos_diff_z_batch[i];
+
+		TRACE_FORCES("Calculating Lennard-Jones forces for:\n{}\n{}\n", p1, p2);
+
+		const double r2 = (dx * dx) + (dy * dy) + (dz * dz);
+		const double inv_r2 = 1.0 / r2;
+
+		const double s1 = system.sigma[p1];
+		const double s2 = system.sigma[p2];
+		const double e1 = system.epsilon[p1];
+		const double e2 = system.epsilon[p2];
+
+		// Branchless logic (Compilers turn these into VPCMP and VMASK)
+		const double sigma = (s1 == s2) ? s1 : (s1 + s2) * 0.5;
+		const double eps = (e1 == e2) ? e1 : std::sqrt(e1 * e2);
+
+		// Using powers of r2 instead of sigma/norm avoids repeated divisions
+		const double s_r_2 = (sigma * sigma) * inv_r2; // (sigma/r)^2
+		const double s_r_6 = s_r_2 * s_r_2 * s_r_2;    // (sigma/r)^6
+
+		scaling_factor_batch[i] = (24.0 * eps * inv_r2) * (s_r_6 - 2.0 * s_r_6 * s_r_6);
+
+		x_delta[i] = -scaling_factor_batch[i] * pos_diff_x_batch[i];
+		y_delta[i] = -scaling_factor_batch[i] * pos_diff_y_batch[i];
+		z_delta[i] = -scaling_factor_batch[i] * pos_diff_z_batch[i];
+	}
+
+	for (std::size_t i = 0; i < BATCH_SIZE; i++) {
+		[[maybe_unused]] auto p1 = p1_batch[i];
+		[[maybe_unused]] auto p2 = p2_batch[i];
+
+		system.fx[p1] += x_delta[i];
+		system.fy[p1] += y_delta[i];
+		system.fz[p1] += z_delta[i];
+
+		// NO 3rd law of Newton opt.
+	}
+}
+
 constexpr void apply_gravity(particle_container& container, double gravity) noexcept {
 	auto& system = container.system();
 #pragma omp parallel for simd schedule(static)
