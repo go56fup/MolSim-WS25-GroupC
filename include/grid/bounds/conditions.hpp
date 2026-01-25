@@ -124,7 +124,7 @@ constexpr void delete_ouflowing_particles(
 		}
 	}
 }
-template <boundary_type Boundary, std::size_t BatchSize>
+template <boundary_type Boundary, std::size_t BatchSize = 8>
 constexpr void periodic_particle_interactions(
 	particle_container& container, const particle_container::index& cell_idx
 ) {
@@ -173,7 +173,7 @@ constexpr void periodic_particle_interactions(
 			batch batch_p1;
 			batch batch_p2;
 
-		#pragma parallel for schedule(dynamic)
+		#pragma omp parallel for schedule(dynamic)
 			for (auto periodic_p : container[periodic_target]) {
 				batch_p1[count] = current_p;
 				batch_p2[count] = periodic_p;
@@ -185,7 +185,7 @@ constexpr void periodic_particle_interactions(
 				system.z[current_p] += particle_mirror.z;
 
 				if (count == BatchSize) {
-					for (int i = 0; i < BatchSize; ++i) {
+					for (std::size_t i = 0; i < BatchSize; ++i) {
 						std::invoke(lennard_jones_force_soa, container, batch_p1[i], batch_p2[i]);
 						system.x[current_p] -= particle_mirror.x;
 						system.y[current_p] -= particle_mirror.y;
@@ -195,7 +195,7 @@ constexpr void periodic_particle_interactions(
 				}
 			}
 
-			for (int i = 0; i < count; ++i) {
+			for (std::size_t i = 0; i < count; ++i) {
 				std::invoke(lennard_jones_force_soa, container, batch_p1[i], batch_p2[i]);
 			}
 		}
