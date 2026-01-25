@@ -9,7 +9,7 @@ jobs:
   run_gtest_suite:
     name: Google Tests
     runs-on: ubuntu-latest
-
+    
     container:
       image: ghcr.io/go56fup/molsim-ws25-groupc
       credentials:
@@ -29,6 +29,7 @@ jobs:
         run: |
           clang-format --dry-run --Werror **/*.cpp **/*.h && \
           cmake-format --check **/CMakeLists.txt cmake/modules/*.cmake
+
 
   check_mac_build:
     name: Google Tests (macOS)
