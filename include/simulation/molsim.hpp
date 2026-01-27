@@ -346,6 +346,15 @@ constexpr void run_sim_iteration(
 #endif
 }
 
+/**
+ * @brief Computes the Radial Distribution Function statistic.
+ * In case of periodic boundaries the effective shortest distance accounting for mirror particles is used.
+ *
+ * @param container Particles simulated.
+ * @param config Simulation parameters.
+ * @param delta_r Sample width for the distance intervals.
+ * @return Calculated local densities.
+ */
 constexpr std::vector<double> radial_distribution_function(particle_container& container, const sim_configuration& config,
 	const double delta_r) {
 	auto& system = container.system();
@@ -355,11 +364,11 @@ constexpr std::vector<double> radial_distribution_function(particle_container& c
 	const double y_size = cell_width * grid[axis::y];
 	const double z_size = cell_width * grid[axis::z];
 	const double r_max = std::sqrt(x_size * x_size + y_size * y_size + z_size * z_size);
-	const auto number_of_interval = static_cast<std::size_t>(std::ceil(r_max / delta_r));
+	const auto number_of_interval = static_cast<std::size_t>(r_max / delta_r);
 	std::vector<double> local_densities (number_of_interval, 0);
 
-	for (std::size_t p1_idx = 0; p1_idx < system.size(); p1_idx++) {
-		for (std::size_t p2_idx = p1_idx + 1; p2_idx < system.size(); p2_idx++) {
+	for (particle_system::particle_id p1_idx = 0; p1_idx < system.size(); p1_idx++) {
+		for (particle_system::particle_id p2_idx = p1_idx + 1; p2_idx < system.size(); p2_idx++) {
 			double diff_x = system.x[p1_idx] - system.x[p2_idx];
 			if (config.boundary_behavior.x_max == boundary_condition::periodic ||
 				config.boundary_behavior.x_min == boundary_condition::periodic ) {
@@ -384,11 +393,11 @@ constexpr std::vector<double> radial_distribution_function(particle_container& c
 				if (diff_z < 0) {
 					diff_z = std::max(diff_z, system.z[p2_idx] - system.z[p1_idx] - z_size);
 				} else {
-					diff_z= std::min(diff_z, system.z[p2_idx] - system.z[p1_idx] + z_size);
+					diff_z = std::min(diff_z, system.z[p2_idx] - system.z[p1_idx] + z_size);
 				}
 				}
 			const double r = std::sqrt(diff_x * diff_x + diff_y * diff_y + diff_z * diff_z);
-			const auto interval_idx = static_cast<std::size_t>(r/delta_r);
+			const auto interval_idx = static_cast<std::size_t>(r/delta_r)-1;
 			local_densities[interval_idx] += 1;
 		}
 	}
@@ -398,6 +407,64 @@ constexpr std::vector<double> radial_distribution_function(particle_container& c
 		local_densities[i] *= 3/(4 * std::numbers::pi * (r_i_next * r_i_next * r_i_next - r_i * r_i * r_i));
 	}
 	return local_densities;
+}
+
+
+/**
+ * @brief Computes the Diffusion statistic.
+ * The absolute distances with respect to periodic boundaries is used.
+ *
+ * @param container Particles simulated.
+ * @param config Simulation parameters.
+ * @param old_x X positions at the reference time t0.
+ * @param old_y Y positions at the reference time t0.
+ * @param old_z Z positions at the reference time t0.
+ * @return Calculated variance.
+ */
+constexpr double diffusion(particle_container& container, const sim_configuration& config,
+	std::vector<double>& old_x, std::vector<double>& old_y, std::vector<double>& old_z) {
+	double variance = 0;
+	auto& system = container.system();
+	const auto& grid = container.grid_size();
+	const double cell_width = container.cutoff_radius();
+	const double x_size = cell_width * grid[axis::x];
+	const double y_size = cell_width * grid[axis::y];
+	const double z_size = cell_width * grid[axis::z];
+
+	for (particle_system::particle_id p = 0; p< system.size(); p++) {
+		if (config.boundary_behavior.x_max == boundary_condition::periodic ||
+		    config.boundary_behavior.x_min == boundary_condition::periodic ) {
+			double current_x = system.x[p] + x_size * system.x_boundary_crosses;
+			variance += (current_x - old_x[p]) * (current_x - old_x[p]);
+			system.x_boundary_crosses = 0;
+		} else {
+			variance += (system.x[p] - old_x[p]) * (system.x[p] - old_x[p]);
+		}
+
+		if (config.boundary_behavior.y_max == boundary_condition::periodic ||
+			config.boundary_behavior.y_min == boundary_condition::periodic ) {
+			double current_y = system.y[p] + y_size * system.y_boundary_crosses;
+			variance += (current_y - old_y[p]) * (current_y - old_y[p]);
+			system.y_boundary_crosses = 0;
+		} else {
+			variance += (system.y[p] - old_y[p]) * (system.y[p] - old_y[p]);
+		}
+
+		if (config.boundary_behavior.z_max == boundary_condition::periodic ||
+			config.boundary_behavior.z_min == boundary_condition::periodic ) {
+			double current_z = system.z[p] + z_size * system.z_boundary_crosses;
+			variance += (current_z - old_z[p]) * (current_z - old_z[p]);
+			system.z_boundary_crosses = 0;
+			} else {
+				variance += (system.z[p] - old_z[p]) * (system.z[p] - old_z[p]);
+			}
+	}
+
+	variance = variance / system.size();
+	old_x = system.x;
+	old_y = system.y;
+	old_z = system.z;
+	return variance;
 }
 
 // TODO(anyone): update span references
