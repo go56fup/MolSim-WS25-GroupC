@@ -51,11 +51,11 @@ TEST(ForceTests, LennardJones) {
 	GTEST_CXP vec first_pos{4, 4, 4};
 	GTEST_CXP vec second_pos{5, 6, 4};
 
-	auto first_force = std::invoke([&] -> vec {
+	GTEST_CXP auto first_force = std::invoke([&] -> vec {
 		particle_container particles(config.domain, config.cutoff_radius);
 		particles.add_particle(first_pos, {}, material);
 		particles.add_particle(second_pos, {}, material);
-		run_simulation(particles, config, lennard_jones_force_soa, "unused");
+		run_simulation(particles, config, "unused");
 		return particles.system().serialize_force(0);
 	});
 

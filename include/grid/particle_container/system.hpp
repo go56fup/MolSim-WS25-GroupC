@@ -42,6 +42,7 @@ public:
 		destructure_push_back(pos, x, y, z);
 		destructure_push_back(velocity, vx, vy, vz);
 
+		// TODO(tuna): add finalization pass for numa
 		fx.push_back(0);
 		fy.push_back(0);
 		fz.push_back(0);
@@ -109,8 +110,17 @@ public:
 			x.size() == y.size() && y.size() == z.size() && z.size() == fx.size() &&
 			fx.size() == fy.size() && fy.size() == fz.size() && fz.size() == old_fx.size() &&
 			old_fx.size() == old_fy.size() && old_fy.size() == old_fz.size() &&
-			old_fz.size() == type.size()
+			old_fz.size() == mass.size() && mass.size() == sigma.size() &&
+			sigma.size() == epsilon.size()
 		);
 		return x.size();
 	}
 };
+
+// TODO(tuna): move to appropriate header w/o circular deps
+inline constexpr std::size_t batch_size = 8;
+
+template <typename Value>
+using batch = std::array<Value, batch_size>;
+
+using particle_batch = batch<particle_system::particle_id>;

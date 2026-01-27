@@ -13,7 +13,10 @@ CONSTEXPR_IF_GCC inline double
 get_temperature(particle_container& container, decltype(sim_configuration::dimensions) dimensions) {
 	double result = 0;
 	const auto& system = container.system();
+
+#ifndef SINGLETHREADED
 #pragma omp parallel for simd schedule(static) reduction(+ : result)
+#endif
 	for (particle_system::particle_id p = 0; p < system.size(); ++p) {
 		const double squared_norm = (system.vx[p] * system.vx[p]) + (system.vy[p] * system.vy[p]) +
 		                            (system.vz[p] * system.vz[p]);
@@ -47,7 +50,9 @@ CONSTEXPR_IF_GCC inline void run_thermostat(
 	if (const double beta = std::sqrt(new_temp / current_temp); beta != 1) {
 		auto& system = container.system();
 
+#ifndef SINGLETHREADED
 #pragma omp parallel for simd schedule(static)
+#endif
 		for (particle_system::particle_id p = 0; p < system.size(); ++p) {
 			system.vx[p] *= beta;
 			system.vy[p] *= beta;

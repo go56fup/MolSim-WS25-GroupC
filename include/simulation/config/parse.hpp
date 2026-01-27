@@ -58,7 +58,7 @@ constexpr std::vector<body_entry> parse_bodies(std::string_view json_data) {
 }
 
 constexpr void populate_simulation(
-	particle_container& particles, sim_configuration& config, std::span<body_entry> bodies
+	particle_container& particles, const sim_configuration& config, std::span<body_entry> bodies
 ) noexcept(false) {
 	std::once_flag two_d_domain_check_flag;
 	std::size_t seq_no = 0;

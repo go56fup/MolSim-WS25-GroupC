@@ -90,7 +90,8 @@ TEST(ConfigTest, SimConfigurationComponent) {
 	STATIC_EXPECT_EQ(sim_config.boundary_behavior.z_max, outflow);
 	STATIC_EXPECT_EQ(sim_config.end_time, 0.3);
 	STATIC_EXPECT_EQ(sim_config.write_frequency, 10);
-	STATIC_EXPECT_STREQ(sim_config.base_name.c_str(), "base_name");
+	using namespace std::literals;
+	STATIC_EXPECT_EQ(sim_config.base_name.c_str(), "base_name"sv);
 	STATIC_EXPECT_EQ(sim_config.domain, vec(0.4, 0.5, 0.6));
 	STATIC_EXPECT_TRUE(sim_config.create_checkpoint);
 	STATIC_EXPECT_DOUBLE_EQ(sim_config.gravitational_constant, 0);
@@ -216,7 +217,7 @@ TEST(ConfigTest, BasicConfig) {
 		cfg.boundary_behavior, boundary_conditions_descriptor::all(boundary_condition::reflecting)
 	);
 	STATIC_EXPECT_EQ(cfg.end_time, 0.3);
-	STATIC_EXPECT_STREQ(cfg.base_name.c_str(), "MD_vtk");
+	STATIC_EXPECT_EQ(cfg.base_name, "MD_vtk");
 	STATIC_EXPECT_EQ(cfg.write_frequency, 10);
 	STATIC_EXPECT_VEC_DOUBLE_EQ(cfg.domain, vec(13.1, 13.2, 13.3));
 	STATIC_EXPECT_FALSE(cfg.thermostat.has_value());

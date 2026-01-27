@@ -28,13 +28,17 @@
 			}
 		},
 		{
-			"name": "test-lite-base",
+			"name": "novtk",
 			"hidden": true,
-			"description": "Runtime tests only, no VTK output, no static analysis",
-			"inherits": "debug-base",
 			"cacheVariables": {
 				"ENABLE_VTK_OUTPUT": "OFF"
 			}
+		},
+		{
+			"name": "test-lite-base",
+			"hidden": true,
+			"description": "Runtime tests only, no VTK output, no static analysis",
+			"inherits": ["debug-base", "novtk"]
 		},
 		{
 			"name": "test-base",
@@ -82,13 +86,18 @@
 			"description": "Configure Release build with GCC"
 		},
 		{
+			"name": "benchmarking",
+			"inherits": ["release-base", "gcc", "native-arch", "novtk"],
+			"displayName": "Release (performance testing)",
+			"description": "Configure Release build with GCC and no VTK output"
+		},
+		{
 			"name": "muc",
-			"inherits": ["release-base", "gcc"],
+			"inherits": ["release-base", "gcc", "novtk"],
 			"displayName": "Release (GCC, optimized for MUC)",
 			"description": "Configure Release build with GCC, with tuning flags set for the CM4 cluster",
 			"cacheVariables": {
-				"CMAKE_TOOLCHAIN_FILE": "${sourceDir}/cmake/toolchain/muc.cmake",
-				"ENABLE_VTK_OUTPUT": "OFF"
+				"CMAKE_TOOLCHAIN_FILE": "${sourceDir}/cmake/toolchain/muc.cmake"
 			}
 		},
 		{

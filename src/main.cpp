@@ -113,8 +113,24 @@ int usual_main(int argc, char* argv[]) {
 			unhandled_json(ex);
 		}
 	}
+	const std::string output_prefix = std::string(output_name) + "/" + config.base_name.c_str();
 
-	run_simulation(container, config, lennard_jones_force_soa, output_name);
+	const auto start = std::chrono::steady_clock::now();
+	const auto iteration = run_simulation(container, config, output_prefix);
+	const auto finish = std::chrono::steady_clock::now();
+	const std::chrono::duration<double, std::milli> elapsed = finish - start;
+
+	SPDLOG_INFO(
+		"Runtime: {} ms, iterations: {}, tick length: {} ms", elapsed.count(), iteration,
+		elapsed.count() / iteration
+	);
+
+	if (config.create_checkpoint) {
+		// TODO(tuna): specify both in terms of plot_particles, where iteration is used in the
+		// filename Or just remove plot_particles
+		WRITE_CHECKPOINT(container, fmt::format("{}_checkpoint.json", output_prefix));
+	}
+
 
 	SPDLOG_INFO("output written. Terminating...");
 

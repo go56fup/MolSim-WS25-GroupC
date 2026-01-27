@@ -110,7 +110,7 @@ TEST(ThermostatTests, Holding) {
 
 		static constexpr sim_iteration_t hold_temperature_over_n_iterations = 10;
 		for (sim_iteration_t i = 0; i < hold_temperature_over_n_iterations; ++i) {
-			run_sim_iteration(lennard_jones_force_soa, container, config, i);
+			run_sim_iteration(container, config, i);
 		}
 		return get_temperature(container, config.dimensions);
 	});

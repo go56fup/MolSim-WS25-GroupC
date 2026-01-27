@@ -11,6 +11,7 @@
 #include <spdlog/spdlog.h>
 
 #include "config/parse.hpp"
+
 #include "grid/bounds/conditions.hpp"
 #include "grid/bounds/operations.hpp"
 #include "grid/enums.hpp"
@@ -26,6 +27,7 @@
 #include "simulation/config/parse.hpp"
 #include "simulation/thermostat.hpp"
 #include "utility/concepts.hpp"
+#include "utility/macros.hpp"
 #include "utility/tracing/macros.hpp"
 
 /**
@@ -46,34 +48,28 @@
  * @param particles The span over particles on which forces will be calculated.
  *
  */
-template <std::size_t BatchSize>
-constexpr void calculate_forces_batched(
-	force_calculator auto calculator, particle_container& container, const sim_configuration& config
-) noexcept {
-	using batch = std::array<particle_system::particle_id, BatchSize>;
 
-	auto use_batch = [&](batch& batch_p1, batch& batch_p2, std::size_t up_to = BatchSize) {
-		TRACE_FORCES(
-			"Using &batch_p1={}, &batch_p2={} on thread {}", static_cast<void*>(&batch_p1),
-			static_cast<void*>(&batch_p2), omp_get_thread_num()
-		);
+constexpr void
+calculate_forces_batched(particle_container& container, const sim_configuration& config) noexcept {
+	auto use_batch_piecewise = [&](particle_batch batch_p1, particle_batch batch_p2,
+	                               std::size_t up_to = batch_size) {
 		for (std::size_t i = 0; i < up_to; ++i) {
 			// TODO(gabriel): Also we must fully remove Newtons Axiom from our code.
-			// TODO(gabriel): does it rly need to be an invoke do we ever use this not as
-			// lennard jones forces?
-			std::invoke(
-				calculator, container, batch_p1[i], batch_p2[i]
-			);
+			lennard_jones_force_soa(container, batch_p1[i], batch_p2[i]);
 		}
 	};
 
-#pragma omp parallel for schedule(dynamic)
-	for (auto& cell : container.cells()) {
-		TRACE_FORCES("Doing cell {} on thread {}", static_cast<void*>(&cell), omp_get_thread_num());
+	auto use_batch = [&](particle_batch batch_p1, particle_batch batch_p2) {
+		lennard_jones_force_soa_batchwise(container, batch_p1, batch_p2);
+	};
 
+#ifndef SINGLETHREADED
+#pragma omp parallel for schedule(dynamic)
+#endif
+	for (auto& cell : container.cells()) {
 		std::size_t count = 0;
-		batch batch_p1;
-		batch batch_p2;
+		particle_batch batch_p1;
+		particle_batch batch_p2;
 
 		for (auto [p1_idx, p2_idx] : unique_pairs(cell)) {
 			TRACE_FORCES(
@@ -84,12 +80,12 @@ constexpr void calculate_forces_batched(
 			batch_p2[count] = p2_idx;
 			++count;
 
-			if (count == BatchSize) {
+			if (count == batch_size) {
 				use_batch(batch_p1, batch_p2);
 				count = 0;
 			}
 		}
-		use_batch(batch_p1, batch_p2, count);
+		use_batch_piecewise(batch_p1, batch_p2, count);
 	}
 
 	for (const auto& [current_cell_idx, target_cell_idx] : container.directional_interactions()) {
@@ -99,8 +95,8 @@ constexpr void calculate_forces_batched(
 		const auto& target_cell = container[target_cell_idx];
 
 		std::size_t count = 0;
-		batch batch_p1;
-		batch batch_p2;
+		particle_batch batch_p1;
+		particle_batch batch_p2;
 
 		for (auto p1_idx : current_cell) {
 			for (auto p2_idx : target_cell) {
@@ -108,13 +104,13 @@ constexpr void calculate_forces_batched(
 				batch_p2[count] = p2_idx;
 				++count;
 
-				if (count == BatchSize) {
+				if (count == batch_size) {
 					use_batch(batch_p1, batch_p2);
 					count = 0;
 				}
 			}
 		}
-		use_batch(batch_p1, batch_p2, count);
+		use_batch_piecewise(batch_p1, batch_p2, count);
 	}
 
 	handle_boundaries(container, config);
@@ -149,7 +145,9 @@ calculate_x(particle_container& container, const sim_configuration& config) noex
 	const auto& grid = container.grid_size();
 	auto& system = container.system();
 
-#pragma omp parallel for schedule(dynamic)
+#ifndef SINGLETHREADED
+	// #pragma omp parallel for schedule(dynamic)
+#endif
 	for (auto&& [cell_idx, cell] : container.enumerate_cells()) {
 		const vec cell_origin{
 			cell_idx.x * cell_width, cell_idx.y * cell_width, cell_idx.z * cell_width
@@ -249,7 +247,9 @@ calculate_x(particle_container& container, const sim_configuration& config) noex
 constexpr void calculate_v(particle_container& container, double delta_t) noexcept {
 	auto& system = container.system();
 
+#ifndef SINGLETHREADED
 #pragma omp parallel for simd schedule(static)
+#endif
 	for (particle_system::particle_id i = 0; i < container.system().size(); ++i) {
 		// TODO(gabriel): Maybe add a invM array and * 0.5 instead of / 2 to remove all these costly
 		// divisions
@@ -289,7 +289,9 @@ constexpr void plot_particles(
  * @param particles Mutable span over particles to update.
  */
 constexpr void update_values(particle_system& system) noexcept {
+#ifndef SINGLETHREADED
 #pragma omp parallel for simd schedule(static)
+#endif
 	for (particle_system::particle_id p = 0; p < system.size(); ++p) {
 		system.old_fx[p] = system.fx[p];
 		system.old_fy[p] = system.fy[p];
@@ -311,17 +313,17 @@ constexpr void update_values(particle_system& system) noexcept {
 // TODO(tuna): now that iteration is being passed in, isFirstIteration should probably be removed
 template <bool IsFirstIteration = false>
 constexpr void run_sim_iteration(
-	force_calculator auto force_calc, particle_container& container,
-	const sim_configuration& config, sim_iteration_t iteration
+	particle_container& container, const sim_configuration& config, sim_iteration_t iteration
 ) noexcept {
 	if constexpr (!IsFirstIteration) {
 		update_values(container.system());
 	}
 
+	// TODO(tuna): mark if_not_testing
 	static const bool has_thermostat = config.thermostat.has_value();
 	static const bool has_gravity = config.gravitational_constant != 0;
 	calculate_x(container, config);
-	calculate_forces_batched<8>(force_calc, container, config);
+	calculate_forces_batched(container, config);
 
 	if (has_thermostat && iteration % config.thermostat->application_frequency == 0) {
 		run_thermostat(container, *config.thermostat, config.dimensions);
@@ -356,13 +358,11 @@ constexpr void run_sim_iteration(
  * @param force_calc Force calculation method to use for simulation.
  * @param output_path Path to put simulation result files into.
  **/
-constexpr void run_simulation(
-	particle_container& container, const sim_configuration& config,
-	force_calculator auto force_calc, std::string_view output_path
+constexpr sim_iteration_t run_simulation(
+	particle_container& container, const sim_configuration& config, std::string_view output_prefix
 ) noexcept {
 	double current_time = 0;
 	sim_iteration_t iteration = 0;
-	const std::string output_prefix = std::string(output_path) + "/" + config.base_name.c_str();
 
 	struct sim_traits {
 		bool is_first_iteration = false;
@@ -374,27 +374,14 @@ constexpr void run_simulation(
 			WRITE_VTK_OUTPUT(plot_particles, container, output_prefix, iteration);
 		}
 
-		run_sim_iteration<Traits.is_first_iteration>(force_calc, container, config, iteration);
+		run_sim_iteration<Traits.is_first_iteration>(container, config, iteration);
 		current_time += config.delta_t;
 		++iteration;
 	};
 
-	auto start = std::chrono::steady_clock::now();
 	run_sim_pass.template operator()<{.is_first_iteration = true}>();
 	while (current_time < config.end_time) {
 		run_sim_pass.template operator()();
 	}
-	auto finish = std::chrono::steady_clock::now();
-	std::chrono::duration<double, std::milli> elapsed = finish - start;
-
-	SPDLOG_INFO(
-		"Runtime: {} ms, iterations: {}, tick length: {} ms", elapsed.count(), iteration,
-		elapsed.count() / iteration
-	);
-
-	if (config.create_checkpoint) {
-		// TODO(tuna): specify both in terms of plot_particles, where iteration is used in the
-		// filename Or just remove plot_particles
-		WRITE_CHECKPOINT(container, fmt::format("{}_checkpoint.json", output_prefix));
-	}
+	return iteration;
 }
