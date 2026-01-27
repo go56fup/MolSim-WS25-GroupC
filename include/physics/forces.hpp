@@ -4,6 +4,7 @@
 #include <concepts>
 #include <functional>
 #include <omp.h>
+#include <numbers>
 
 #include "grid/particle_container/fwd.hpp"
 #include "grid/particle_container/system.hpp"
@@ -284,6 +285,186 @@ CONSTEXPR_IF_GCC inline void lennard_jones_force_soa_batchwise_v2(
 	}
 }
 
+/**
+ * @brief Calculates the force resulting from the smoothed Lennard-Jones potential.
+ *
+ * The force acted upon particle `p1` by particle `p2` is calculated according to the
+ * negative gradient of the smoothed Lennard-Jones potential:
+ *
+ *
+ * @param p1 The particle being acted upon (particle i).
+ * @param p2 The particle exerting the force (particle j).
+ * @param cutoff_radius Cutoff radius in the simulation.
+ * @param lower_radius Radius resulting in the regular lennard jones force calculation.
+ */
+CONSTEXPR_IF_GCC inline void smoothed_lennard_jones_force(particle_container& container, particle_system::particle_id p1, particle_system::particle_id p2, const double cutoff_radius, const double lower_radius) noexcept {
+	auto& system = container.system();
+	const double pos_diff_x = system.x[p1] - system.x[p2];
+	const double pos_diff_y = system.y[p1] - system.y[p2];
+	const double pos_diff_z = system.z[p1] - system.z[p2];
+	const double norm =
+		std::sqrt(pos_diff_x * pos_diff_x + pos_diff_y * pos_diff_y + pos_diff_z * pos_diff_z);
+	if (norm >= cutoff_radius) {
+		return;
+	}
+
+	const double sigma = system.sigma[p1] == system.sigma[p2]
+							 ? system.sigma[p1]
+							 : (system.sigma[p1] + system.sigma[p2]) / 2;
+	const double eps = system.epsilon[p1] == system.epsilon[p2]
+						   ? system.epsilon[p1]
+						   : std::sqrt(system.epsilon[p1] * system.epsilon[p2]);
+	double scaling_factor;
+
+	if (norm <= lower_radius) {
+		const double normalized_sigma = sixth_power(sigma / norm);
+		scaling_factor = (24 * eps / (norm * norm)) * (normalized_sigma - 2 * normalized_sigma * normalized_sigma);
+	}
+	else {
+		const double sigma_sixth_power = sixth_power(sigma);
+		const double norm_sixth_power = sixth_power(norm);
+		const double norm_seventh_power = norm * norm_sixth_power;
+		const double norm_fourteen_power = norm_seventh_power * norm_seventh_power;
+		scaling_factor = -24 * sigma_sixth_power * eps/ (norm_fourteen_power * cubed(cutoff_radius - lower_radius)) * (cutoff_radius - norm)
+		* ((cutoff_radius * cutoff_radius) * (2 * sigma_sixth_power - norm_sixth_power)
+			+ cutoff_radius *  (3 * lower_radius - norm) * (norm_sixth_power - 2 * sigma_sixth_power)
+			+ norm * (5 * lower_radius * sigma_sixth_power - 2 * lower_radius * norm_sixth_power - 3* sigma_sixth_power * norm + norm_seventh_power)
+		);
+	}
+
+	const auto x_delta = -scaling_factor * pos_diff_x;
+	const auto y_delta = -scaling_factor * pos_diff_y;
+	const auto z_delta = -scaling_factor * pos_diff_z;
+
+	#pragma omp atomic
+		system.fx[p1] += x_delta;
+	#pragma omp atomic
+		system.fy[p1] += y_delta;
+	#pragma omp atomic
+		system.fz[p1] += z_delta;
+
+	#pragma omp atomic
+		system.fx[p2] -= x_delta;
+	#pragma omp atomic
+		system.fy[p2] -= y_delta;
+	#pragma omp atomic
+		system.fz[p2] -= z_delta;
+}
+
+
+/**
+ * @brief Computes the harmonic force exerted on one particle by one of its horizontal or vertical neighbours in a membrane.
+	*
+	\f[
+	*   \vec{F}_{ij}
+	*   = k
+	*       \left(r_{ij} - r_0 \right)
+	*     \frac{(\vec{x}_j - \vec{x}_i)}{r_{ij}}
+	* \f]
+	*
+	* @param p1 The particle being acted upon (particle i).
+	* @param p2 The particle exerting the force (particle j).
+	* @param average_bond_length The average bond length of a particle pair.
+	* @param k Stiffness constant.
+*/
+CONSTEXPR_IF_GCC inline void harmonic_force_orthogonal(particle_container& container, particle_system::particle_id p1, particle_system::particle_id p2, const double average_bond_length, const double k) {
+	auto& system = container.system();
+	const double pos_diff_x = system.x[p1] - system.x[p2];
+	const double pos_diff_y = system.y[p1] - system.y[p2];
+	const double pos_diff_z = system.z[p1] - system.z[p2];
+	const double norm =
+		std::sqrt(pos_diff_x * pos_diff_x + pos_diff_y * pos_diff_y + pos_diff_z * pos_diff_z);
+
+	const double scaling_factor = k * (norm  - average_bond_length) / norm;
+	const auto x_delta = -scaling_factor * pos_diff_x;
+	const auto y_delta = -scaling_factor * pos_diff_y;
+	const auto z_delta = -scaling_factor * pos_diff_z;
+
+	#pragma omp atomic
+		system.fx[p1] += x_delta;
+	#pragma omp atomic
+		system.fy[p1] += y_delta;
+	#pragma omp atomic
+		system.fz[p1] += z_delta;
+
+	#pragma omp atomic
+		system.fx[p2] -= x_delta;
+	#pragma omp atomic
+		system.fy[p2] -= y_delta;
+	#pragma omp atomic
+		system.fz[p2] -= z_delta;
+}
+
+
+
+/**
+ * @brief Computes the harmonic force exerted on one particle by one of its diagonal neighbours in a membrane.
+ *
+ \f[
+ *   \vec{F}_{ij}
+ *   = k
+ *       \left(r_{ij} - \sqrt{2} r_0\right)
+ *     \frac{(\vec{x}_j - \vec{x}_i)}{r_{ij}}
+ * \f]
+ *
+ * @param p1 The particle being acted upon (particle i).
+ * @param p2 The particle exerting the force (particle j).
+ * @param average_bond_length The average bond length of a particle pair.
+ * @param k Stiffness constant.
+ */
+CONSTEXPR_IF_GCC inline void harmonic_force_diagonal(particle_container& container, particle_system::particle_id p1, particle_system::particle_id p2, const double average_bond_length, const double k) {
+	auto& system = container.system();
+	const double pos_diff_x = system.x[p1] - system.x[p2];
+	const double pos_diff_y = system.y[p1] - system.y[p2];
+	const double pos_diff_z = system.z[p1] - system.z[p2];
+	const double norm =
+		std::sqrt(pos_diff_x * pos_diff_x + pos_diff_y * pos_diff_y + pos_diff_z * pos_diff_z);
+
+	const double scaling_factor = k * (norm  - std::numbers::sqrt2 * average_bond_length) / norm;
+	const auto x_delta = -scaling_factor * pos_diff_x;
+	const auto y_delta = -scaling_factor * pos_diff_y;
+	const auto z_delta = -scaling_factor * pos_diff_z;
+
+	#pragma omp atomic
+		system.fx[p1] += x_delta;
+	#pragma omp atomic
+		system.fy[p1] += y_delta;
+	#pragma omp atomic
+		system.fz[p1] += z_delta;
+
+	#pragma omp atomic
+		system.fx[p2] -= x_delta;
+	#pragma omp atomic
+		system.fy[p2] -= y_delta;
+	#pragma omp atomic
+		system.fz[p2] -= z_delta;
+}
+
+
+
+/**
+ * @brief Computes an external force in the z-direction acting on certain particles with x/y-indices (17/24), (17/25), (18/24) and (18/25) in a membrane.
+ *
+ * @param container Particles on which the force is applied.
+ * @param upward_force The magnitude of the force.
+ */
+constexpr void apply_upward_force(particle_container& container, const double upward_force) noexcept {
+	auto& system = container.system();
+#pragma omp parallel for simd schedule(static)
+	for (particle_system::particle_id p = 0; p < system.size(); ++p) {
+		if ((system.x[p] == 17 || system.x[p] == 18) && (system.y[p] == 24 || system.y[p] == 25)) {
+			system.fz[p] += upward_force;
+		}
+	}
+}
+
+
+/**
+ * @brief Computes an external gravitational force in the y-direction acting on particles.
+ *
+ * @param container Particles on which gravity is applied.
+ * @param gravity Gravitational constant.
+ */
 constexpr void apply_gravity(particle_container& container, double gravity) noexcept {
 	auto& system = container.system();
 #pragma omp parallel for simd schedule(static)

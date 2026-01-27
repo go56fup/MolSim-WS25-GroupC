@@ -28,6 +28,8 @@
 #include "utility/concepts.hpp"
 #include "utility/tracing/macros.hpp"
 
+#include <__xlocale.h>
+
 /**
  * @brief Updates forces of two particles where one particle acts on the other.
  * @param calculator A callable object that computes forces for the particles.
@@ -342,6 +344,60 @@ constexpr void run_sim_iteration(
 		);
 	}
 #endif
+}
+
+constexpr std::vector<double> radial_distribution_function(particle_container& container, const sim_configuration& config,
+	const double delta_r) {
+	auto& system = container.system();
+	const auto& grid = container.grid_size();
+	const double cell_width = container.cutoff_radius();
+	const double x_size = cell_width * grid[axis::x];
+	const double y_size = cell_width * grid[axis::y];
+	const double z_size = cell_width * grid[axis::z];
+	const double r_max = std::sqrt(x_size * x_size + y_size * y_size + z_size * z_size);
+	const auto number_of_interval = static_cast<std::size_t>(std::ceil(r_max / delta_r));
+	std::vector<double> local_densities (number_of_interval, 0);
+
+	for (std::size_t p1_idx = 0; p1_idx < system.size(); p1_idx++) {
+		for (std::size_t p2_idx = p1_idx + 1; p2_idx < system.size(); p2_idx++) {
+			double diff_x = system.x[p1_idx] - system.x[p2_idx];
+			if (config.boundary_behavior.x_max == boundary_condition::periodic ||
+				config.boundary_behavior.x_min == boundary_condition::periodic ) {
+				if (diff_x < 0) {
+					diff_x = std::max(diff_x, system.x[p2_idx] - system.x[p1_idx] - x_size);
+				} else {
+					diff_x = std::min(diff_x, system.x[p2_idx] - system.x[p1_idx] + x_size);
+				}
+			}
+			double diff_y = system.y[p1_idx] - system.y[p2_idx];
+			if (config.boundary_behavior.y_max == boundary_condition::periodic ||
+				config.boundary_behavior.y_min == boundary_condition::periodic ) {
+				if (diff_y < 0) {
+					diff_y = std::max(diff_y, system.y[p2_idx] - system.y[p1_idx] - y_size);
+				} else {
+					diff_y = std::min(diff_y, system.y[p2_idx] - system.y[p1_idx] + y_size);
+				}
+			}
+			double diff_z = system.z[p1_idx] - system.z[p2_idx];
+			if (config.boundary_behavior.z_max == boundary_condition::periodic ||
+				config.boundary_behavior.z_min == boundary_condition::periodic ) {
+				if (diff_z < 0) {
+					diff_z = std::max(diff_z, system.z[p2_idx] - system.z[p1_idx] - z_size);
+				} else {
+					diff_z= std::min(diff_z, system.z[p2_idx] - system.z[p1_idx] + z_size);
+				}
+				}
+			const double r = std::sqrt(diff_x * diff_x + diff_y * diff_y + diff_z * diff_z);
+			const auto interval_idx = static_cast<std::size_t>(r/delta_r);
+			local_densities[interval_idx] += 1;
+		}
+	}
+	for (unsigned i = 0; i < number_of_interval; i++) {
+		const double r_i = i * delta_r;
+		const double r_i_next = r_i + delta_r;
+		local_densities[i] *= 3/(4 * std::numbers::pi * (r_i_next * r_i_next * r_i_next - r_i * r_i * r_i));
+	}
+	return local_densities;
 }
 
 // TODO(anyone): update span references
