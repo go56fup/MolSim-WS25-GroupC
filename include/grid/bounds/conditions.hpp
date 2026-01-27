@@ -124,7 +124,6 @@ constexpr void delete_ouflowing_particles(
 		}
 	}
 }
-
 template <boundary_type Boundary>
 constexpr void periodic_particle_interactions(
 	particle_container& container, const particle_container::index& cell_idx
@@ -192,17 +191,43 @@ constexpr void periodic_particle_interactions(
 			particle_batch batch_p1{};
 			particle_batch batch_p2{};
 
+<<<<<<< HEAD
+=======
+		#pragma omp parallel for schedule(dynamic)
+>>>>>>> 7205c237e05c2d9c38148363282e9fd9d71c8ed0
 			for (auto periodic_p : container[periodic_target]) {
 				batch_p1[count] = current_p;
 				batch_p2[count] = periodic_p;
 				++count;
 
+<<<<<<< HEAD
 				if (count == batch_size) {
 					use_batch(batch_p1, batch_p2);
 					count = 0;
 				}
 			}
 			use_batch_piecewise(batch_p1, batch_p2, count);
+=======
+				// TODO(tuna): is this actually the best way of doing this?
+				system.x[current_p] += particle_mirror.x;
+				system.y[current_p] += particle_mirror.y;
+				system.z[current_p] += particle_mirror.z;
+
+				if (count == BatchSize) {
+					for (std::size_t i = 0; i < BatchSize; ++i) {
+						std::invoke(lennard_jones_force_soa, container, batch_p1[i], batch_p2[i]);
+						system.x[current_p] -= particle_mirror.x;
+						system.y[current_p] -= particle_mirror.y;
+						system.z[current_p] -= particle_mirror.z;
+					}
+					count = 0;
+				}
+			}
+
+			for (std::size_t i = 0; i < count; ++i) {
+				std::invoke(lennard_jones_force_soa, container, batch_p1[i], batch_p2[i]);
+			}
+>>>>>>> 7205c237e05c2d9c38148363282e9fd9d71c8ed0
 		}
 	}
 }
