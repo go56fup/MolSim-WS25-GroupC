@@ -38,10 +38,8 @@ function(create_test_target)
 	# Disable warnings from inside GTest.
 	target_include_directories("${tests_TARGET}" SYSTEM PRIVATE "${googletest_SOURCE_DIR}/include")
 
-	target_include_directories(
-		"${tests_TARGET}" PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include"
-	)
-	
+	target_include_directories("${tests_TARGET}" PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include")
+
 	if(CXX_COMPILER_ID STREQUAL Clang)
 		target_compile_options("${tests_TARGET}" PRIVATE -fmacro-backtrace-limit=0)
 	endif()

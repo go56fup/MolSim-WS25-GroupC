@@ -82,7 +82,8 @@ public:
 				return *this;
 			}
 		}
-		// TRACE_GRID("end = virtual: {}, target: {}, signed_grid: {}", current_virtual_idx, target_cell_idx, signed_grid);
+		// TRACE_GRID("end = virtual: {}, target: {}, signed_grid: {}", current_virtual_idx,
+		// target_cell_idx, signed_grid);
 		return *this;
 	}
 

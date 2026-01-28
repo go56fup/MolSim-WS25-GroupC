@@ -36,9 +36,7 @@ file(
 add_executable(MolSim ${MY_SRC})
 add_library(project_options INTERFACE)
 
-target_include_directories(
-	project_options INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/include
-)
+target_include_directories(project_options INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/modules)
 
@@ -86,7 +84,6 @@ if(BENCHMARK_PRESET)
 endif()
 
 target_compile_definitions(MolSim PRIVATE "SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_${LOG_LEVEL}")
-
 
 include(vtk)
 include(clang-format)

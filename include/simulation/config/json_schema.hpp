@@ -103,7 +103,6 @@ struct json_data_contract<thermostat_parameters> {
 		// TODO(tuna): can you also just say double?
 		json_number_null<"target_temperature", std::optional<double>>,
 		json_number_null<"max_temperature_difference", std::optional<double>>,
-		json_bool<"enforce_initial_temperature">
-		>;
+		json_bool<"enforce_initial_temperature">>;
 };
 }  // namespace daw::json

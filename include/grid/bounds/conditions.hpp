@@ -94,12 +94,9 @@ constexpr void lambda(
 		}
 	};
 
-	const auto x_max_f = [&](const vec& x) {
-		return vec{-x.x + 2 * domain.x, x.y, x.z}; };
-	const auto y_max_f = [&](const vec& x) {
-		return vec{x.x, -x.y + 2 * domain.y, x.z}; };
-	const auto z_max_f = [&](const vec& x) {
-		return vec{x.x, x.y, -x.z + 2 * domain.z}; };
+	const auto x_max_f = [&](const vec& x) { return vec{-x.x + 2 * domain.x, x.y, x.z}; };
+	const auto y_max_f = [&](const vec& x) { return vec{x.x, -x.y + 2 * domain.y, x.z}; };
+	const auto z_max_f = [&](const vec& x) { return vec{x.x, x.y, -x.z + 2 * domain.z}; };
 
 	switch (border_type) {
 	case x_min:

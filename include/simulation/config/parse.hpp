@@ -59,7 +59,8 @@ constexpr void populate_simulation(
 	std::once_flag two_d_domain_check;
 	std::size_t seq_no = 0;
 	auto decide_brownian = [&](const auto& params) {
-		static const bool initial_temp_enforced = config.thermostat.has_value() && config.thermostat->enforce_initial_temperature;
+		static const bool initial_temp_enforced =
+			config.thermostat.has_value() && config.thermostat->enforce_initial_temperature;
 		if (initial_temp_enforced) {
 			return std::sqrt(config.thermostat->initial_temperature / params.particle_mass);
 		}

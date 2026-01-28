@@ -89,11 +89,14 @@ struct thermostat_parameters {
 struct thermostat_parameters_constructor {
 	static constexpr thermostat_parameters operator()(
 		double initial_temperature, sim_iteration_t application_frequency,
-		std::optional<double> target_temperature, std::optional<double> max_temperature_difference, bool enforce_initial_temperature
+		std::optional<double> target_temperature, std::optional<double> max_temperature_difference,
+		bool enforce_initial_temperature
 	) {
 		return thermostat_parameters{
-			initial_temperature, application_frequency, target_temperature.value_or(initial_temperature),
-			max_temperature_difference.value_or(std::numeric_limits<double>::infinity()), enforce_initial_temperature
+			initial_temperature, application_frequency,
+			target_temperature.value_or(initial_temperature),
+			max_temperature_difference.value_or(std::numeric_limits<double>::infinity()),
+			enforce_initial_temperature
 		};
 	}
 };

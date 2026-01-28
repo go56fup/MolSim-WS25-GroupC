@@ -159,8 +159,8 @@ public:
 	}
 
 	// NOLINTNEXTLINE(*-explicit-conversions, google-explicit-constructor)
-	[[nodiscard]] constexpr explicit(false)
-	operator std::basic_string_view<CharT>() const noexcept {
+	[[nodiscard]] constexpr explicit(false
+	) operator std::basic_string_view<CharT>() const noexcept {
 		return view();
 	}
 

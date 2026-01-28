@@ -524,8 +524,8 @@ constexpr void run_simulation(
 	std::chrono::duration<double, std::milli> elapsed = finish - start;
 
 	SPDLOG_INFO(
-		"Runtime: {} ms, iterations: {}, tick length: {} ms, MUPS/s: {}", elapsed.count(), iteration,
-		elapsed.count() / iteration, (iteration / elapsed.count()) * 1000
+		"Runtime: {} ms, iterations: {}, tick length: {} ms, MUPS/s: {}", elapsed.count(),
+		iteration, elapsed.count() / iteration, (iteration / elapsed.count()) * 1000
 	);
 
 	if (config.create_checkpoint) {
