@@ -126,7 +126,7 @@ int usual_main(int argc, char* argv[]) {
 	if (config.create_checkpoint) {
 		// TODO(tuna): specify both in terms of plot_particles, where iteration is used in the
 		// filename Or just remove plot_particles
-		write_state_to_file(dump_state(container), output_prefix);
+		write_state_to_file(dump_state(container), output_prefix + "_checkpoint.json");
 	}
 
 	SPDLOG_INFO("output written. Terminating...");

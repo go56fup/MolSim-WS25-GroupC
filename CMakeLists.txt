@@ -43,12 +43,13 @@ list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/modules)
 include(embed)
 
 option(SINGLETHREADED "Do not use OpenMP to parallelize simulation" OFF)
+target_compile_definitions(project_options INTERFACE SINGLETHREADED=$<IF:$<BOOL:${SINGLETHREADED}>,1,0>)
+option(DETERMINISTIC "Use deterministic functions: will result in a slower but consistent simulation across runs" OFF)
+target_compile_definitions(project_options INTERFACE DETERMINISTIC=$<IF:$<BOOL:${DETERMINISTIC}>,1,0>)
 
 if(NOT SINGLETHREADED)
 	find_package(OpenMP)
 	target_link_libraries(project_options INTERFACE OpenMP::OpenMP_CXX)
-else()
-	target_compile_definitions(project_options INTERFACE "SINGLETHREADED")
 endif()
 
 if(HAS_EMBED)
@@ -79,12 +80,15 @@ target_compile_options(
 )
 
 if(ENABLE_SANITIZERS)
-	target_compile_options(project_options INTERFACE "-fsanitize=undefined,address")
-	target_link_options(project_options INTERFACE "-fsanitize=undefined,address")
-endif()
-
-if(ENABLE_VTK_OUTPUT)
-	target_compile_definitions(project_options INTERFACE "ENABLE_VTK_OUTPUT")
+	if(ENABLE_TSAN)
+		target_compile_options(project_options INTERFACE "-fsanitize=thread")
+		target_link_options(project_options INTERFACE "-fsanitize=thread")
+	else()
+		target_compile_options(project_options INTERFACE "-fsanitize=address")
+		target_link_options(project_options INTERFACE "-fsanitize=address")
+	endif()
+	target_compile_options(project_options INTERFACE "-fsanitize=undefined")
+	target_link_options(project_options INTERFACE "-fsanitize=undefined")
 endif()
 
 if(BENCHMARK_PRESET)
@@ -97,8 +101,12 @@ include(vtk)
 include(clang-format)
 include(doxygen)
 include(clang-tidy)
-include(third-party)
 
+if(ENABLE_VTK_OUTPUT)
+	target_compile_definitions(project_options INTERFACE "ENABLE_VTK_OUTPUT")
+endif()
+
+include(third-party)
 get_third_party(TARGET third_party)
 target_link_libraries(project_options INTERFACE third_party)
 

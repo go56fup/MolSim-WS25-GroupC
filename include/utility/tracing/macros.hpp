@@ -40,6 +40,12 @@
 #define TRACE_SIM(...) (void)0
 #endif
 
+#if LOG_SIM_STATE
+#define TRACE_SIM_STATE(...) SPDLOG_TRACE(__VA_ARGS__)
+#else
+#define TRACE_SIM_STATE(...) (void)0
+#endif
+
 #if LOG_GRID
 #define TRACE_GRID(...) SPDLOG_TRACE(__VA_ARGS__)
 #else

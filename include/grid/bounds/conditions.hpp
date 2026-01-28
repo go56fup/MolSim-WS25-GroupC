@@ -185,17 +185,14 @@ constexpr void periodic_particle_interactions(
 			Boundary, current_virtual_idx
 		);
 
-#ifndef SINGLETHREADED
-		// #pragma omp parallel for schedule(dynamic)
+#if !SINGLETHREADED && !DETERMINISTIC
+#pragma omp parallel for schedule(dynamic)
 #endif
 		for (auto current_p : container[cell_idx]) {
 			std::size_t count = 0;
 			particle_batch batch_p1{};
 			particle_batch batch_p2{};
 
-#ifndef SINGLETHREADED
-			// #pragma omp parallel for schedule(dynamic)
-#endif
 			for (auto periodic_p : container[periodic_target]) {
 				batch_p1[count] = current_p;
 				batch_p2[count] = periodic_p;

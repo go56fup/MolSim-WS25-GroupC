@@ -37,7 +37,7 @@ constexpr void calculate_forces_batched(particle_container& container) noexcept 
 		lennard_jones_force_soa_batchwise(container, batch_p1, batch_p2);
 	};
 
-#ifndef SINGLETHREADED
+#if !SINGLETHREADED
 #pragma omp parallel for schedule(dynamic)
 #endif
 	for (auto& cell : container.cells()) {
@@ -62,30 +62,41 @@ constexpr void calculate_forces_batched(particle_container& container) noexcept 
 		}
 		use_batch_piecewise(batch_p1, batch_p2, count);
 	}
+#if !SINGLETHREADED && !DETERMINISTIC
+#pragma omp parallel
+#endif
+	{
+#if !SINGLETHREADED && !DETERMINISTIC
+#pragma omp single
+#endif
+		for (const auto& [current_cell_idx, target_cell_idx] :
+		     container.directional_interactions()) {
+			// TODO(tuna): see if after the implementation of the border iterator whether we still
+			// need the indices
+#if !SINGLETHREADED && !DETERMINISTIC
+#pragma omp task firstprivate(current_cell_idx, target_cell_idx)
+#endif
+			{
+				const auto& current_cell = container[current_cell_idx];
+				const auto& target_cell = container[target_cell_idx];
+				std::size_t count = 0;
+				particle_batch batch_p1;
+				particle_batch batch_p2;
+				for (auto p1_idx : current_cell) {
+					for (auto p2_idx : target_cell) {
+						batch_p1[count] = p1_idx;
+						batch_p2[count] = p2_idx;
+						++count;
 
-	for (const auto& [current_cell_idx, target_cell_idx] : container.directional_interactions()) {
-		// TODO(tuna): see if after the implementation of the border iterator whether we still
-		// need the indices
-		const auto& current_cell = container[current_cell_idx];
-		const auto& target_cell = container[target_cell_idx];
-
-		std::size_t count = 0;
-		particle_batch batch_p1;
-		particle_batch batch_p2;
-
-		for (auto p1_idx : current_cell) {
-			for (auto p2_idx : target_cell) {
-				batch_p1[count] = p1_idx;
-				batch_p2[count] = p2_idx;
-				++count;
-
-				if (count == batch_size) {
-					use_batch(batch_p1, batch_p2);
-					count = 0;
+						if (count == batch_size) {
+							use_batch(batch_p1, batch_p2);
+							count = 0;
+						}
+					}
 				}
+				use_batch_piecewise(batch_p1, batch_p2, count);
 			}
 		}
-		use_batch_piecewise(batch_p1, batch_p2, count);
 	}
 }
 
@@ -118,7 +129,7 @@ calculate_x(particle_container& container, const sim_configuration& config) noex
 	const auto& grid = container.grid_size();
 	auto& system = container.system();
 
-#ifndef SINGLETHREADED
+#if !SINGLETHREADED
 	// #pragma omp parallel for schedule(dynamic)
 #endif
 	for (auto&& [cell_idx, cell] : container.enumerate_cells()) {
@@ -200,6 +211,9 @@ calculate_x(particle_container& container, const sim_configuration& config) noex
 				// Skip moving if all checks succeed
 				continue;
 			}
+#if !SINGLETHREADED
+			// #pragma omp critical
+#endif
 			move_to_cell(new_cell_idx, cell, particle_idx);
 		}
 	}
@@ -218,7 +232,7 @@ calculate_x(particle_container& container, const sim_configuration& config) noex
  * @param delta_t The time step for integration.
  */
 constexpr void calculate_v(particle_system& system, double delta_t) noexcept {
-#ifndef SINGLETHREADED
+#if !SINGLETHREADED
 #pragma omp parallel for simd schedule(static)
 #endif
 	for (particle_system::particle_id i = 0; i < system.size(); ++i) {
@@ -240,7 +254,7 @@ constexpr void calculate_v(particle_system& system, double delta_t) noexcept {
  * @param system Particle data to update.
  */
 constexpr void update_values(particle_system& system) noexcept {
-#ifndef SINGLETHREADED
+#if !SINGLETHREADED
 #pragma omp parallel for simd schedule(static)
 #endif
 	for (particle_system::particle_id p = 0; p < system.size(); ++p) {
@@ -284,10 +298,10 @@ constexpr void run_sim_iteration(
 	}
 
 	calculate_v(container.system(), config.delta_t);
-#if LOG_SIM
+#if LOG_SIM_STATE
 	const auto& system = container.system();
 	for (particle_system::particle_id i = 0; i < system.size(); ++i) {
-		TRACE_SIM(
+		TRACE_SIM_STATE(
 			"End of iteration, particle {}: pos={}, v={}, f={}, old_f={}", i,
 			system.serialize_position(i), system.serialize_velocity(i), system.serialize_force(i),
 			system.serialize_old_force(i)
@@ -319,7 +333,7 @@ constexpr sim_iteration_t run_simulation(
 	};
 
 	auto run_sim_pass = [&]<sim_traits Traits = {}> {
-		TRACE_SIM("beginning iteration, current_time={}", current_time);
+		TRACE_SIM("beginning iteration {}, current_time={}", iteration, current_time);
 		if (iteration % config.write_frequency == 0) {
 			WRITE_VTK_OUTPUT(container, output_prefix, iteration);
 		}

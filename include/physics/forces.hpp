@@ -75,7 +75,10 @@ constexpr double get_scaling_factor(double sigma, double eps, double r2) {
 }
 
 // TODO(tuna): remove this
+#if SINGLETHREADED
 #define NO_ATOMICS
+#endif
+// #define NO_ATOMICS
 
 CONSTEXPR_IF_GCC inline void lennard_jones_force_soa(
 	particle_container& container, particle_system::particle_id p1, particle_system::particle_id p2,
@@ -227,7 +230,7 @@ CONSTEXPR_IF_GCC inline void lennard_jones_force_soa_batchwise(
 
 constexpr void apply_gravity(particle_container& container, double gravity) noexcept {
 	auto& system = container.system();
-#ifndef SINGLETHREADED
+#if !SINGLETHREADED
 #pragma omp parallel for simd schedule(static)
 #endif
 	for (particle_system::particle_id p = 0; p < system.size(); ++p) {

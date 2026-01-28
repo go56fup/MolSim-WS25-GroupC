@@ -5,6 +5,7 @@
 
 #include "physics/vec_3d.hpp"
 #include "simulation/entities.hpp"
+#include "utility/tracing/macros.hpp"
 
 #define system_arithmetic(op, idx, value, x_comp, y_comp, z_comp)                                  \
 	do {                                                                                           \
@@ -26,6 +27,15 @@ private:
 		z.push_back(value.z);
 	}
 
+	constexpr void
+	add_common(const vec& pos, const vec& velocity, const material_description& material) {
+		destructure_push_back(pos, x, y, z);
+		destructure_push_back(velocity, vx, vy, vz);
+		mass.push_back(material.mass);
+		sigma.push_back(material.sigma);
+		epsilon.push_back(material.epsilon);
+	}
+
 public:
 	std::vector<double> x, y, z;
 	std::vector<double> vx, vy, vz;
@@ -39,9 +49,7 @@ public:
 
 	constexpr void
 	add_particle(const vec& pos, const vec& velocity, const material_description& material) {
-		destructure_push_back(pos, x, y, z);
-		destructure_push_back(velocity, vx, vy, vz);
-
+		add_common(pos, velocity, material);
 		// TODO(tuna): add finalization pass for numa
 		fx.push_back(0);
 		fy.push_back(0);
@@ -50,19 +58,15 @@ public:
 		old_fx.push_back(0);
 		old_fy.push_back(0);
 		old_fz.push_back(0);
-
-		mass.push_back(material.mass);
-		sigma.push_back(material.sigma);
-		epsilon.push_back(material.epsilon);
 	}
 
 	constexpr void add_particle(
 		const vec& pos, const vec& velocity, const vec& force, const vec& old_force,
 		const material_description& material
 	) {
+		add_common(pos, velocity, material);
 		destructure_push_back(force, fx, fy, fz);
 		destructure_push_back(old_force, old_fx, old_fy, old_fz);
-		add_particle(pos, velocity, material);
 	}
 
 	constexpr vec serialize_force(particle_id i) const noexcept {
