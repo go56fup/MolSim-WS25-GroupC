@@ -31,4 +31,3 @@
 #else
 #define IS_CLANG 0
 #endif
-

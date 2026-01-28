@@ -38,11 +38,9 @@ function(create_test_target)
 	# Disable warnings from inside GTest.
 	target_include_directories("${tests_TARGET}" SYSTEM PRIVATE "${googletest_SOURCE_DIR}/include")
 
-	target_include_directories(
-		"${tests_TARGET}" PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include"
-	)
+	target_include_directories("${tests_TARGET}" PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include")
 	target_compile_definitions("${tests_TARGET}" PRIVATE "IS_TESTING")
-	
+
 	gtest_discover_tests("${tests_TARGET}" TEST_PREFIX "${tests_PREFIX}")
 endfunction()
 

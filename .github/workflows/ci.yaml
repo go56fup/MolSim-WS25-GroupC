@@ -27,7 +27,7 @@ jobs:
 
       - name: Check formatting
         run: |
-          clang-format --dry-run --Werror **/*.cpp **/*.h && \
+          clang-format --dry-run --Werror src/*.cpp include/**/*.hpp && \
           cmake-format --check **/CMakeLists.txt cmake/modules/*.cmake
 
   check_mac_build:

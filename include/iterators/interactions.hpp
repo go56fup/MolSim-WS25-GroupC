@@ -60,7 +60,7 @@ private:
 	/// Number of registered displacements.
 	static constexpr std::size_t displacement_count = std::tuple_size_v<decltype(displacements)>;
 	static_assert(
-		displacement_count * 2 + 1 == 3uz * 3 *3,
+		displacement_count * 2 + 1 == 3uz * 3 * 3,
 		"Covers all adjacent cells (3x3x3 cube around current_cell_idx)"
 	);
 

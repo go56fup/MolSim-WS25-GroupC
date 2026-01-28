@@ -11,4 +11,3 @@ inline int get_thread_num() {
 	return omp_get_thread_num();
 #endif
 }
-

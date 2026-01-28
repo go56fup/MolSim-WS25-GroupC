@@ -55,6 +55,7 @@ CONSTEXPR_IF_GCC inline vec lennard_jones_force(const lennard_jones_parameters& 
 }
 
 #define LENNARD_JONES_V2
+
 constexpr double get_scaling_factor(double sigma, double eps, double r2) {
 #ifdef LENNARD_JONES_V2
 	const double inv_r2 = 1.0 / r2;
@@ -221,6 +222,7 @@ CONSTEXPR_IF_GCC inline void lennard_jones_force_soa_batchwise(
 		system.fz[p2] -= z_delta[i];
 	}
 }
+
 #undef NO_ATOMICS
 
 constexpr void apply_gravity(particle_container& container, double gravity) noexcept {

@@ -214,9 +214,10 @@ constexpr void periodic_particle_interactions(
 namespace detail {
 constexpr bool has_periodic(const sim_configuration& config) {
 	using enum boundary_type;
-	STATIC_IF_NOT_TESTING const bool result = config.boundary_behavior[x_min] == boundary_condition::periodic ||
-	                           config.boundary_behavior[y_min] == boundary_condition::periodic ||
-	                           config.boundary_behavior[z_min] == boundary_condition::periodic;
+	STATIC_IF_NOT_TESTING const bool result =
+		config.boundary_behavior[x_min] == boundary_condition::periodic ||
+		config.boundary_behavior[y_min] == boundary_condition::periodic ||
+		config.boundary_behavior[z_min] == boundary_condition::periodic;
 	return result;
 }
 

@@ -14,5 +14,7 @@
 #include "physics/particle.hpp"
 
 namespace output_writer::xyz {
-void plotParticles(std::span<const Particle> particles, std::string_view filename, unsigned iteration);
+void plotParticles(
+	std::span<const Particle> particles, std::string_view filename, unsigned iteration
+);
 }

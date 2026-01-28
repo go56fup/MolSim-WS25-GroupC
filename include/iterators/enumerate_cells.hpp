@@ -4,7 +4,7 @@
 
 namespace detail {
 
-	// TODO(tuna): upgrade to std::random_iterator_tag
+// TODO(tuna): upgrade to std::random_iterator_tag
 class enumerate_cells_iterator {
 private:
 	using inner = typename particle_container::value_type;

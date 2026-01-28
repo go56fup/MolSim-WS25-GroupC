@@ -9,7 +9,8 @@
 #include "physics/particle.hpp"
 
 namespace output_writer::txt {
-inline void plotParticles(std::span<const Particle> particles, std::string_view filename, unsigned iteration) {
+inline void
+plotParticles(std::span<const Particle> particles, std::string_view filename, unsigned iteration) {
 	std::ofstream file;
 	std::stringstream strstr;
 	strstr << filename << "_" << std::setfill('0') << std::setw(4) << iteration << ".txt";
@@ -22,4 +23,4 @@ inline void plotParticles(std::span<const Particle> particles, std::string_view 
 
 	file.close();
 }
-}  // namespace outputWriter::TXTWriter
+}  // namespace output_writer::txt
