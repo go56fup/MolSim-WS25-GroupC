@@ -10,47 +10,22 @@
 #include <fmt/compile.h>
 #include <spdlog/spdlog.h>
 
-#include "config/parse.hpp"
-
 #include "grid/bounds/conditions.hpp"
-#include "grid/bounds/operations.hpp"
-#include "grid/enums.hpp"
-#include "grid/particle_container/fwd.hpp"
 #include "grid/particle_container/particle_container.hpp"
 #include "grid/particle_container/system.hpp"
 #include "iterators/pairwise.hpp"
-#include "iterators/periodic.hpp"
 #include "output_writers/io.hpp"
 #include "physics/forces.hpp"
-#include "physics/particle.hpp"
-#include "simulation/config/entities.hpp"
-#include "simulation/config/parse.hpp"
+#include "simulation/entities.hpp"
 #include "simulation/thermostat.hpp"
-#include "utility/concepts.hpp"
 #include "utility/macros.hpp"
 #include "utility/tracing/macros.hpp"
 
 /**
- * @brief Updates forces of two particles where one particle acts on the other.
- * @param calculator A callable object that computes forces for the particles.
- * Its type must satisfy `force_calculator`.
- * @param p1 The particle being acted upon.
- * @param p2 The particle exerting the force.
+ * @brief Calculates interaction forces on a collection of particles.
+ * @param container Particles on which forces will be calculated.
  */
-/**
- * @brief Calculates forces on a collection of particles using the provided force calculator.
- *
- * This function delegates the force calculation to the provided @p calculator callable,
- * allowing different calculation methods.
- *
- * @param calculator A callable object that computes forces for a span of particles.
- * Its type must satisfy force_calculator.
- * @param particles The span over particles on which forces will be calculated.
- *
- */
-
-constexpr void
-calculate_forces_batched(particle_container& container, const sim_configuration& config) noexcept {
+constexpr void calculate_forces_batched(particle_container& container) noexcept {
 	auto use_batch_piecewise = [&](particle_batch batch_p1, particle_batch batch_p2,
 	                               std::size_t up_to = batch_size) {
 		for (std::size_t i = 0; i < up_to; ++i) {
@@ -112,12 +87,10 @@ calculate_forces_batched(particle_container& container, const sim_configuration&
 		}
 		use_batch_piecewise(batch_p1, batch_p2, count);
 	}
-
-	handle_boundaries(container, config);
 }
 
 /**
- * @brief Updates the position of each particle.
+ * @brief Updates the position of each particle and move particles inside grid.
  *
  * Implements the first step of the velocity Störmer-Verlet algorithm:
  * \f[
@@ -125,15 +98,15 @@ calculate_forces_batched(particle_container& container, const sim_configuration&
  * \vec{F}(t)
  * \f]
  *
- * @param particles Mutable span over particles to update.
- * @param delta_t The time step for integration.
+ * @param container Particles to calculate positional updates for.
+ * @param config Simulation parameters.
  */
 constexpr void
 calculate_x(particle_container& container, const sim_configuration& config) noexcept(false) {
 	const double cell_width = container.cutoff_radius();
 	auto move_to_cell = [&](const particle_container::index& new_cell_idx,
 	                        particle_container::cell& current_cell,
-	                        particle_container::cell::size_type i) noexcept {
+	                        particle_container::cell::size_type i) {
 		const auto& particle = current_cell[i];
 		TRACE_GRID("Moving {} to {}", particle, new_cell_idx);
 		particle_container::cell& new_cell = container[new_cell_idx];
@@ -241,16 +214,14 @@ calculate_x(particle_container& container, const sim_configuration& config) noex
  * \Delta t)\right]
  * \f]
  *
- * @param particles Mutable span over particles to update.
+ * @param system Particle data to update.
  * @param delta_t The time step for integration.
  */
-constexpr void calculate_v(particle_container& container, double delta_t) noexcept {
-	auto& system = container.system();
-
+constexpr void calculate_v(particle_system& system, double delta_t) noexcept {
 #ifndef SINGLETHREADED
 #pragma omp parallel for simd schedule(static)
 #endif
-	for (particle_system::particle_id i = 0; i < container.system().size(); ++i) {
+	for (particle_system::particle_id i = 0; i < system.size(); ++i) {
 		// TODO(gabriel): Maybe add a invM array and * 0.5 instead of / 2 to remove all these costly
 		// divisions
 		const auto velocity_scalar = delta_t / (2 * system.mass[i]);
@@ -260,33 +231,13 @@ constexpr void calculate_v(particle_container& container, double delta_t) noexce
 	}
 }
 
-// TODO(tuna): fix docs
-/**
- * @brief Exports particle data using the given I/O provider.
- *
- * This function delegates to the given @p io_provider callable, allowing different
- * data exporting strategies.
- *
- * @param io_provider Callable object responsible for exporting particle data. Its type must
- * satisfy particle_io_provider.
- * @param particles Constant span of particles to export data from.
- * @param out_name  Base name for the output file.
- * @param iteration Current simulation iteration (used for output naming).
- */
-constexpr void plot_particles(
-	particle_io_provider auto&& io_provider, particle_container& particles,
-	std::string_view out_name, unsigned iteration
-) {
-	io_provider(particles, out_name, iteration);
-}
-
 /**
  * @brief Prepares particles for the next iteration.
  *
- * Currently only sets the old force of each particle to the force calculated within the
+ * Sets the old force of each particle to the force calculated within the
  * most recent iteration at the end of each iteraton.
  *
- * @param particles Mutable span over particles to update.
+ * @param system Particle data to update.
  */
 constexpr void update_values(particle_system& system) noexcept {
 #ifndef SINGLETHREADED
@@ -305,25 +256,24 @@ constexpr void update_values(particle_system& system) noexcept {
 /**
  * @brief Run a tick of the simulation.
  *
- * @param force_calc A callable object that computes forces for a span of particles.
- * Its type must satisfy force_calculator.
- * @param particles Mutable span over particles to run simulation tick for
- * @param delta_t Tick length
+ * @param container Particles to simulate.
+ * @param config Simulation parameters.
+ * @param iteration The index of iteration to simulate.
  */
 // TODO(tuna): now that iteration is being passed in, isFirstIteration should probably be removed
 template <bool IsFirstIteration = false>
 constexpr void run_sim_iteration(
 	particle_container& container, const sim_configuration& config, sim_iteration_t iteration
-) noexcept {
+) {
 	if constexpr (!IsFirstIteration) {
 		update_values(container.system());
 	}
 
-	// TODO(tuna): mark if_not_testing
-	static const bool has_thermostat = config.thermostat.has_value();
-	static const bool has_gravity = config.gravitational_constant != 0;
+	STATIC_IF_NOT_TESTING const bool has_thermostat = config.thermostat.has_value();
+	STATIC_IF_NOT_TESTING const bool has_gravity = config.gravitational_constant != 0;
 	calculate_x(container, config);
-	calculate_forces_batched(container, config);
+	calculate_forces_batched(container);
+	handle_boundaries(container, config);
 
 	if (has_thermostat && iteration % config.thermostat->application_frequency == 0) {
 		run_thermostat(container, *config.thermostat, config.dimensions);
@@ -333,7 +283,7 @@ constexpr void run_sim_iteration(
 		apply_gravity(container, config.gravitational_constant);
 	}
 
-	calculate_v(container, config.delta_t);
+	calculate_v(container.system(), config.delta_t);
 #if LOG_SIM
 	const auto& system = container.system();
 	for (particle_system::particle_id i = 0; i < system.size(); ++i) {
@@ -346,7 +296,6 @@ constexpr void run_sim_iteration(
 #endif
 }
 
-// TODO(anyone): update span references
 /**
  * @brief Start the simulation.
  *
@@ -355,12 +304,13 @@ constexpr void run_sim_iteration(
  *
  * @param container Particles to simulate.
  * @param config Simulation parameters.
- * @param force_calc Force calculation method to use for simulation.
- * @param output_path Path to put simulation result files into.
+ * @param output_prefix Path to put simulation result files into.
+ * @return Number of iterations taken to reach specified end time.
  **/
 constexpr sim_iteration_t run_simulation(
-	particle_container& container, const sim_configuration& config, std::string_view output_prefix
-) noexcept {
+	particle_container& container, const sim_configuration& config,
+	[[maybe_unused]] std::string_view output_prefix
+) {
 	double current_time = 0;
 	sim_iteration_t iteration = 0;
 
@@ -371,7 +321,7 @@ constexpr sim_iteration_t run_simulation(
 	auto run_sim_pass = [&]<sim_traits Traits = {}> {
 		TRACE_SIM("beginning iteration, current_time={}", current_time);
 		if (iteration % config.write_frequency == 0) {
-			WRITE_VTK_OUTPUT(plot_particles, container, output_prefix, iteration);
+			WRITE_VTK_OUTPUT(container, output_prefix, iteration);
 		}
 
 		run_sim_iteration<Traits.is_first_iteration>(container, config, iteration);

@@ -1,4 +1,4 @@
-option(ENABLE_VTK_OUTPUT "Enable VTK output" OFF)
+option(ENABLE_VTK_OUTPUT "Enable VTK output" ON)
 
 if(ENABLE_VTK_OUTPUT)
 	message(STATUS "VTK output enabled")

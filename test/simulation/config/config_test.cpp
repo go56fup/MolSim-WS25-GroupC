@@ -7,10 +7,9 @@
 #include <gtest/gtest.h>
 
 #include "grid/particle_container/particle_container.hpp"
-#include "physics/particle.hpp"
-#include "simulation/config/entities.hpp"
 #include "simulation/config/json_schema.hpp"
 #include "simulation/config/parse.hpp"
+#include "simulation/entities.hpp"
 
 #include "testing_utilities.hpp"
 
@@ -217,14 +216,14 @@ TEST(ConfigTest, BasicConfig) {
 		cfg.boundary_behavior, boundary_conditions_descriptor::all(boundary_condition::reflecting)
 	);
 	STATIC_EXPECT_EQ(cfg.end_time, 0.3);
-	STATIC_EXPECT_EQ(cfg.base_name, "MD_vtk");
+	STATIC_EXPECT_EQ(std::string_view(cfg.base_name.c_str()), "MD_vtk");
 	STATIC_EXPECT_EQ(cfg.write_frequency, 10);
 	STATIC_EXPECT_VEC_DOUBLE_EQ(cfg.domain, vec(13.1, 13.2, 13.3));
 	STATIC_EXPECT_FALSE(cfg.thermostat.has_value());
 	STATIC_EXPECT_TRUE(cfg.create_checkpoint);
 
 	GTEST_CXP std::string_view body_json_data = R"([
-{
+    {
       "type": "cuboid",
       "geometry": {
         "origin": [0, 0, 0],
@@ -233,7 +232,7 @@ TEST(ConfigTest, BasicConfig) {
       "velocity": [0.1, 0.1, 0.1],
       "parameters": {
         "meshwidth": 1.12,
-        "brownian_mean": 0.1
+        "brownian_mean": 0
        },
        "material": {
         "mass": 10,
@@ -259,9 +258,9 @@ TEST(ConfigTest, BasicConfig) {
 		particle_container container(cfg.domain, cfg.cutoff_radius);
 		auto bodies = config::parse_bodies(body_json_data);
 		config::populate_simulation(container, cfg, bodies);
-		const particle_system::particle_id rectangle =
-			container.cell_containing({2.5, 2.5, 2.5}).at(0);
 		const particle_system::particle_id particle =
+			container.cell_containing({2.5, 2.5, 2.5}).at(0);
+		const particle_system::particle_id rectangle =
 			container.cell_containing({0.2, 0.2, 0.2}).at(0);
 
 		const auto& system = container.system();

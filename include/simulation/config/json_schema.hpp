@@ -6,7 +6,7 @@
 
 #include "grid/particle_container/fwd.hpp"
 #include "physics/vec_3d.hpp"
-#include "simulation/config/entities.hpp"
+#include "simulation/entities.hpp"
 
 namespace daw::json {
 template <typename T>

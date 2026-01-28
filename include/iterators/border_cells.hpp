@@ -27,7 +27,7 @@ private:
 	/// Pointer to container which the iterator obtains the border cells from.
 	particle_container* container = nullptr;
 	/// Index of the current cell of iteration.
-	particle_container::index idx{};
+	particle_container::index idx;
 	/// Boundary type of current cell.
 	boundary_type type{};
 

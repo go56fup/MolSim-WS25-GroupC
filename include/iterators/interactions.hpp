@@ -34,9 +34,9 @@ private:
 	/// Pointer to container which the iterator obtains the cell pairs from.
 	particle_container* container = nullptr;
 	/// Index of the first cell of the returned interacting pair.
-	particle_container::index current_cell_idx{};
+	particle_container::index current_cell_idx;
 	/// Index of the second cell of the returned interacting pair.
-	particle_container::index target_cell_idx{};
+	particle_container::index target_cell_idx;
 	/// Index into @ref displacements describing the progress of the scan of cells to interact with.
 	std::uint8_t displacement_idx = 0;
 
@@ -60,7 +60,7 @@ private:
 	/// Number of registered displacements.
 	static constexpr std::size_t displacement_count = std::tuple_size_v<decltype(displacements)>;
 	static_assert(
-		displacement_count * 2 + 1 == 3 * 3 * 3,
+		displacement_count * 2 + 1 == 3uz * 3 *3,
 		"Covers all adjacent cells (3x3x3 cube around current_cell_idx)"
 	);
 
@@ -132,7 +132,7 @@ public:
 	 * @return Reference to this iterator after increment.
 	 */
 	constexpr interactions_iterator& operator++() noexcept {
-		auto& grid = container->grid_size();
+		const auto& grid = container->grid_size();
 
 		while (current_cell_idx.z < grid.z) {
 			// Try all displacements for the current cell

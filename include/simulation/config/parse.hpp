@@ -1,24 +1,16 @@
 #pragma once
 
-#include <fstream>
 #include <stdexcept>
 #include <string_view>
-#include <type_traits>
-#include <utility>
 
 #include <daw/json/daw_json_link.h>
 #include <spdlog/spdlog.h>
 
-#include "entities.hpp"
 #include "grid/enums.hpp"
 #include "grid/particle_container/fwd.hpp"
-#include "grid/particle_container/particle_container.hpp"
-#include "grid/particle_container/system.hpp"
-#include "physics/vec_3d.hpp"
-#include "simulation/config/entities.hpp"
 #include "simulation/config/json_schema.hpp"
-#include "utility/concepts.hpp"
-#include "utility/constants.hpp"
+#include "simulation/entities.hpp"
+#include "utility/macros.hpp"
 
 namespace detail {
 constexpr void check_for_2d_domain(const sim_configuration& config) noexcept(false) {
@@ -66,7 +58,7 @@ constexpr void populate_simulation(
 		std::call_once(two_d_domain_check_flag, detail::check_for_2d_domain, config);
 	};
 	auto decide_brownian = [&](body_entry& body) {
-		static const bool initial_temp_enforced =
+		STATIC_IF_NOT_TESTING const bool initial_temp_enforced =
 			config.thermostat.has_value() && config.thermostat->enforce_initial_temperature;
 		if (initial_temp_enforced) {
 			assert(body.parameters->brownian_mean == 0.0);
@@ -119,48 +111,5 @@ constexpr void populate_simulation(
 }
 
 // TODO(tuna): move to output part of the codebase
-constexpr std::string dump_state(particle_container& container) {
-	const auto& system = container.system();
-
-	// daw::json::json_value is non-owning, so the underlying string has to persist until the final
-	// serialization.
-	std::vector<std::string> geometries;
-	geometries.resize(system.size());
-
-	std::vector<body_entry> out;
-	out.resize(system.size());
-
-	for (particle_system::particle_id i = 0; i < system.size(); ++i) {
-		const particle_state_parameters state{
-			.position = system.serialize_position(i),
-			.force = system.serialize_force(i),
-			.old_force = system.serialize_old_force(i)
-		};
-		TRACE_CHECKPOINT(
-			"Serializing particle state: position={}, force={}, old_force={}", state.position,
-			state.force, state.old_force
-		);
-		// TODO(tuna): the below deserializes to "", fix
-		geometries.push_back(daw::json::to_json(state));
-		TRACE_CHECKPOINT("Serialized particle state: {}", geometries[i]);
-		body_entry particle_entry{
-			.type = "particle_state",
-			// TODO(tuna): check if this is a view over a string that gets destructed at the end of
-		    // the loop or is owning
-			.geometry = daw::json::json_value(geometries[i]),
-			.velocity = system.serialize_velocity(i),
-			.material =
-				{.mass = system.mass[i], .sigma = system.sigma[i], .epsilon = system.epsilon[i]}
-		};
-		out.push_back(particle_entry);
-	}
-	return daw::json::
-		to_json_array(out, daw::json::options::output_flags<daw::json::options::SerializationFormat::Pretty>);
-};
-
-inline void write_state_to_file(std::string_view state, std::string_view output_path) {
-	std::ofstream out(output_path.data());
-	out << state;
-}
 
 }  // namespace config

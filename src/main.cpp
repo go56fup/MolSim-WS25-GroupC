@@ -1,27 +1,25 @@
-#include <daw/json/daw_json_exception.h>
+#include <chrono>
+#include <cstdlib>
 #include <exception>
 #include <filesystem>
 #include <fstream>
+#include <ratio>
 #include <sstream>
 #include <string_view>
+#include <vector>
 
 #include <argparse/argparse.hpp>
+#include <daw/json/daw_json_exception.h>
 #include <fmt/base.h>
 #include <spdlog/common.h>
 #include <spdlog/spdlog.h>
 
-#include "physics/forces.hpp"
-#include "physics/particle.hpp"
-#include "simulation/config/entities.hpp"
+#include "grid/particle_container/fwd.hpp"
+#include "output_writers/checkpoint.hpp"
 #include "simulation/config/parse.hpp"
+#include "simulation/entities.hpp"
 #include "simulation/molsim.hpp"
 
-struct use_formatting_t {};
-
-inline constexpr use_formatting_t use_formatting{};
-
-// TODO(tuna): look into how spdlog implements its overloads for fmt and remove the tag type if
-// possible
 template <typename... Args>
 [[noreturn]] void terminating_log(fmt::format_string<Args...> fmt_string, Args&&... args) {
 	SPDLOG_CRITICAL(fmt_string, std::forward<Args>(args)...);
@@ -128,9 +126,8 @@ int usual_main(int argc, char* argv[]) {
 	if (config.create_checkpoint) {
 		// TODO(tuna): specify both in terms of plot_particles, where iteration is used in the
 		// filename Or just remove plot_particles
-		WRITE_CHECKPOINT(container, fmt::format("{}_checkpoint.json", output_prefix));
+		write_state_to_file(dump_state(container), output_prefix);
 	}
-
 
 	SPDLOG_INFO("output written. Terminating...");
 

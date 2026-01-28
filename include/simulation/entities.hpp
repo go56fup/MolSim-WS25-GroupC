@@ -94,10 +94,12 @@ struct thermostat_parameters_constructor {
 		bool enforce_initial_temperature
 	) {
 		return thermostat_parameters{
-			initial_temperature, application_frequency,
-			target_temperature.value_or(initial_temperature),
-			max_temperature_difference.value_or(std::numeric_limits<double>::infinity()),
-			enforce_initial_temperature
+			.initial_temperature = initial_temperature,
+			.application_frequency = application_frequency,
+			.target_temperature = target_temperature.value_or(initial_temperature),
+			.max_temperature_difference =
+				max_temperature_difference.value_or(std::numeric_limits<double>::infinity()),
+			.enforce_initial_temperature = enforce_initial_temperature
 		};
 	}
 };
@@ -112,16 +114,16 @@ struct material_description {
 
 struct particle_properties {
 	vec velocity;
-	material_description material;
+	material_description material{};
 };
 
 struct sim_configuration {
 	static constexpr auto max_base_name_len = 32;
-	double delta_t;
-	double cutoff_radius;
-	boundary_conditions_descriptor boundary_behavior;
+	double delta_t{};
+	double cutoff_radius{};
+	boundary_conditions_descriptor boundary_behavior{};
 	std::optional<thermostat_parameters> thermostat = std::nullopt;
-	double end_time;
+	double end_time{};
 	sim_iteration_t write_frequency = std::numeric_limits<sim_iteration_t>::max();
 	p3094::fixed_string<max_base_name_len> base_name{std::from_range, "unused"};
 	vec domain;
@@ -188,9 +190,7 @@ struct cuboid_parameters {
 	vec_n<Dimensions, std::uint32_t> scale;
 
 	constexpr cuboid_parameters<3> extend_to_3d(const vec& domain) const {
-		return {
-			.origin = {origin.x, origin.y, domain.z / 2}, .scale = {scale.x, scale.y, 1}
-		};
+		return {.origin = {origin.x, origin.y, domain.z / 2}, .scale = {scale.x, scale.y, 1}};
 	}
 };
 
@@ -213,7 +213,7 @@ struct body_entry {
 	daw::json::json_value geometry;
 	std::optional<body_common_parameters> parameters = std::nullopt;
 	vec velocity;
-	material_description material;
+	material_description material{};
 };
 
 struct particle_parameters {

@@ -46,7 +46,9 @@ public:
 	constexpr periodic_iterator() noexcept = default;
 
 	// Start Constructor
-	constexpr periodic_iterator(particle_container& c, const particle_container::signed_index& v_idx)
+	constexpr periodic_iterator(
+		particle_container& c, const particle_container::signed_index& v_idx
+	)
 		: container(&c)
 		, current_virtual_idx(v_idx)
 		, target_cell_idx(v_idx)
@@ -67,7 +69,7 @@ public:
 		TRACE_INTERACTION_ITER("Doing displacement {} on {}", displacement, current_virtual_idx);
 
 		// We do not need to use __builtin_add_overflow() here, because:
-		assert(displacement[Axis] >= -1 || displacement[Axis] <= 1);
+		assert(displacement[Axis] == -1 || displacement[Axis] == 1 || displacement[Axis] == 0);
 		target_cell_idx[Axis] = current_virtual_idx[Axis] + displacement[Axis];
 
 		// If we are moving backwards, don't go beyond the first ghost layer

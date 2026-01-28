@@ -7,9 +7,8 @@
 #include <vector>
 
 #include "grid/particle_container/system.hpp"
-#include "physics/particle.hpp"
 #include "physics/vec_3d.hpp"
-#include "simulation/config/entities.hpp"
+#include "simulation/entities.hpp"
 #include "utility/concepts.hpp"
 
 // TODO(tuna): add particle_system related docs

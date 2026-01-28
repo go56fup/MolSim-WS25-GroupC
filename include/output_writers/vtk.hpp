@@ -8,7 +8,6 @@
 #pragma once
 #ifdef ENABLE_VTK_OUTPUT
 #include <iomanip>
-#include <span>
 #include <sstream>
 #include <string_view>
 
@@ -22,8 +21,6 @@
 #include <vtkXMLUnstructuredGridWriter.h>
 
 #include "grid/particle_container/fwd.hpp"
-#include "physics/particle.hpp"
-#include "utility/concepts.hpp"
 
 namespace output_writer::vtk {
 /**

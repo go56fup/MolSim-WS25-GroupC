@@ -2,12 +2,11 @@
 
 #include "grid/particle_container/fwd.hpp"
 #include "gtest_constexpr/macros.hpp"
-#include "simulation/config/entities.hpp"
+#include "simulation/entities.hpp"
 #include "testing_utilities.hpp"
 
 #include "grid/particle_container/particle_container.hpp"
 #include "physics/forces.hpp"
-#include "physics/particle.hpp"
 #include "simulation/molsim.hpp"
 #include "utility/concepts.hpp"
 

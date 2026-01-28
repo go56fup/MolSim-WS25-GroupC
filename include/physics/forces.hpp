@@ -6,7 +6,6 @@
 
 #include "grid/particle_container/fwd.hpp"
 #include "grid/particle_container/system.hpp"
-#include "physics/particle.hpp"
 #include "utility/compiler_traits.hpp"
 #include "utility/tracing/macros.hpp"
 
@@ -41,8 +40,8 @@
 struct lennard_jones_parameters {
 	vec p1_position;
 	vec p2_position;
-	double sigma;
-	double epsilon;
+	double sigma{};
+	double epsilon{};
 };
 
 CONSTEXPR_IF_GCC inline vec lennard_jones_force(const lennard_jones_parameters& params) noexcept {
@@ -72,8 +71,12 @@ constexpr double get_scaling_factor(double sigma, double eps, double r2) {
 	const double scaling_factor =
 		(24 * eps / r2) * (normalized_sigma - 2 * normalized_sigma * normalized_sigma);
 #endif
+	TRACE_FORCES("Scaling factor for sigma={}, eps={}, r2={}: {}", sigma, eps, r2, scaling_factor);
 	return scaling_factor;
 }
+
+// TODO(tuna): remove this
+#define NO_ATOMICS
 
 CONSTEXPR_IF_GCC inline void lennard_jones_force_soa(
 	particle_container& container, particle_system::particle_id p1, particle_system::particle_id p2,
@@ -97,28 +100,28 @@ CONSTEXPR_IF_GCC inline void lennard_jones_force_soa(
 	const auto z_delta = -scaling_factor * pos_diff_z;
 	TRACE_FORCES("Force delta for {} - {}:  {} {} {}", p1, p2, x_delta, y_delta, z_delta);
 
-#ifndef SINGLETHREADED
+#ifndef NO_ATOMICS
 #pragma omp atomic
 #endif
 	system.fx[p1] += x_delta;
-#ifndef SINGLETHREADED
+#ifndef NO_ATOMICS
 #pragma omp atomic
 #endif
 	system.fy[p1] += y_delta;
-#ifndef SINGLETHREADED
+#ifndef NO_ATOMICS
 #pragma omp atomic
 #endif
 	system.fz[p1] += z_delta;
 
-#ifndef SINGLETHREADED
+#ifndef NO_ATOMICS
 #pragma omp atomic
 #endif
 	system.fx[p2] -= x_delta;
-#ifndef SINGLETHREADED
+#ifndef NO_ATOMICS
 #pragma omp atomic
 #endif
 	system.fy[p2] -= y_delta;
-#ifndef SINGLETHREADED
+#ifndef NO_ATOMICS
 #pragma omp atomic
 #endif
 	system.fz[p2] -= z_delta;
@@ -136,7 +139,7 @@ CONSTEXPR_IF_GCC inline void lennard_jones_force_soa_batchwise(
 	batch<double> scaling_factor;
 
 	// Position differences
-#ifndef SINGLETHREADED
+#ifndef NO_ATOMICS
 #pragma omp simd
 #endif
 	for (std::size_t i = 0; i < batch_size; ++i) {
@@ -149,7 +152,7 @@ CONSTEXPR_IF_GCC inline void lennard_jones_force_soa_batchwise(
 	}
 
 	// Force scaling factor (matches scalar math exactly)
-#ifndef SINGLETHREADED
+#ifndef NO_ATOMICS
 #pragma omp simd
 #endif
 	for (std::size_t i = 0; i < batch_size; ++i) {
@@ -177,7 +180,7 @@ CONSTEXPR_IF_GCC inline void lennard_jones_force_soa_batchwise(
 	batch<double> y_delta;
 	batch<double> z_delta;
 
-#ifndef SINGLETHREADED
+#ifndef NO_ATOMICS
 #pragma omp simd
 #endif
 	for (std::size_t i = 0; i < batch_size; ++i) {
@@ -193,33 +196,34 @@ CONSTEXPR_IF_GCC inline void lennard_jones_force_soa_batchwise(
 			"Force delta for {} - {}:  {} {} {}", p1, p2, x_delta[i], y_delta[i], z_delta[i]
 		);
 
-#ifndef SINGLETHREADED
+#ifndef NO_ATOMICS
 #pragma omp atomic
 #endif
 		system.fx[p1] += x_delta[i];
-#ifndef SINGLETHREADED
+#ifndef NO_ATOMICS
 #pragma omp atomic
 #endif
 		system.fy[p1] += y_delta[i];
-#ifndef SINGLETHREADED
+#ifndef NO_ATOMICS
 #pragma omp atomic
 #endif
 		system.fz[p1] += z_delta[i];
 
-#ifndef SINGLETHREADED
+#ifndef NO_ATOMICS
 #pragma omp atomic
 #endif
 		system.fx[p2] -= x_delta[i];
-#ifndef SINGLETHREADED
+#ifndef NO_ATOMICS
 #pragma omp atomic
 #endif
 		system.fy[p2] -= y_delta[i];
-#ifndef SINGLETHREADED
+#ifndef NO_ATOMICS
 #pragma omp atomic
 #endif
 		system.fz[p2] -= z_delta[i];
 	}
 }
+#undef NO_ATOMICS
 
 constexpr void apply_gravity(particle_container& container, double gravity) noexcept {
 	auto& system = container.system();

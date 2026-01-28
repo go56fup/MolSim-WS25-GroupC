@@ -3,9 +3,8 @@
 #include <algorithm>
 #include <cmath>
 
-#include "grid/particle_container/particle_container.hpp"
-#include "physics/particle.hpp"
-#include "simulation/config/entities.hpp"
+#include "grid/particle_container/fwd.hpp"
+#include "simulation/entities.hpp"
 #include "utility/compiler_traits.hpp"
 #include "utility/concepts.hpp"
 
@@ -15,7 +14,7 @@ get_temperature(particle_container& container, decltype(sim_configuration::dimen
 	const auto& system = container.system();
 
 #ifndef SINGLETHREADED
-#pragma omp parallel for simd schedule(static) reduction(+ : result)
+	// #pragma omp parallel for simd schedule(static) reduction(+ : result)
 #endif
 	for (particle_system::particle_id p = 0; p < system.size(); ++p) {
 		const double squared_norm = (system.vx[p] * system.vx[p]) + (system.vy[p] * system.vy[p]) +

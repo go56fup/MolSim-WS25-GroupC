@@ -25,7 +25,7 @@ private:
 	/// Pointer to container to enumerate cells for.
 	particle_container* container = nullptr;
 	/// Current cell index.
-	particle_container::index idx{};
+	particle_container::index idx;
 
 public:
 	/// Default construct an enumerate cells iterator, does not reference any container.

@@ -1,10 +1,7 @@
 #pragma once
 
 #include <cassert>
-#include <concepts>
 #include <cstddef>
-#include <cstdint>
-#include <ranges>
 #include <vector>
 
 #include "grid/bounds/operations.hpp"
@@ -13,9 +10,8 @@
 #include "iterators/enumerate_cells.hpp"
 #include "iterators/interactions.hpp"
 #include "physics/maxwell_boltzmann.hpp"
-#include "physics/particle.hpp"
 #include "physics/vec_3d.hpp"
-#include "simulation/config/entities.hpp"
+#include "simulation/entities.hpp"
 #include "utility/compiler_traits.hpp"
 #include "utility/concepts.hpp"
 #include "utility/tracing/config.hpp"

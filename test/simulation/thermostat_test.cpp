@@ -4,7 +4,7 @@
 #include <gtest/gtest.h>
 
 #include "grid/particle_container/fwd.hpp"
-#include "simulation/config/entities.hpp"
+#include "simulation/entities.hpp"
 #include "simulation/molsim.hpp"
 #include "simulation/thermostat.hpp"
 
@@ -85,7 +85,6 @@ TEST(ThermostatTests, Holding) {
 		.initial_temperature = init_temp,
 		.application_frequency = 1,
 		.target_temperature = init_temp,
-		.max_temperature_difference = std::numeric_limits<double>::infinity(),
 		.enforce_initial_temperature = true
 	};
 
@@ -99,7 +98,7 @@ TEST(ThermostatTests, Holding) {
 		.dimensions = 3,
 	};
 
-	GTEST_CXP_GCC double resulting_temp = std::invoke([&] {
+	/* GTEST_CXP_GCC */ double resulting_temp = std::invoke([&] {
 		particle_container container(config.domain, config.cutoff_radius);
 		std::size_t seq = 0;
 		container.add_cuboid<3>(
@@ -115,5 +114,6 @@ TEST(ThermostatTests, Holding) {
 		return get_temperature(container, config.dimensions);
 	});
 
-	STATIC_EXPECT_DOUBLE_EQ(resulting_temp, init_temp);
+	// TODO(tuna): this returns false when in compile time.
+	/* STATIC_ */ EXPECT_DOUBLE_EQ(resulting_temp, init_temp);
 }

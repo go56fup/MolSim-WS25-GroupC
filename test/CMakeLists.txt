@@ -41,10 +41,8 @@ function(create_test_target)
 	target_include_directories(
 		"${tests_TARGET}" PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include"
 	)
+	target_compile_definitions("${tests_TARGET}" PRIVATE "IS_TESTING")
 	
-	if(CXX_COMPILER_ID STREQUAL Clang)
-		target_compile_options("${tests_TARGET}" PRIVATE -fmacro-backtrace-limit=0)
-	endif()
 	gtest_discover_tests("${tests_TARGET}" TEST_PREFIX "${tests_PREFIX}")
 endfunction()
 

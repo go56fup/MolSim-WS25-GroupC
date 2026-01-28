@@ -4,7 +4,7 @@
 #include <vector>
 
 #include "physics/vec_3d.hpp"
-#include "simulation/config/entities.hpp"
+#include "simulation/entities.hpp"
 
 #define system_arithmetic(op, idx, value, x_comp, y_comp, z_comp)                                  \
 	do {                                                                                           \

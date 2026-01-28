@@ -4,8 +4,7 @@
 #include <gtest/gtest.h>
 
 #include "grid/particle_container/particle_container.hpp"
-
-#include "simulation/config/entities.hpp"
+#include "simulation/entities.hpp"
 #include "testing_utilities.hpp"
 
 // TODO(tuna): flesh out tests
