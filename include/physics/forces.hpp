@@ -2,8 +2,6 @@
 
 #include <cmath>
 
-#include <omp.h>
-
 #include "grid/particle_container/fwd.hpp"
 #include "grid/particle_container/system.hpp"
 #include "utility/compiler_traits.hpp"

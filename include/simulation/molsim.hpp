@@ -6,7 +6,6 @@
 #include <string_view>
 
 #include <fmt/compile.h>
-#include <omp.h>
 #include <spdlog/spdlog.h>
 
 #include "grid/bounds/conditions.hpp"
@@ -17,8 +16,8 @@
 #include "physics/forces.hpp"
 #include "simulation/entities.hpp"
 #include "simulation/thermostat.hpp"
-#include "utility/compiler_traits.hpp"
 #include "utility/macros.hpp"
+#include "utility/openmp.hpp"
 #include "utility/tracing/macros.hpp"
 
 /**

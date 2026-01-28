@@ -32,14 +32,3 @@
 #define IS_CLANG 0
 #endif
 
-#ifndef SINGLETHREAD
-#include <omp.h>
-#endif
-
-inline int get_thread_num() {
-#ifdef SINGLETHREADED
-	return -1;
-#else
-	return omp_get_thread_num();
-#endif
-}
