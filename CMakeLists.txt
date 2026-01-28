@@ -42,6 +42,8 @@ list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/modules)
 
 include(embed)
 
+option(SINGLETHREADED "Do not use OpenMP to parallelize simulation" OFF)
+
 if(NOT SINGLETHREADED)
 	find_package(OpenMP)
 	target_link_libraries(project_options INTERFACE OpenMP::OpenMP_CXX)

@@ -34,10 +34,17 @@
 			}
 		},
 		{
+			"name": "singlethreaded",
+			"hidden": true,
+			"cacheVariables": {
+				"SINGLETHREADED": "ON"
+			}
+		},
+		{
 			"name": "test-lite-base",
 			"hidden": true,
 			"description": "Runtime tests only, no VTK output, no static analysis",
-			"inherits": ["debug-base", "novtk"]
+			"inherits": ["debug-base", "novtk", "singlethreaded"]
 		},
 		{
 			"name": "test-base",
