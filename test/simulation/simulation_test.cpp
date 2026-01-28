@@ -7,6 +7,7 @@
 
 #include "grid/particle_container/particle_container.hpp"
 #include "physics/forces.hpp"
+#include "simulation/config/parse.hpp"
 #include "simulation/molsim.hpp"
 #include "utility/concepts.hpp"
 
@@ -78,17 +79,18 @@ TEST(ConfigTest, GridTest) {
 #embed "assignment5/debug/simple/2_two_particles_moving_towards_each_other/config.json"
 		, 0
 	};
-		static constexpr char bodies_data[]{
+	static constexpr char bodies_data[]{
 #embed "assignment5/debug/simple/2_two_particles_moving_towards_each_other/bodies.json"
 		, 0
-		};
+	};
 	constexpr auto config_json_data = std::string_view(config_data);
 	constexpr auto bodies_json_data = std::string_view(bodies_data);
-	GTEST_CXP auto config = config::parse_config(json_data);
+	GTEST_CXP auto config = config::parse_config(config_json_data);
 	GTEST_CXP_SIM auto particle_result = std::invoke([&] {
 		particle_container container(config.domain, config.cutoff_radius);
-		config::populate_simulation(container, config, config::parse_bodies(bodies_json_data));
-		run_simulation(container, config, lennard_jones_force_soa, "unused");
+		auto bodies = config::parse_bodies(bodies_json_data);
+		config::populate_simulation(container, config, bodies);
+		run_simulation(container, config, "unused");
 		const auto& system = container.system();
 		return std::pair{system.serialize_position(0), system.serialize_position(1)};
 	});

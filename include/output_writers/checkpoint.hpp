@@ -7,6 +7,7 @@
 
 #include "grid/particle_container/fwd.hpp"
 #include "grid/particle_container/system.hpp"
+#include "simulation/config/json_schema.hpp"
 #include "simulation/entities.hpp"
 
 constexpr std::string dump_state(particle_container& container) {

@@ -13,10 +13,10 @@
 #include "utility/compiler_traits.hpp"
 #include "utility/constants.hpp"
 
-#define HAS_EMBEDx 0
+#define USE_EMBED 0
 
 namespace detail {
-#if !HAS_EMBEDx
+#if !USE_EMBED
 #if IS_GCC
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wnarrowing"
@@ -31,7 +31,7 @@ inline constexpr auto random_numbers = [] consteval {
 	// C arrays are how #embed is meant to be used.
 	// NOLINTNEXTLINE(*avoid-c-arrays)
 	const std::uint8_t data[]{
-#if HAS_EMBEDx
+#if USE_EMBED
 #embed "random.bin"
 #else
 #include "utility/random_preprocessed.hpp"
@@ -39,7 +39,7 @@ inline constexpr auto random_numbers = [] consteval {
 	};
 	return std::bit_cast<std::array<double, random_table_size>>(data);
 }();
-#if !HAS_EMBEDx
+#if !USE_EMBED
 #if IS_GCC
 #pragma GCC diagnostic pop
 #elif IS_CLANG

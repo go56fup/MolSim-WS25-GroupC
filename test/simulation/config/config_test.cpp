@@ -326,8 +326,7 @@ TEST(ConfigTest, EmbedTest) {
 		, 0
 	};
 	constexpr auto json_data = std::string_view(data);
-	GTEST_CXP auto parse_result = config::parse(json_data);
-	GTEST_CXP const auto& cfg = parse_result.config;
+	GTEST_CXP auto cfg = config::parse_config(json_data);
 	STATIC_EXPECT_DOUBLE_EQ(cfg.delta_t, 0.0005);
 	STATIC_EXPECT_DOUBLE_EQ(cfg.cutoff_radius, 3);
 	STATIC_EXPECT_EQ(cfg.domain, vec(180, 90, 3));

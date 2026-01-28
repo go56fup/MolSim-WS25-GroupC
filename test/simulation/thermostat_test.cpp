@@ -98,7 +98,7 @@ TEST(ThermostatTests, Holding) {
 		.dimensions = 3,
 	};
 
-	/* GTEST_CXP_GCC */ double resulting_temp = std::invoke([&] {
+	double resulting_temp = std::invoke([&] {
 		particle_container container(config.domain, config.cutoff_radius);
 		std::size_t seq = 0;
 		container.add_cuboid<3>(
@@ -114,6 +114,7 @@ TEST(ThermostatTests, Holding) {
 		return get_temperature(container, config.dimensions);
 	});
 
-	// TODO(tuna): this returns false when in compile time.
-	/* STATIC_ */ EXPECT_DOUBLE_EQ(resulting_temp, init_temp);
+	// TODO(tuna): this test has interesting behavior. it returns false at compile time,
+	// and fails when run with other tests; but passes on its own.
+	EXPECT_DOUBLE_EQ(resulting_temp, init_temp);
 }

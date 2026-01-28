@@ -110,6 +110,4 @@ constexpr void populate_simulation(
 	}
 }
 
-// TODO(tuna): move to output part of the codebase
-
 }  // namespace config

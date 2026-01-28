@@ -1,6 +1,6 @@
 #pragma once
 
-#define LOG_FORCES 1
+#define LOG_FORCES 0
 #define LOG_INTERACTION_ITER 0
 #define LOG_PARTICLE_CONTAINER 0
 #define LOG_BORDER_CELL_ITER 0
@@ -10,5 +10,5 @@
 #define LOG_INPUT_PARSING 0
 #define LOG_PERIODIC 0
 #define LOG_THERMOSTAT 0
-#define LOG_CHECKPOINT 1
-#define LOG_RANDOM 0
+#define LOG_CHECKPOINT 0
+#define LOG_RANDOM 1
