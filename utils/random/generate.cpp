@@ -3,7 +3,7 @@
 #include <random>
 #include <span>
 
-#include "Constants.h"
+#include "utility/constants.hpp"
 
 int main() {
 	std::ofstream file("random.bin", std::ios::binary);

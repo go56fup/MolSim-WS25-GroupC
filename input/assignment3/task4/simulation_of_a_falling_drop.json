@@ -16,7 +16,7 @@
     "write_frequency": 10,
     "base_name": "MD_vtk",
     "domain": [
-	  120,
+      120,
       50,
       1
     ]
@@ -26,14 +26,15 @@
       "type": "disc",
       "parameters": {
         "center": [
-			60,
-			25
+          60,
+          25
         ],
-		"radius": 15,
+        "radius": 15,
         "velocity": [
           0,
           -10
         ],
+        "brownian_mean": 0.1,
         "particle_mass": 1
       }
     }
