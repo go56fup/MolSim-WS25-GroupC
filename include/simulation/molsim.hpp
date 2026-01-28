@@ -1,13 +1,12 @@
 #pragma once
 
 #include <cmath>
-#include <functional>
-#include <omp.h>
 #include <ranges>
 #include <span>
 #include <string_view>
 
 #include <fmt/compile.h>
+#include <omp.h>
 #include <spdlog/spdlog.h>
 
 #include "grid/bounds/conditions.hpp"
@@ -18,6 +17,7 @@
 #include "physics/forces.hpp"
 #include "simulation/entities.hpp"
 #include "simulation/thermostat.hpp"
+#include "utility/compiler_traits.hpp"
 #include "utility/macros.hpp"
 #include "utility/tracing/macros.hpp"
 
@@ -49,7 +49,8 @@ constexpr void calculate_forces_batched(particle_container& container) noexcept 
 		for (auto [p1_idx, p2_idx] : unique_pairs(cell)) {
 			TRACE_FORCES(
 				"Putting {} {} into batch, count={} on thread {}", p1_idx, p2_idx, count,
-				omp_get_thread_num()
+				get_thread_num()
+
 			);
 			batch_p1[count] = p1_idx;
 			batch_p2[count] = p2_idx;
