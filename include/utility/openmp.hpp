@@ -21,11 +21,7 @@ inline int get_max_threads() {
 }
 
 inline int get_num_threads() {
-#if SINGLETHREADED
-	return 1;
-#else
 	return omp_get_num_threads();
-#endif
 }
 
 inline void set_num_threads() {
