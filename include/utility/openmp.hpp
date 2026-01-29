@@ -1,8 +1,8 @@
 #pragma once
 
-#if !SINGLETHREADED
+
 #include <omp.h>
-#endif
+
 
 inline int get_thread_num() {
 #if SINGLETHREADED
