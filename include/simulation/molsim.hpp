@@ -41,22 +41,26 @@ constexpr void calculate_forces_batched(particle_container& container) noexcept 
 
 	// #if !SINGLETHREADED
 #if CALCULATE_F_MULTITHREADED
-#pragma omp parallel for schedule(dynamic)
+#pragma omp parallel
 #endif
-	for (auto& cell : container.cells()) {
+{
+	#pragma omp master
+	{
+		spdlog::info("Thread number {}", get_num_threads());
+	}
+
+#if CALCULATE_F_MULTITHREADED
+#pragma omp for schedule(static)
+#endif
+	for (auto &cell: container.cells()) {
 		std::size_t count = 0;
 		particle_batch batch_p1;
 		particle_batch batch_p2;
 
-		#pragma omp master
-		{
-			spdlog::info("Thread number {}", get_num_threads());
-		}
-
-		for (auto [p1_idx, p2_idx] : unique_pairs(cell)) {
+		for (auto [p1_idx, p2_idx]: unique_pairs(cell)) {
 			TRACE_FORCES(
-				"Putting {} {} into batch, count={} on thread {}", p1_idx, p2_idx, count,
-				get_thread_num()
+					"Putting {} {} into batch, count={} on thread {}", p1_idx, p2_idx, count,
+					get_thread_num()
 
 			);
 			batch_p1[count] = p1_idx;
@@ -70,6 +74,7 @@ constexpr void calculate_forces_batched(particle_container& container) noexcept 
 		}
 		use_batch_piecewise(batch_p1, batch_p2, count);
 	}
+}
 // #if !SINGLETHREADED && !DETERMINISTIC
 #if CALCULATE_F_MULTITHREADED
 #pragma omp parallel
