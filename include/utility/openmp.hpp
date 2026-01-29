@@ -28,7 +28,7 @@ inline int get_num_threads() {
 #endif
 }
 
-void debug_omp() {
+inline void debug_omp() {
 #if SINGLETHREADED
 	return;
 #else
