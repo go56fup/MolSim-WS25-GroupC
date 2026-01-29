@@ -7,7 +7,6 @@
 
 #include <fmt/compile.h>
 #include <spdlog/spdlog.h>
-#include <omp.h>
 
 #include "grid/bounds/conditions.hpp"
 #include "grid/particle_container/particle_container.hpp"
@@ -51,7 +50,7 @@ constexpr void calculate_forces_batched(particle_container& container) noexcept 
 
 		#pragma omp master
 		{
-			spdlog::info("Thread number {}", omp_get_num_threads());
+			spdlog::info("Thread number {}", get_num_threads());
 		}
 
 		for (auto [p1_idx, p2_idx] : unique_pairs(cell)) {

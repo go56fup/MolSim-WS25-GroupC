@@ -19,3 +19,11 @@ inline int get_max_threads() {
 	return omp_get_max_threads();
 #endif
 }
+
+inline int get_num_threads() {
+#if SINGLETHREADED
+	return 1;
+#else
+	return omp_get_num_threads();
+#endif
+}
