@@ -291,6 +291,7 @@ constexpr void run_sim_iteration(
 		update_values(container.system());
 	}
 
+	set_num_threads();
 	STATIC_IF_NOT_TESTING const bool has_thermostat = config.thermostat.has_value();
 	STATIC_IF_NOT_TESTING const bool has_gravity = config.gravitational_constant != 0;
 	calculate_x(container, config);
