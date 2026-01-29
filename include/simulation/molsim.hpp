@@ -39,6 +39,12 @@ constexpr void calculate_forces_batched(particle_container& container) noexcept 
 		lennard_jones_force_soa_batchwise(container, batch_p1, batch_p2);
 	};
 
+
+#if CALCULATE_F_MULTITHREADED
+	spdlog::info("Macro is ON");
+#else
+	spdlog::info("Macro is OFF");
+#endif
 	// #if !SINGLETHREADED
 #if CALCULATE_F_MULTITHREADED
 #pragma omp parallel
