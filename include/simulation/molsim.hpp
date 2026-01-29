@@ -54,6 +54,8 @@ constexpr void calculate_forces_batched(particle_container& container) noexcept 
 		particle_batch batch_p1;
 		particle_batch batch_p2;
 
+		spdlog::info("Thread number {}", get_num_threads());
+
 		for (auto [p1_idx, p2_idx]: unique_pairs(cell)) {
 			TRACE_FORCES(
 					"Putting {} {} into batch, count={} on thread {}", p1_idx, p2_idx, count,
