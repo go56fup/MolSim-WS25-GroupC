@@ -7,6 +7,7 @@
 
 #include <fmt/compile.h>
 #include <spdlog/spdlog.h>
+#include <omp.h>
 
 #include "grid/bounds/conditions.hpp"
 #include "grid/particle_container/particle_container.hpp"
