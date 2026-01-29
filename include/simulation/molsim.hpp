@@ -40,24 +40,18 @@ constexpr void calculate_forces_batched(particle_container& container) noexcept 
 	};
 
 
-#if CALCULATE_F_MULTITHREADED
+
 	spdlog::info("Macro is ON");
-#else
-	spdlog::info("Macro is OFF");
-#endif
-	// #if !SINGLETHREADED
-#if CALCULATE_F_MULTITHREADED
+
+
 #pragma omp parallel
-#endif
 {
 	#pragma omp master
 	{
 		spdlog::info("Thread number {}", get_num_threads());
 	}
 
-#if CALCULATE_F_MULTITHREADED
 #pragma omp for schedule(static)
-#endif
 	for (auto &cell: container.cells()) {
 		std::size_t count = 0;
 		particle_batch batch_p1;
@@ -82,22 +76,17 @@ constexpr void calculate_forces_batched(particle_container& container) noexcept 
 	}
 }
 // #if !SINGLETHREADED && !DETERMINISTIC
-#if CALCULATE_F_MULTITHREADED
 #pragma omp parallel
-#endif
 	{
 // #if !SINGLETHREADED && !DETERMINISTIC
-#if CALCULATE_F_MULTITHREADED
+
 #pragma omp single
-#endif
 		for (const auto& [current_cell_idx, target_cell_idx] :
 		     container.directional_interactions()) {
 // TODO(tuna): see if after the implementation of the border iterator whether we still
 // need the indices
 // #if !SINGLETHREADED && !DETERMINISTIC
-#if CALCULATE_F_MULTITHREADED
 #pragma omp task firstprivate(current_cell_idx, target_cell_idx)
-#endif
 			{
 				const auto& current_cell = container[current_cell_idx];
 				const auto& target_cell = container[target_cell_idx];
