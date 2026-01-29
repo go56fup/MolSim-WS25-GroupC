@@ -29,11 +29,7 @@ inline int get_num_threads() {
 }
 
 inline void set_num_threads() {
-#if SINGLETHREADED
-	return;
-#else
 	return omp_set_num_threads(2);;
-#endif
 }
 
 
