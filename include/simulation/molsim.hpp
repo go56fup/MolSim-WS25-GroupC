@@ -39,7 +39,7 @@ constexpr void calculate_forces_batched(particle_container& container) noexcept 
 		lennard_jones_force_soa_batchwise(container, batch_p1, batch_p2);
 	};
 
-	spdlog::info("Max: {}", get_max_threads());
+	debug_omp();
 
 #pragma omp parallel
 {
