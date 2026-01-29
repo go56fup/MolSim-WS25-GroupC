@@ -34,8 +34,9 @@ inline void set_num_threads() {
 
 
 inline void debug_omp() {
+	omp_set_num_threads(4);
 	spdlog::info("--- OpenMP Debug ---");
-	spdlog::info("Max threads (omp_get_max_threads): {}", omp_get_num_threads());
+	spdlog::info("Num threads (omp_get_num_threads): {}", omp_get_num_threads());
 	spdlog::info("Max threads (omp_get_max_threads): {}", get_max_threads());
 	spdlog::info("Thread limit (omp_get_thread_limit): {}", omp_get_thread_limit());
 	spdlog::info("Nested level (omp_get_level): {}", omp_get_level());
