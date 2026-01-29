@@ -364,7 +364,7 @@ constexpr std::vector<double> radial_distribution_function(particle_container& c
 	const double y_size = cell_width * grid[axis::y];
 	const double z_size = cell_width * grid[axis::z];
 	const double r_max = std::sqrt(x_size * x_size + y_size * y_size + z_size * z_size);
-	const auto number_of_interval = static_cast<std::size_t>(r_max / delta_r);
+	const auto number_of_interval = static_cast<std::size_t>(std::ceil(r_max / delta_r));
 	std::vector<double> local_densities (number_of_interval, 0);
 
 	for (particle_system::particle_id p1_idx = 0; p1_idx < system.size(); p1_idx++) {
@@ -372,35 +372,27 @@ constexpr std::vector<double> radial_distribution_function(particle_container& c
 			double diff_x = system.x[p1_idx] - system.x[p2_idx];
 			if (config.boundary_behavior.x_max == boundary_condition::periodic ||
 				config.boundary_behavior.x_min == boundary_condition::periodic ) {
-				if (diff_x < 0) {
-					diff_x = std::max(diff_x, system.x[p2_idx] - system.x[p1_idx] - x_size);
-				} else {
-					diff_x = std::min(diff_x, system.x[p2_idx] - system.x[p1_idx] + x_size);
+				if (diff_x >  0.5 * x_size) diff_x -= x_size;
+				if (diff_x < -0.5 * x_size) diff_x += x_size;
 				}
-			}
 			double diff_y = system.y[p1_idx] - system.y[p2_idx];
 			if (config.boundary_behavior.y_max == boundary_condition::periodic ||
 				config.boundary_behavior.y_min == boundary_condition::periodic ) {
-				if (diff_y < 0) {
-					diff_y = std::max(diff_y, system.y[p2_idx] - system.y[p1_idx] - y_size);
-				} else {
-					diff_y = std::min(diff_y, system.y[p2_idx] - system.y[p1_idx] + y_size);
+				if (diff_y >  0.5 * y_size) diff_y -= y_size;
+				if (diff_y < -0.5 * y_size) diff_y += y_size;
 				}
-			}
 			double diff_z = system.z[p1_idx] - system.z[p2_idx];
 			if (config.boundary_behavior.z_max == boundary_condition::periodic ||
 				config.boundary_behavior.z_min == boundary_condition::periodic ) {
-				if (diff_z < 0) {
-					diff_z = std::max(diff_z, system.z[p2_idx] - system.z[p1_idx] - z_size);
-				} else {
-					diff_z = std::min(diff_z, system.z[p2_idx] - system.z[p1_idx] + z_size);
-				}
-				}
+				if (diff_z >  0.5 * z_size) diff_z -= z_size;
+				if (diff_z < -0.5 * z_size) diff_z += z_size;
+			}
 			const double r = std::sqrt(diff_x * diff_x + diff_y * diff_y + diff_z * diff_z);
-			const auto interval_idx = static_cast<std::size_t>(r/delta_r)-1;
+			const auto interval_idx = static_cast<std::size_t>(r/delta_r);
 			local_densities[interval_idx] += 1;
 		}
 	}
+
 	for (unsigned i = 0; i < number_of_interval; i++) {
 		const double r_i = i * delta_r;
 		const double r_i_next = r_i + delta_r;
@@ -431,30 +423,31 @@ constexpr double diffusion(particle_container& container, const sim_configuratio
 	const double y_size = cell_width * grid[axis::y];
 	const double z_size = cell_width * grid[axis::z];
 
+
 	for (particle_system::particle_id p = 0; p< system.size(); p++) {
 		if (config.boundary_behavior.x_max == boundary_condition::periodic ||
 		    config.boundary_behavior.x_min == boundary_condition::periodic ) {
-			double current_x = system.x[p] + x_size * system.x_boundary_crosses;
+			double current_x = system.x[p] + x_size * system.x_boundary_crosses[p];
 			variance += (current_x - old_x[p]) * (current_x - old_x[p]);
-			system.x_boundary_crosses = 0;
+			system.x_boundary_crosses[p] = 0;
 		} else {
 			variance += (system.x[p] - old_x[p]) * (system.x[p] - old_x[p]);
 		}
 
 		if (config.boundary_behavior.y_max == boundary_condition::periodic ||
 			config.boundary_behavior.y_min == boundary_condition::periodic ) {
-			double current_y = system.y[p] + y_size * system.y_boundary_crosses;
+			double current_y = system.y[p] + y_size * system.y_boundary_crosses[p];
 			variance += (current_y - old_y[p]) * (current_y - old_y[p]);
-			system.y_boundary_crosses = 0;
+			system.y_boundary_crosses[p] = 0;
 		} else {
 			variance += (system.y[p] - old_y[p]) * (system.y[p] - old_y[p]);
 		}
 
 		if (config.boundary_behavior.z_max == boundary_condition::periodic ||
 			config.boundary_behavior.z_min == boundary_condition::periodic ) {
-			double current_z = system.z[p] + z_size * system.z_boundary_crosses;
+			double current_z = system.z[p] + z_size * system.z_boundary_crosses[p];
 			variance += (current_z - old_z[p]) * (current_z - old_z[p]);
-			system.z_boundary_crosses = 0;
+			system.z_boundary_crosses[p] = 0;
 			} else {
 				variance += (system.z[p] - old_z[p]) * (system.z[p] - old_z[p]);
 			}
