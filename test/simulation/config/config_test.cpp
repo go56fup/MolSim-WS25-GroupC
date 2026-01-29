@@ -258,9 +258,9 @@ TEST(ConfigTest, BasicConfig) {
 		particle_container container(cfg.domain, cfg.cutoff_radius);
 		auto bodies = config::parse_bodies(body_json_data);
 		config::populate_simulation(container, cfg, bodies);
-		const particle_system::particle_id particle =
+		const particle_id particle =
 			container.cell_containing({2.5, 2.5, 2.5}).at(0);
-		const particle_system::particle_id rectangle =
+		const particle_id rectangle =
 			container.cell_containing({0.2, 0.2, 0.2}).at(0);
 
 		const auto& system = container.system();

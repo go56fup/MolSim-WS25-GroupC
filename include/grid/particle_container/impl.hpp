@@ -6,6 +6,7 @@
 
 #include "grid/bounds/operations.hpp"
 #include "grid/enums.hpp"
+#include "grid/particle_container/fwd.hpp"
 #include "iterators/border_cells.hpp"
 #include "iterators/enumerate_cells.hpp"
 #include "iterators/interactions.hpp"
@@ -118,6 +119,57 @@ constexpr void particle_container::reload_particle_state(
 		parameters.position, velocity, parameters.force, parameters.old_force, material
 	);
 	grid[pos_to_linear_index(parameters.position)].push_back(system_.size() - 1);
+}
+
+constexpr void particle_container::add_membrane(
+	const cuboid_parameters<3>& membrane, const body_common_parameters& body_parameters,
+	const vec& velocity, const material_description& material, std::size_t& seq_no
+) {
+	static constexpr std::array<particle_container::index, 4> upwards_moving_particle_coords{
+		{{17, 24, 0}, {17, 25, 0}, {18, 24, 0}, {18, 25, 0}}
+	};
+
+	assert(membrane_scale_ == particle_container::index(0, 0, 0));
+	membrane_scale_ = membrane.scale;
+
+	const std::size_t old = system_.size();
+	const std::size_t new_particle_count =
+		static_cast<std::size_t>(membrane.scale.x) * membrane.scale.y;
+
+	membrane_particles_.reserve(membrane_particles_.size() + new_particle_count);
+
+	for (size_type x = 0; x < membrane.scale.x; ++x) {
+		for (size_type y = 0; y < membrane.scale.y; ++y) {
+			for (size_type z = 0; z < membrane.scale.z; ++z) {
+				const particle_container::index index{x, y, z};
+				const vec coords{
+					membrane.origin.x + (x * body_parameters.meshwidth),
+					membrane.origin.y + (y * body_parameters.meshwidth),
+					membrane.origin.z + (z * body_parameters.meshwidth)
+					// 1.5 + (z * body_parameters.meshwidth)
+				};
+				if (std::ranges::contains(upwards_moving_particle_coords, index)) {
+					const auto id = system_.size();
+					TRACE_MEMBRANE("Found {} at {} with id={}", index, coords, id);
+					upwards_moving_membrane_members_.push_back(id);
+				}
+
+				add_particle(
+					coords,
+					maxwell_boltzmann_distributed_velocity<2>(
+						body_parameters.brownian_mean, seq_no
+					) + velocity,
+					material
+				);
+			}
+		}
+	}
+
+	const std::size_t new_i = system_.size();
+
+	for (std::size_t i = old; i < new_i; ++i) {
+		membrane_particles_.push_back(i);
+	}
 }
 
 template <std::size_t N>
@@ -243,4 +295,17 @@ constexpr const particle_system& particle_container::system() const noexcept {
 
 constexpr particle_system& particle_container::system() noexcept {
 	return system_;
+}
+
+constexpr std::span<const particle_id> particle_container::membrane_particles() const noexcept {
+	return membrane_particles_;
+}
+
+constexpr const particle_container::index& particle_container::membrane_scale() const noexcept {
+	return membrane_scale_;
+}
+
+constexpr std::span<const particle_id>
+particle_container::upwards_moving_membrane_members() const noexcept {
+	return upwards_moving_membrane_members_;
 }

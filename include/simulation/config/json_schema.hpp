@@ -32,15 +32,24 @@ struct json_data_contract<boundary_conditions_descriptor> {
 };
 
 template <>
+struct json_data_contract<membrane_simulation_parameters> {
+	using type = json_member_list<
+		json_number<"stiffness", double>, json_number<"average_bond_length", double>,
+		json_number<"upwards_force", double>>;
+};
+
+template <>
 struct json_data_contract<sim_configuration> {
 	using constructor_t = sim_configuration_constructor;
 	using type = json_member_list<
 		json_number<"delta_t", double>, json_number<"cutoff_radius", double>,
 		json_class<"boundary_conditions", boundary_conditions_descriptor>,
 		json_class_null<"thermostat", std::optional<thermostat_parameters>>,
+		json_class_null<"membrane_parameters", std::optional<membrane_simulation_parameters>>,
 		json_number<"end_time", double>, json_number<"write_frequency", sim_iteration_t>,
 		json_string<"base_name">, json_class<"domain", vec>, json_bool<"create_checkpoint">,
-		json_number_null<"gravitational_constant", std::optional<double>>>;
+		json_number_null<"gravitational_constant", std::optional<double>>,
+		json_string<"force_calculator">, json_number_null<"lower_radius", std::optional<double>>>;
 };
 
 template <std::size_t Dimensions>

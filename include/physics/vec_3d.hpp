@@ -1,6 +1,5 @@
 #pragma once
 
-#include <cmath>
 #include <ostream>
 
 #include <fmt/base.h>
@@ -11,19 +10,6 @@
 #include "utility/concepts.hpp"
 #include "utility/tracing/special_memfun.hpp"
 
-namespace detail {
-/**
- * @brief Concept constraining a type to be arithmetic.
- *
- * This concept ensures that the given type `T` is either an integral
- * or a floating-point type (i.e., satisfies `std::is_arithmetic_v<T>`).
- *
- * @tparam T The type to check.
- */
-template <typename T>
-concept arithmetic = std::is_arithmetic_v<T>;
-}  // namespace detail
-
 /**
  * @brief Three-dimensional vector with arithmetic components.
  *
@@ -32,7 +18,7 @@ concept arithmetic = std::is_arithmetic_v<T>;
  *
  * @tparam Value The numeric type of the vector components. Must satisfy detail::arithmetic.
  */
-template <detail::arithmetic Value>
+template <arithmetic Value>
 // Discarding the argument of the special member function in flag_special_member_funcs is
 // on purpose.
 // NOLINTNEXTLINE(*slicing)
@@ -99,7 +85,7 @@ public:
 	 * @param scalar The scalar.
 	 * @return Reference to this vector after scaling.
 	 */
-	constexpr vec_3d<Value>& operator*=(detail::arithmetic auto scalar) noexcept {
+	constexpr vec_3d<Value>& operator*=(arithmetic auto scalar) noexcept {
 		x *= scalar;
 		y *= scalar;
 		z *= scalar;
@@ -219,7 +205,7 @@ public:
  * @param rhs The right-hand side vector.
  * @return A new vector equal to the sum of the two inputs.
  */
-template <detail::arithmetic Value>
+template <arithmetic Value>
 constexpr vec_3d<Value> operator+(const vec_3d<Value>& lhs, const vec_3d<Value>& rhs) noexcept {
 	return vec_3d{lhs.x + rhs.x, lhs.y + rhs.y, lhs.z + rhs.z};
 }
@@ -234,7 +220,7 @@ constexpr vec_3d<Value> operator+(const vec_3d<Value>& lhs, const vec_3d<Value>&
  * @param rhs The right-hand side vector.
  * @return A new vector equal to the difference of the two inputs.
  */
-template <detail::arithmetic Value>
+template <arithmetic Value>
 constexpr vec_3d<Value> operator-(const vec_3d<Value>& lhs, const vec_3d<Value>& rhs) noexcept {
 	return vec_3d{lhs.x - rhs.x, lhs.y - rhs.y, lhs.z - rhs.z};
 }
@@ -249,9 +235,8 @@ constexpr vec_3d<Value> operator-(const vec_3d<Value>& lhs, const vec_3d<Value>&
  * @param vector The vector to scale.
  * @return A new scaled vector.
  */
-template <detail::arithmetic Value>
-constexpr vec_3d<Value>
-operator*(detail::arithmetic auto scalar, const vec_3d<Value>& vector) noexcept {
+template <arithmetic Value>
+constexpr vec_3d<Value> operator*(arithmetic auto scalar, const vec_3d<Value>& vector) noexcept {
 	return vec_3d{vector.x * scalar, vector.y * scalar, vector.z * scalar};
 }
 
@@ -265,9 +250,8 @@ operator*(detail::arithmetic auto scalar, const vec_3d<Value>& vector) noexcept 
  * @param scalar The scalar multiplier.
  * @return A new scaled vector.
  */
-template <detail::arithmetic Value>
-constexpr vec_3d<Value>
-operator*(const vec_3d<Value>& vector, detail::arithmetic auto scalar) noexcept {
+template <arithmetic Value>
+constexpr vec_3d<Value> operator*(const vec_3d<Value>& vector, arithmetic auto scalar) noexcept {
 	return scalar * vector;
 }
 
@@ -304,7 +288,7 @@ struct fmt::formatter<vec_3d<T>> {
  * @param vector Vector to print.
  * @return Reference to the modified output stream.
  */
-template <detail::arithmetic Value>
+template <arithmetic Value>
 std::ostream& operator<<(std::ostream& stream, const vec_3d<Value>& vector) {
 	return stream << fmt::format("{}", vector);
 }

@@ -117,12 +117,19 @@ struct particle_properties {
 	material_description material{};
 };
 
+struct membrane_simulation_parameters {
+	double stiffness;
+	double average_bond_length;
+	double upwards_force;
+};
+
 struct sim_configuration {
 	static constexpr auto max_base_name_len = 32;
 	double delta_t{};
 	double cutoff_radius{};
 	boundary_conditions_descriptor boundary_behavior{};
 	std::optional<thermostat_parameters> thermostat = std::nullopt;
+	std::optional<membrane_simulation_parameters> membrane_parameters = std::nullopt;
 	double end_time{};
 	sim_iteration_t write_frequency = std::numeric_limits<sim_iteration_t>::max();
 	p3094::fixed_string<max_base_name_len> base_name{std::from_range, "unused"};
@@ -130,17 +137,21 @@ struct sim_configuration {
 	bool create_checkpoint = false;
 	std::uint8_t dimensions = 3;
 	double gravitational_constant = 0;
+	force_calculator::type force_method = force_calculator::lennard_jones;
+	double lower_radius = 0;
 };
 
 struct sim_configuration_constructor {
 	template <
 		typename String, fwd_reference_to<vec> Vec,
 		fwd_reference_to<boundary_conditions_descriptor> Descriptor,
-		fwd_reference_to<std::optional<thermostat_parameters>> Thermostat>
+		fwd_reference_to<std::optional<thermostat_parameters>> Thermostat,
+		fwd_reference_to<std::optional<membrane_simulation_parameters>> MembraneParams>
 	static constexpr sim_configuration operator()(
 		double delta_t, double cutoff_radius, Descriptor&& conditions, Thermostat&& thermostat,
-		double end_time, sim_iteration_t write_frequency, String&& base_name, Vec&& domain,
-		bool create_checkpoint, std::optional<double> gravity
+		MembraneParams&& membrane_params, double end_time, sim_iteration_t write_frequency,
+		String&& base_name, Vec&& domain, bool create_checkpoint, std::optional<double> gravity,
+		std::string_view force_calc, std::optional<double> lower_radius
 	) {
 		const decltype(sim_configuration::dimensions) dims = domain.z > cutoff_radius ? 3 : 2;
 		return sim_configuration{
@@ -148,13 +159,16 @@ struct sim_configuration_constructor {
 			cutoff_radius,
 			std::forward<Descriptor>(conditions),
 			std::forward<Thermostat>(thermostat),
+			std::forward<MembraneParams>(membrane_params),
 			end_time,
 			write_frequency,
 			{std::from_range, std::forward<String>(base_name)},
 			std::forward<Vec>(domain),
 			create_checkpoint,
 			dims,
-			gravity.value_or(0)
+			gravity.value_or(0),
+			force_calculator::from_string(force_calc),
+			lower_radius.value_or(0)
 		};
 	}
 };

@@ -23,7 +23,7 @@ private:
 
 public:
 	/// The fundamental element of the grid structure of the simulation.
-	using cell = std::vector<particle_system::particle_id>;
+	using cell = std::vector<particle_id>;
 	using value_type = cell;
 	/// The type representing the index of a cell on an axis.
 	// Not std::size_t because this type needs to operate nicely with positions of doubles, and
@@ -62,6 +62,9 @@ private:
 	/// world.
 	double cutoff_radius_;
 	particle_system system_;
+	std::vector<particle_id> membrane_particles_;
+	std::vector<particle_id> upwards_moving_membrane_members_;
+	index membrane_scale_;
 
 public:
 	/**
@@ -127,6 +130,11 @@ public:
 	template <std::size_t N>
 	constexpr void add_cuboid(
 		const cuboid_parameters<3>& cuboid, const body_common_parameters& body_parameters,
+		const vec& velocity, const material_description& material, std::size_t& seq_no
+	);
+
+	constexpr void add_membrane(
+		const cuboid_parameters<3>& membrane, const body_common_parameters& body_parameters,
 		const vec& velocity, const material_description& material, std::size_t& seq_no
 	);
 
@@ -250,4 +258,8 @@ public:
 
 	constexpr const particle_system& system() const noexcept;
 	constexpr particle_system& system() noexcept;
+
+	constexpr std::span<const particle_id> membrane_particles() const noexcept;
+	constexpr const index& membrane_scale() const noexcept;
+	constexpr std::span<const particle_id> upwards_moving_membrane_members() const noexcept;
 };

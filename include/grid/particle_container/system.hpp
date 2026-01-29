@@ -5,7 +5,7 @@
 
 #include "physics/vec_3d.hpp"
 #include "simulation/entities.hpp"
-#include "utility/tracing/macros.hpp"
+#include "simulation/particle.hpp"
 
 #define system_arithmetic(op, idx, value, x_comp, y_comp, z_comp)                                  \
 	do {                                                                                           \
@@ -15,9 +15,6 @@
 	} while (0)
 
 class particle_system {
-public:
-	using particle_id = std::vector<double>::size_type;
-
 private:
 	constexpr void destructure_push_back(
 		const vec& value, std::vector<double>& x, std::vector<double>& y, std::vector<double>& z
@@ -109,6 +106,18 @@ public:
 		std::unreachable();
 	}
 
+	constexpr std::span<double> force_component(axis a) noexcept {
+		switch (a) {
+		case axis::x:
+			return fx;
+		case axis::y:
+			return fy;
+		case axis::z:
+			return fz;
+		}
+		std::unreachable();
+	}
+
 	constexpr std::size_t size() const noexcept {
 		assert(
 			x.size() == y.size() && y.size() == z.size() && z.size() == fx.size() &&
@@ -120,11 +129,3 @@ public:
 		return x.size();
 	}
 };
-
-// TODO(tuna): move to appropriate header w/o circular deps
-inline constexpr std::size_t batch_size = 8;
-
-template <typename Value>
-using batch = std::array<Value, batch_size>;
-
-using particle_batch = batch<particle_system::particle_id>;

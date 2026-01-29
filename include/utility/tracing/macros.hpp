@@ -81,3 +81,21 @@
 #else
 #define TRACE_RANDOM(...) (void)0
 #endif
+
+#if LOG_MEMBRANE
+#define TRACE_MEMBRANE(...) SPDLOG_TRACE(__VA_ARGS__)
+#else
+#define TRACE_MEMBRANE(...) (void)0
+#endif
+
+#if LOG_MEMBRANE_NEIGHBORS
+#define TRACE_MEMBRANE_NEIGHBORS(...) SPDLOG_TRACE(__VA_ARGS__)
+#else
+#define TRACE_MEMBRANE_NEIGHBORS(...) (void)0
+#endif
+
+#if LOG_HARMONIC
+#define TRACE_HARMONIC(...) SPDLOG_TRACE(__VA_ARGS__)
+#else
+#define TRACE_HARMONIC(...) (void)0
+#endif

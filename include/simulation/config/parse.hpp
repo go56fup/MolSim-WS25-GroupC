@@ -106,6 +106,13 @@ constexpr void populate_simulation(
 			);
 			continue;
 		}
+		if (body.type == "membrane") {
+			particles.add_membrane(
+				body.geometry.as<cuboid_parameters<2>>().extend_to_3d(config.domain),
+				body.parameters.value(), body.velocity, body.material, seq_no
+			);
+			continue;
+		}
 		throw std::invalid_argument(fmt::format("Unknown body type: {}", body.type));
 	}
 }

@@ -5,6 +5,7 @@
 #include "grid/particle_container/fwd.hpp"
 #include "iterators/periodic.hpp"
 #include "physics/forces.hpp"
+#include "simulation/entities.hpp"
 #include "utility/constants.hpp"
 #include "utility/macros.hpp"
 #include "utility/tracing/macros.hpp"
@@ -25,7 +26,8 @@ constexpr vec z_min_f(const vec& x) {
 
 template <boundary_type Boundary>
 constexpr void reflect_via_ghost_particle(
-	particle_container& container, const particle_container::index& cell_idx
+	particle_container& container, const sim_configuration& config,
+	const particle_container::index& cell_idx
 ) noexcept {
 	using enum boundary_type;
 
@@ -42,11 +44,10 @@ constexpr void reflect_via_ghost_particle(
 			const auto max = domain - min;
 			if (out_of_bounds_soa<b>(system, p, max, min)) {
 				const vec current_pos{system.x[p], system.y[p], system.z[p]};
-				const auto resulting_force = lennard_jones_force(
-					{.p1_position = current_pos,
-				     .p2_position = make_ghost_pos(current_pos),
-				     .sigma = system.sigma[p],
-				     .epsilon = system.epsilon[p]}
+				const auto resulting_force = force_calculator::single(
+					config, {.p1_position = current_pos,
+				             .p2_position = make_ghost_pos(current_pos),
+				             .constants{.sigma = system.sigma[p], .epsilon = system.epsilon[p]}}
 				);
 				system.fx[p] += resulting_force.x;
 				system.fy[p] += resulting_force.y;
@@ -128,7 +129,8 @@ constexpr void delete_ouflowing_particles(
 
 template <boundary_type Boundary>
 constexpr void periodic_particle_interactions(
-	particle_container& container, const particle_container::index& cell_idx
+	particle_container& container, const sim_configuration& config,
+	const particle_container::index& cell_idx
 ) {
 	using enum boundary_type;
 	using signed_ = particle_container::difference_type;
@@ -169,14 +171,18 @@ constexpr void periodic_particle_interactions(
 	handle_boundary.template operator()<z_min>();
 	handle_boundary.template operator()<z_max>();
 
-	auto use_batch = [&](particle_batch batch_p1, particle_batch batch_p2) {
-		lennard_jones_force_soa_batchwise(container, batch_p1, batch_p2, particle_mirror);
-	};
+	// TODO(tuna): refactor into common batch prep routine
 	auto use_batch_piecewise = [&](particle_batch batch_p1, particle_batch batch_p2,
-	                               std::size_t up_to) {
+	                               std::size_t up_to = batch_size) {
 		for (std::size_t i = 0; i < up_to; ++i) {
-			lennard_jones_force_soa(container, batch_p1[i], batch_p2[i], particle_mirror);
+			force_calculator::soa(
+				container.system(), config, batch_p1[i], batch_p2[i], particle_mirror
+			);
 		}
+	};
+
+	auto use_batch = [&](particle_batch batch_p1, particle_batch batch_p2) {
+		force_calculator::batch(container.system(), config, batch_p1, batch_p2, particle_mirror);
 	};
 
 	for (const auto& periodic_target : periodic_range(container, current_virtual_idx)) {
@@ -228,7 +234,7 @@ constexpr bool is_periodic(const sim_configuration& config) {
 
 template <boundary_type Boundary>
 constexpr void handle_boundary_condition(
-	const sim_configuration& config, particle_container& container,
+	particle_container& container, const sim_configuration& config,
 	const particle_container::index& cell_idx
 ) {
 	using enum boundary_type;
@@ -237,13 +243,13 @@ constexpr void handle_boundary_condition(
 	const auto behavior = config.boundary_behavior[Boundary];
 	switch (behavior) {
 	case boundary_condition::reflecting:
-		reflect_via_ghost_particle<Boundary>(container, cell_idx);
+		reflect_via_ghost_particle<Boundary>(container, config, cell_idx);
 		break;
 	case boundary_condition::outflow:
 		delete_ouflowing_particles<Boundary>(container, cell_idx);
 		break;
 	case boundary_condition::periodic:
-		periodic_particle_interactions<Boundary>(container, cell_idx);
+		periodic_particle_interactions<Boundary>(container, config, cell_idx);
 		break;
 	}
 }
@@ -255,22 +261,22 @@ constexpr void handle_boundaries(particle_container& container, const sim_config
 	// TODO(gabriel):parallelis this (Attention corners need to be done atomically)
 	for (particle_container::size_type i = 0; i < grid.y; ++i) {
 		for (particle_container::size_type j = 0; j < grid.z; ++j) {
-			handle_boundary_condition<x_min>(config, container, {0, i, j});
-			handle_boundary_condition<x_max>(config, container, {grid.x - 1, i, j});
+			handle_boundary_condition<x_min>(container, config, {0, i, j});
+			handle_boundary_condition<x_max>(container, config, {grid.x - 1, i, j});
 		}
 	}
 
 	for (particle_container::size_type i = 0; i < grid.x; ++i) {
 		for (particle_container::size_type j = 0; j < grid.z; ++j) {
-			handle_boundary_condition<y_min>(config, container, {i, 0, j});
-			handle_boundary_condition<y_max>(config, container, {i, grid.y - 1, j});
+			handle_boundary_condition<y_min>(container, config, {i, 0, j});
+			handle_boundary_condition<y_max>(container, config, {i, grid.y - 1, j});
 		}
 	}
 
 	for (particle_container::size_type i = 0; i < grid.x; ++i) {
 		for (particle_container::size_type j = 0; j < grid.y; ++j) {
-			handle_boundary_condition<z_min>(config, container, {i, j, 0});
-			handle_boundary_condition<z_max>(config, container, {i, j, grid.z - 1});
+			handle_boundary_condition<z_min>(container, config, {i, j, 0});
+			handle_boundary_condition<z_max>(container, config, {i, j, grid.z - 1});
 		}
 	}
 
@@ -278,42 +284,50 @@ constexpr void handle_boundaries(particle_container& container, const sim_config
 
 	if (detail::is_periodic<x_min, y_min>(config)) {
 		for (particle_container::size_type i = 0; i < grid.z; ++i) {
-			periodic_particle_interactions<x_min | y_min>(container, {0, 0, i});
-			periodic_particle_interactions<x_min | y_max>(container, {0, grid.y, i});
-			periodic_particle_interactions<x_max | y_min>(container, {grid.x, 0, i});
-			periodic_particle_interactions<x_max | y_max>(container, {grid.x, grid.y, i});
+			periodic_particle_interactions<x_min | y_min>(container, config, {0, 0, i});
+			periodic_particle_interactions<x_min | y_max>(container, config, {0, grid.y, i});
+			periodic_particle_interactions<x_max | y_min>(container, config, {grid.x, 0, i});
+			periodic_particle_interactions<x_max | y_max>(container, config, {grid.x, grid.y, i});
 		}
 	}
 
 	if (detail::is_periodic<x_min, z_min>(config)) {
 		for (particle_container::size_type i = 0; i < grid.y; ++i) {
-			periodic_particle_interactions<x_min | z_min>(container, {0, i, 0});
-			periodic_particle_interactions<x_min | z_max>(container, {0, i, grid.z});
-			periodic_particle_interactions<x_max | z_min>(container, {grid.x, i, 0});
-			periodic_particle_interactions<x_max | z_max>(container, {grid.x, i, grid.z});
+			periodic_particle_interactions<x_min | z_min>(container, config, {0, i, 0});
+			periodic_particle_interactions<x_min | z_max>(container, config, {0, i, grid.z});
+			periodic_particle_interactions<x_max | z_min>(container, config, {grid.x, i, 0});
+			periodic_particle_interactions<x_max | z_max>(container, config, {grid.x, i, grid.z});
 		}
 	}
 
 	if (detail::is_periodic<y_min, z_min>(config)) {
 		for (particle_container::size_type i = 0; i < grid.y; ++i) {
-			periodic_particle_interactions<y_min | z_min>(container, {i, 0, 0});
-			periodic_particle_interactions<y_min | z_max>(container, {i, 0, grid.z});
-			periodic_particle_interactions<y_max | z_min>(container, {i, grid.y, 0});
-			periodic_particle_interactions<y_max | z_max>(container, {i, grid.y, grid.z});
+			periodic_particle_interactions<y_min | z_min>(container, config, {i, 0, 0});
+			periodic_particle_interactions<y_min | z_max>(container, config, {i, 0, grid.z});
+			periodic_particle_interactions<y_max | z_min>(container, config, {i, grid.y, 0});
+			periodic_particle_interactions<y_max | z_max>(container, config, {i, grid.y, grid.z});
 		}
 	}
 
 	if (detail::is_periodic<x_min, y_min, z_min>(config)) {
-		periodic_particle_interactions<x_min | y_min | z_min>(container, {0, 0, 0});
+		periodic_particle_interactions<x_min | y_min | z_min>(container, config, {0, 0, 0});
 
-		periodic_particle_interactions<x_max | y_min | z_min>(container, {grid.x, 0, 0});
-		periodic_particle_interactions<x_min | y_max | z_min>(container, {0, grid.y, 0});
-		periodic_particle_interactions<x_min | y_min | z_max>(container, {0, 0, grid.z});
+		periodic_particle_interactions<x_max | y_min | z_min>(container, config, {grid.x, 0, 0});
+		periodic_particle_interactions<x_min | y_max | z_min>(container, config, {0, grid.y, 0});
+		periodic_particle_interactions<x_min | y_min | z_max>(container, config, {0, 0, grid.z});
 
-		periodic_particle_interactions<x_max | y_max | z_min>(container, {grid.x, grid.y, 0});
-		periodic_particle_interactions<x_min | y_max | z_max>(container, {0, grid.y, grid.z});
-		periodic_particle_interactions<x_max | y_min | z_max>(container, {grid.x, 0, grid.z});
+		periodic_particle_interactions<x_max | y_max | z_min>(
+			container, config, {grid.x, grid.y, 0}
+		);
+		periodic_particle_interactions<x_min | y_max | z_max>(
+			container, config, {0, grid.y, grid.z}
+		);
+		periodic_particle_interactions<x_max | y_min | z_max>(
+			container, config, {grid.x, 0, grid.z}
+		);
 
-		periodic_particle_interactions<x_max | y_max | z_max>(container, {grid.x, grid.y, grid.z});
+		periodic_particle_interactions<x_max | y_max | z_max>(
+			container, config, {grid.x, grid.y, grid.z}
+		);
 	}
 }

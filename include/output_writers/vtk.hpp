@@ -48,7 +48,7 @@ plot_particles(particle_container& particles, std::string_view filename, unsigne
 	forceArray->SetNumberOfComponents(3);
 
 	const auto& system = particles.system();
-	for (particle_system::particle_id i = 0; i < system.size(); ++i) {
+	for (particle_id i = 0; i < system.size(); ++i) {
 		points->InsertNextPoint(system.serialize_position(i).data());
 		massArray->InsertNextValue(static_cast<float>(system.mass[i]));
 		velocityArray->InsertNextTuple(system.serialize_velocity(i).data());

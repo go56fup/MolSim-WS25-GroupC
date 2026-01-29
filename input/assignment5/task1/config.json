@@ -1,0 +1,28 @@
+{
+  "delta_t": 0.01,
+  "cutoff_radius": 4.0,
+  "boundary_conditions": {
+    "x_min": "reflecting",
+    "y_min": "reflecting",
+    "z_min": "reflecting",
+    "x_max": "reflecting",
+    "y_max": "reflecting",
+    "z_max": "reflecting"
+  },
+  "end_time": 500,
+  "membrane_parameters": {
+    "stiffness": 300,
+    "average_bond_length": 2.2,
+    "upwards_force": 0.8
+  },
+  "write_frequency": 10,
+  "base_name": "MD_vtk",
+  "domain": [
+    148,
+    148,
+    148
+  ],
+  "gravitational_constant": -0.001,
+  "create_checkpoint": false,
+  "force_calculator": "truncated_lennard_jones"
+}

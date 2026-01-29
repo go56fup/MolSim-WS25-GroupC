@@ -21,7 +21,7 @@ constexpr std::string dump_state(particle_container& container) {
 	std::vector<body_entry> out;
 	out.resize(system.size());
 
-	for (particle_system::particle_id i = 0; i < system.size(); ++i) {
+	for (particle_id i = 0; i < system.size(); ++i) {
 		const particle_state_parameters state{
 			.position = system.serialize_position(i),
 			.force = system.serialize_force(i),

@@ -23,5 +23,6 @@
     2.5
   ],
   "gravitational_constant": -12.44,
-  "create_checkpoint": false
+  "create_checkpoint": false,
+  "force_calculator": "lennard_jones"
 }

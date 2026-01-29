@@ -4,6 +4,9 @@
 #include <cstdint>
 #include <utility>
 
+#include "simulation/particle.hpp"
+#include "utility/concepts.hpp"
+
 #include <fmt/format.h>
 
 // NOLINTBEGIN(*convert-member-functions-to-static)
@@ -139,7 +142,7 @@ constexpr boundary_type axis_to_boundary_type(axis a, extremum e) noexcept {
 /**
  * @brief Specialization of the {fmt} API for the `boundary_type` enum.
  *
- * Enables use of fmt::format and fmt::print with axis enumerators.
+ * Enables use of fmt::format and fmt::print with boundary_type enumerators.
  *
  */
 template <>
@@ -179,3 +182,129 @@ public:
 // NOLINTEND(*convert-member-functions-to-static)
 
 enum class boundary_condition : std::uint8_t { outflow, reflecting, periodic };
+
+class particle_system;
+struct sim_configuration;
+
+template <arithmetic Value>
+struct vec_3d;
+
+struct lennard_jones_parameters;
+
+struct force_calculator {
+	enum type : std::uint8_t {
+		lennard_jones,
+		smoothed_lennard_jones,
+		truncated_lennard_jones,
+		gravity
+	};
+
+	static constexpr force_calculator::type from_string(std::string_view description) {
+		if (description == "lennard_jones") return lennard_jones;
+		if (description == "smoothed_lennard_jones") return smoothed_lennard_jones;
+		if (description == "truncated_lennard_jones") return truncated_lennard_jones;
+		if (description == "gravity") return gravity;
+		throw std::invalid_argument(fmt::format("Unknown force calculation method: {}", description)
+		);
+	}
+
+	static constexpr std::string_view to_string(type t) {
+		switch (t) {
+		case lennard_jones:
+			return "lennard_jones";
+		case smoothed_lennard_jones:
+			return "smoothed_lennard_jones";
+		case truncated_lennard_jones:
+			return "truncated_lennard_jones";
+		case gravity:
+			return "gravity";
+		}
+		std::unreachable();
+	}
+
+	static constexpr vec_3d<double>
+	single(const sim_configuration& config, const lennard_jones_parameters& params);
+
+	static constexpr void
+	soa(particle_system& system, const sim_configuration& config, particle_id p1, particle_id p2,
+	    vec_3d<double> particle_mirror);
+
+	static constexpr void batch(
+		particle_system& system, const sim_configuration& config, particle_batch p1,
+		particle_batch p2, vec_3d<double> particle_mirror
+	);
+};
+
+enum class direction : std::uint8_t {
+	left = 1u << 0u,   // 1
+	right = 1u << 1u,  // 2
+	down = 1u << 2u,   // 4
+	up = 1u << 3u,     // 8
+};
+
+constexpr direction operator|(direction lhs, direction rhs) noexcept {
+	using T = std::underlying_type_t<direction>;
+	return static_cast<direction>(static_cast<T>(lhs) | static_cast<T>(rhs));
+}
+
+constexpr direction operator&(direction lhs, direction rhs) noexcept {
+	using T = std::underlying_type_t<direction>;
+	return static_cast<direction>(static_cast<T>(lhs) & static_cast<T>(rhs));
+}
+
+constexpr direction operator~(direction v) noexcept {
+	using T = std::underlying_type_t<direction>;
+	return static_cast<direction>(~static_cast<T>(v));
+}
+
+/**
+ * @brief Specialization of the {fmt} API for the `direction` enum.
+ *
+ * Enables use of fmt::format and fmt::print with direction enumerators.
+ *
+ */
+template <>
+struct fmt::formatter<direction> {
+private:
+public:
+	/** @brief Parses the format specification (no-op for this type). */
+	constexpr auto parse(fmt::format_parse_context& ctx) {
+		return ctx.begin();
+	}
+
+	/** @brief Formats `direction` enumerators". */
+	constexpr auto format(direction d, fmt::format_context& ctx) const {
+		using enum direction;
+		bool first = true;
+		auto out = ctx.out();
+
+		auto emit = [&](std::string_view name) {
+			if (first) {
+				out = fmt::format_to(out, "{}", name);
+				first = false;
+			} else {
+				out = fmt::format_to(out, ", {}", name);
+			}
+		};
+
+		if ((d & left) == left) emit("left");
+		if ((d & right) == right) emit("right");
+		if ((d & down) == down) emit("down");
+		if ((d & up) == up) emit("up");
+
+		return out;
+	}
+};
+
+template <>
+struct fmt::formatter<force_calculator::type> {
+	/** @brief Parses the format specification (no-op for this type). */
+	constexpr auto parse(fmt::format_parse_context& ctx) {
+		return ctx.begin();
+	}
+
+	/** @brief Formats `force_calculator::type` objects". */
+	auto format(force_calculator::type t, fmt::format_context& ctx) const {
+		return fmt::format_to(ctx.out(), "{}", force_calculator::to_string(t));
+	}
+};

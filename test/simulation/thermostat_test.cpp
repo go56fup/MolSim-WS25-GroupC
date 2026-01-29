@@ -109,7 +109,7 @@ TEST(ThermostatTests, Holding) {
 
 		static constexpr sim_iteration_t hold_temperature_over_n_iterations = 10;
 		for (sim_iteration_t i = 0; i < hold_temperature_over_n_iterations; ++i) {
-			run_sim_iteration(container, config, i);
+			run_sim_iteration(container, config, i, 0);
 		}
 		return get_temperature(container, config.dimensions);
 	});

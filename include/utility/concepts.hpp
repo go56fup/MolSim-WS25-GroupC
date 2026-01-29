@@ -42,3 +42,14 @@ concept fwd_reference_to = std::same_as<std::remove_cvref_t<Candidate>, Expected
 // TODO(tuna): actually differentiate between forwarding references and plain unqualification
 template <typename Candidate, typename Referenced>
 concept same_unqualified_as = std::same_as<std::remove_cvref_t<Candidate>, Referenced>;
+
+/**
+ * @brief Concept constraining a type to be arithmetic.
+ *
+ * This concept ensures that the given type `T` is either an integral
+ * or a floating-point type (i.e., satisfies `std::is_arithmetic_v<T>`).
+ *
+ * @tparam T The type to check.
+ */
+template <typename T>
+concept arithmetic = std::is_arithmetic_v<T>;

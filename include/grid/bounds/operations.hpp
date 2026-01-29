@@ -17,7 +17,7 @@ constexpr bool out_of_bounds(
 
 template <boundary_type border, typename IndexT>
 constexpr bool out_of_bounds_soa(
-	const particle_system& system, particle_system::particle_id p, const vec_3d<IndexT>& bounds,
+	const particle_system& system, particle_id p, const vec_3d<IndexT>& bounds,
 	const vec_3d<IndexT>& min = {0, 0, 0}
 ) noexcept {
 	using enum boundary_type;

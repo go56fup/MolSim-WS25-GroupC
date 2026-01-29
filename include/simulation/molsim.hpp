@@ -9,38 +9,38 @@
 #include <spdlog/spdlog.h>
 
 #include "grid/bounds/conditions.hpp"
+#include "grid/bounds/operations.hpp"
+#include "grid/particle_container/fwd.hpp"
 #include "grid/particle_container/particle_container.hpp"
 #include "grid/particle_container/system.hpp"
 #include "iterators/pairwise.hpp"
 #include "output_writers/io.hpp"
 #include "physics/forces.hpp"
 #include "simulation/entities.hpp"
+#include "simulation/openmp.hpp"
 #include "simulation/thermostat.hpp"
 #include "utility/macros.hpp"
-#include "utility/openmp.hpp"
 #include "utility/tracing/macros.hpp"
-
-#define CALCULATE_F_MULTITHREADED 1
 
 /**
  * @brief Calculates interaction forces on a collection of particles.
  * @param container Particles on which forces will be calculated.
  */
-constexpr void calculate_forces_batched(particle_container& container) noexcept {
+constexpr void
+calculate_forces_batched(particle_container& container, const sim_configuration& config) noexcept {
 	auto use_batch_piecewise = [&](particle_batch batch_p1, particle_batch batch_p2,
 	                               std::size_t up_to = batch_size) {
 		for (std::size_t i = 0; i < up_to; ++i) {
 			// TODO(gabriel): Also we must fully remove Newtons Axiom from our code.
-			lennard_jones_force_soa(container, batch_p1[i], batch_p2[i]);
+			force_calculator::soa(container.system(), config, batch_p1[i], batch_p2[i]);
 		}
 	};
 
 	auto use_batch = [&](particle_batch batch_p1, particle_batch batch_p2) {
-		lennard_jones_force_soa_batchwise(container, batch_p1, batch_p2);
+		force_calculator::batch(container.system(), config, batch_p1, batch_p2);
 	};
 
-	// #if !SINGLETHREADED
-#if CALCULATE_F_MULTITHREADED
+#if !SINGLETHREADED || OVERRIDE_CALCULATE_F
 #pragma omp parallel for schedule(dynamic)
 #endif
 	for (auto& cell : container.cells()) {
@@ -65,21 +65,18 @@ constexpr void calculate_forces_batched(particle_container& container) noexcept 
 		}
 		use_batch_piecewise(batch_p1, batch_p2, count);
 	}
-// #if !SINGLETHREADED && !DETERMINISTIC
-#if CALCULATE_F_MULTITHREADED
+#if (!SINGLETHREADED && !DETERMINISTIC) || OVERRIDE_CALCULATE_F
 #pragma omp parallel
 #endif
 	{
-// #if !SINGLETHREADED && !DETERMINISTIC
-#if CALCULATE_F_MULTITHREADED
+#if (!SINGLETHREADED && !DETERMINISTIC) || OVERRIDE_CALCULATE_F
 #pragma omp single
 #endif
 		for (const auto& [current_cell_idx, target_cell_idx] :
 		     container.directional_interactions()) {
 // TODO(tuna): see if after the implementation of the border iterator whether we still
 // need the indices
-// #if !SINGLETHREADED && !DETERMINISTIC
-#if CALCULATE_F_MULTITHREADED
+#if (!SINGLETHREADED && !DETERMINISTIC) || OVERRIDE_CALCULATE_F
 #pragma omp task firstprivate(current_cell_idx, target_cell_idx)
 #endif
 			{
@@ -241,7 +238,7 @@ constexpr void calculate_v(particle_system& system, double delta_t) noexcept {
 #if !SINGLETHREADED
 #pragma omp parallel for simd schedule(static)
 #endif
-	for (particle_system::particle_id i = 0; i < system.size(); ++i) {
+	for (particle_id i = 0; i < system.size(); ++i) {
 		// TODO(gabriel): Maybe add a invM array and * 0.5 instead of / 2 to remove all these costly
 		// divisions
 		const auto velocity_scalar = delta_t / (2 * system.mass[i]);
@@ -263,7 +260,7 @@ constexpr void update_values(particle_system& system) noexcept {
 #if !SINGLETHREADED
 #pragma omp parallel for simd schedule(static)
 #endif
-	for (particle_system::particle_id p = 0; p < system.size(); ++p) {
+	for (particle_id p = 0; p < system.size(); ++p) {
 		system.old_fx[p] = system.fx[p];
 		system.old_fy[p] = system.fy[p];
 		system.old_fz[p] = system.fz[p];
@@ -273,6 +270,107 @@ constexpr void update_values(particle_system& system) noexcept {
 	}
 }
 
+constexpr void calculate_membrane_forces(
+	particle_container& container, const sim_configuration& config, double current_time
+) {
+	static constexpr double upwards_force_until_timepoint = 150;
+	// STATIC_IF_NOT_TESTING bool still_upwards = true;
+	const auto& membrane_particles = container.membrane_particles();
+
+	const auto& scale = container.membrane_scale();
+	const auto& width = scale.y;
+	const auto& height = scale.x;
+
+	using enum direction;
+	auto perform_interaction = [&]<direction d>(std::size_t current_idx) {
+		static constexpr bool is_orthogonal = d == down || d == up || d == left || d == right;
+		particle_container::difference_type offset = 0;
+		if constexpr ((d & left) == left) {
+			offset -= 1;
+		}
+		if constexpr ((d & right) == right) {
+			offset += 1;
+		}
+		if constexpr ((d & up) == up) {
+			offset += static_cast<decltype(offset)>(width);
+		}
+		if constexpr ((d & down) == down) {
+			offset -= static_cast<decltype(offset)>(width);
+		}
+		const auto other_idx = apply_difference(current_idx, offset);
+		TRACE_MEMBRANE_NEIGHBORS(
+			"Performing interaction towards {}; offset={}. Got current={}, target={} -> [{}, {}] "
+		    "for scale={}",
+			d, offset, current_idx, other_idx, other_idx / width, other_idx % width, scale
+		);
+
+		const particle_id other = membrane_particles[other_idx];
+		const particle_id current = membrane_particles[current_idx];
+		if constexpr (is_orthogonal) {
+			harmonic_force_orthogonal(
+				container.system(), current, other, *config.membrane_parameters
+			);
+		} else {
+			harmonic_force_diagonal(
+				container.system(), current, other, *config.membrane_parameters
+			);
+		}
+	};
+	auto perform_horizontal = [&]<direction d>(std::size_t idx, bool has_up, bool has_down) {
+		perform_interaction.template operator()<d>(idx);
+		if (has_down) {
+			perform_interaction.template operator()<d | down>(idx);
+		}
+		if (has_up) {
+			perform_interaction.template operator()<d | up>(idx);
+		}
+	};
+
+	for (std::size_t idx = 0; idx < membrane_particles.size(); ++idx) {
+		const std::size_t x = idx / width;
+		const std::size_t y = idx % width;
+
+		const bool has_left = (y > 0);
+		const bool has_right = (y + 1 < width);
+		const bool has_down = (x > 0);
+		const bool has_up = (x + 1 < height);
+
+		TRACE_MEMBRANE_NEIGHBORS(
+			"idx={} -> [{}, {}] with scale={}: left={}, right={}, down={}, up={}", idx, x, y, scale,
+			has_left, has_right, has_down, has_up
+		);
+
+		if (has_left) {
+			perform_horizontal.template operator()<left>(idx, has_up, has_down);
+		}
+		if (has_right) {
+			perform_horizontal.template operator()<right>(idx, has_up, has_down);
+		}
+		if (has_up) {
+			perform_interaction.template operator()<up>(idx);
+		}
+		if (has_down) {
+			perform_interaction.template operator()<down>(idx);
+		}
+	}
+	if (current_time < upwards_force_until_timepoint) {
+		for (auto id : container.upwards_moving_membrane_members()) {
+			container.system().fz[id] += config.membrane_parameters->upwards_force;
+		}
+	}
+#if 0
+	if (still_upwards) {
+		if (current_time < upwards_force_until_timepoint) {
+			for (auto id : container.upwards_moving_membrane_members()) {
+				container.system().fz[id] += config.membrane_parameters->upwards_force;
+			}
+		} else {
+			still_upwards = false;
+		}
+	}
+#endif
+}
+
 /**
  * @brief Run a tick of the simulation.
  *
@@ -280,10 +378,12 @@ constexpr void update_values(particle_system& system) noexcept {
  * @param config Simulation parameters.
  * @param iteration The index of iteration to simulate.
  */
-// TODO(tuna): now that iteration is being passed in, isFirstIteration should probably be removed
+// TODO(tuna): now that iteration is being passed in, isFirstIteration should probably be
+// removed
 template <bool IsFirstIteration = false>
 constexpr void run_sim_iteration(
-	particle_container& container, const sim_configuration& config, sim_iteration_t iteration
+	particle_container& container, const sim_configuration& config, sim_iteration_t iteration,
+	double current_time
 ) {
 	if constexpr (!IsFirstIteration) {
 		update_values(container.system());
@@ -291,8 +391,14 @@ constexpr void run_sim_iteration(
 
 	STATIC_IF_NOT_TESTING const bool has_thermostat = config.thermostat.has_value();
 	STATIC_IF_NOT_TESTING const bool has_gravity = config.gravitational_constant != 0;
+	STATIC_IF_NOT_TESTING const bool has_membrane = config.membrane_parameters.has_value();
 	calculate_x(container, config);
-	calculate_forces_batched(container);
+	calculate_forces_batched(container, config);
+
+	if (has_membrane) {
+		calculate_membrane_forces(container, config, current_time);
+	}
+
 	handle_boundaries(container, config);
 
 	if (has_thermostat && iteration % config.thermostat->application_frequency == 0) {
@@ -300,13 +406,17 @@ constexpr void run_sim_iteration(
 	}
 
 	if (has_gravity) {
-		apply_gravity(container, config.gravitational_constant);
+		if (has_membrane) {
+			apply_gravity<axis::z>(container, config.gravitational_constant);
+		} else {
+			apply_gravity<axis::y>(container, config.gravitational_constant);
+		}
 	}
 
 	calculate_v(container.system(), config.delta_t);
 #if LOG_SIM_STATE
 	const auto& system = container.system();
-	for (particle_system::particle_id i = 0; i < system.size(); ++i) {
+	for ([maybe_unused]] particle_id i = 0; i < system.size(); ++i) {
 		TRACE_SIM_STATE(
 			"End of iteration, particle {}: pos={}, v={}, f={}, old_f={}", i,
 			system.serialize_position(i), system.serialize_velocity(i), system.serialize_force(i),
@@ -344,7 +454,7 @@ constexpr sim_iteration_t run_simulation(
 			WRITE_VTK_OUTPUT(container, output_prefix, iteration);
 		}
 
-		run_sim_iteration<Traits.is_first_iteration>(container, config, iteration);
+		run_sim_iteration<Traits.is_first_iteration>(container, config, iteration, current_time);
 		current_time += config.delta_t;
 		++iteration;
 	};

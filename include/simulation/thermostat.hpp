@@ -19,7 +19,7 @@ CONSTEXPR_IF_GCC inline double get_temperature_deterministic(
 #if !SINGLETHREADED
 #pragma omp parallel for simd schedule(static)
 #endif
-	for (particle_system::particle_id p = 0; p < system.size(); ++p) {
+	for (particle_id p = 0; p < system.size(); ++p) {
 		const double squared_norm = (system.vx[p] * system.vx[p]) + (system.vy[p] * system.vy[p]) +
 		                            (system.vz[p] * system.vz[p]);
 		temperature_deltas[p] = system.mass[p] * squared_norm;
@@ -38,7 +38,7 @@ CONSTEXPR_IF_GCC inline double get_temperature_reduction(
 #if !SINGLETHREADED && !DETERMINISTIC
 #pragma omp parallel for simd schedule(static) reduction(+ : result)
 #endif
-	for (particle_system::particle_id p = 0; p < system.size(); ++p) {
+	for (particle_id p = 0; p < system.size(); ++p) {
 		const double squared_norm = (system.vx[p] * system.vx[p]) + (system.vy[p] * system.vy[p]) +
 		                            (system.vz[p] * system.vz[p]);
 		result += system.mass[p] * squared_norm;
@@ -81,7 +81,7 @@ CONSTEXPR_IF_GCC inline void run_thermostat(
 #if !SINGLETHREADED
 #pragma omp parallel for simd schedule(static)
 #endif
-		for (particle_system::particle_id p = 0; p < system.size(); ++p) {
+		for (particle_id p = 0; p < system.size(); ++p) {
 			system.vx[p] *= beta;
 			system.vy[p] *= beta;
 			system.vz[p] *= beta;
