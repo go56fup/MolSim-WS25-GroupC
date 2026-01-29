@@ -29,8 +29,9 @@ CONSTEXPR_IF_GCC inline double get_temperature_deterministic(
 	return result;
 }
 
-CONSTEXPR_IF_GCC inline double
-get_temperature_reduction(particle_container& container, decltype(sim_configuration::dimensions) dimensions) {
+CONSTEXPR_IF_GCC inline double get_temperature_reduction(
+	particle_container& container, decltype(sim_configuration::dimensions) dimensions
+) {
 	double result = 0;
 	const auto& system = container.system();
 
@@ -48,7 +49,7 @@ get_temperature_reduction(particle_container& container, decltype(sim_configurat
 
 #if DETERMINISTIC
 #define get_temperature get_temperature_reduction
-//#define get_temperature get_temperature_deterministic
+// #define get_temperature get_temperature_deterministic
 #else
 #define get_temperature get_temperature_reduction
 #endif

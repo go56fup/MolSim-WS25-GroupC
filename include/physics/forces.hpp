@@ -75,8 +75,8 @@ constexpr double get_scaling_factor(double sigma, double eps, double r2) {
 }
 
 // TODO(tuna): remove this
-#if SINGLETHREADED
-#define NO_ATOMICS
+#if SINGLETHREADED && !CALCULATE_F_MULTITHREADED
+// #define NO_ATOMICS
 #endif
 // #define NO_ATOMICS
 

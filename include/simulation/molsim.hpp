@@ -20,6 +20,8 @@
 #include "utility/openmp.hpp"
 #include "utility/tracing/macros.hpp"
 
+#define CALCULATE_F_MULTITHREADED 1
+
 /**
  * @brief Calculates interaction forces on a collection of particles.
  * @param container Particles on which forces will be calculated.
@@ -37,7 +39,8 @@ constexpr void calculate_forces_batched(particle_container& container) noexcept 
 		lennard_jones_force_soa_batchwise(container, batch_p1, batch_p2);
 	};
 
-#if !SINGLETHREADED
+	// #if !SINGLETHREADED
+#if CALCULATE_F_MULTITHREADED
 #pragma omp parallel for schedule(dynamic)
 #endif
 	for (auto& cell : container.cells()) {
@@ -62,18 +65,21 @@ constexpr void calculate_forces_batched(particle_container& container) noexcept 
 		}
 		use_batch_piecewise(batch_p1, batch_p2, count);
 	}
-#if !SINGLETHREADED && !DETERMINISTIC
+// #if !SINGLETHREADED && !DETERMINISTIC
+#if CALCULATE_F_MULTITHREADED
 #pragma omp parallel
 #endif
 	{
-#if !SINGLETHREADED && !DETERMINISTIC
+// #if !SINGLETHREADED && !DETERMINISTIC
+#if CALCULATE_F_MULTITHREADED
 #pragma omp single
 #endif
 		for (const auto& [current_cell_idx, target_cell_idx] :
 		     container.directional_interactions()) {
-			// TODO(tuna): see if after the implementation of the border iterator whether we still
-			// need the indices
-#if !SINGLETHREADED && !DETERMINISTIC
+// TODO(tuna): see if after the implementation of the border iterator whether we still
+// need the indices
+// #if !SINGLETHREADED && !DETERMINISTIC
+#if CALCULATE_F_MULTITHREADED
 #pragma omp task firstprivate(current_cell_idx, target_cell_idx)
 #endif
 			{
