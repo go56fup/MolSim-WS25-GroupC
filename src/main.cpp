@@ -144,7 +144,6 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
 #ifdef BENCHMARK_PRESET
 	presets::BENCHMARK_PRESET();
 #else
-	omp_set_num_threads(2);
 	return usual_main(argc, argv);
 #endif
 }

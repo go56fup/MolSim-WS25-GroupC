@@ -28,6 +28,15 @@ inline int get_num_threads() {
 #endif
 }
 
+inline void set_num_threads(int n) {
+#if SINGLETHREADED
+	return 1;
+#else
+	return omp_set_num_threads(n);;
+#endif
+}
+
+
 inline void debug_omp() {
 #if SINGLETHREADED
 	return;
