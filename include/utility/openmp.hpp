@@ -30,7 +30,7 @@ inline int get_num_threads() {
 
 inline void set_num_threads(int n) {
 #if SINGLETHREADED
-	return 1;
+	return n;
 #else
 	return omp_set_num_threads(n);;
 #endif
