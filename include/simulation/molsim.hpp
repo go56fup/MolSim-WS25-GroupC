@@ -49,7 +49,7 @@ calculate_forces_batched(particle_container& container, const sim_configuration&
 		particle_batch batch_p2;
 
 		for (auto [p1_idx, p2_idx] : unique_pairs(cell)) {
-			TRACE_FORCES(
+			SPDLOG_CRITICAL(
 				"Putting {} {} into batch, count={} on thread {}", p1_idx, p2_idx, count,
 				get_thread_num()
 
