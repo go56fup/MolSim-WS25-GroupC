@@ -14,7 +14,7 @@
 #include "utility/constants.hpp"
 #include "utility/tracing/macros.hpp"
 
-#define OVERRIDE_CALCULATE_F 1
+#define OVERRIDE_CALCULATE_F 0
 
 [[gnu::const]] constexpr double cubed(double x) noexcept {
 	return x * x * x;
