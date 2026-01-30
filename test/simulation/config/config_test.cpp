@@ -2,6 +2,7 @@
 #include <utility>
 
 #include "daw/json/daw_json_link.h"
+#include "grid/enums.hpp"
 #include "grid/particle_container/system.hpp"
 #include "gtest_constexpr/macros.hpp"
 #include <gtest/gtest.h>
@@ -75,7 +76,8 @@ TEST(ConfigTest, SimConfigurationComponent) {
 "write_frequency": 10,
 "base_name": "base_name",
 "domain": [0.4, 0.5, 0.6],
-"create_checkpoint": true
+"create_checkpoint": true,
+"force_calculator": "lennard_jones"
 })");
 	using enum boundary_condition;
 	using enum boundary_type;
@@ -94,6 +96,7 @@ TEST(ConfigTest, SimConfigurationComponent) {
 	STATIC_EXPECT_EQ(sim_config.domain, vec(0.4, 0.5, 0.6));
 	STATIC_EXPECT_TRUE(sim_config.create_checkpoint);
 	STATIC_EXPECT_DOUBLE_EQ(sim_config.gravitational_constant, 0);
+	STATIC_EXPECT_EQ(sim_config.force_method, force_calculator::lennard_jones);
 }
 
 // Check that a cuboid description parses to the correct cuboid
@@ -205,7 +208,8 @@ TEST(ConfigTest, BasicConfig) {
     13.2,
     13.3
   ],
-  "create_checkpoint": true
+  "create_checkpoint": true,
+  "force_calculator": "gravity"
 })";
 	using enum boundary_condition;
 
@@ -221,6 +225,7 @@ TEST(ConfigTest, BasicConfig) {
 	STATIC_EXPECT_VEC_DOUBLE_EQ(cfg.domain, vec(13.1, 13.2, 13.3));
 	STATIC_EXPECT_FALSE(cfg.thermostat.has_value());
 	STATIC_EXPECT_TRUE(cfg.create_checkpoint);
+	STATIC_EXPECT_EQ(cfg.force_method, force_calculator::gravity);
 
 	GTEST_CXP std::string_view body_json_data = R"([
     {
@@ -302,7 +307,8 @@ TEST(ConfigTest, ThermostatOptional) {
       13.2,
       13.3
     ],
-    "create_checkpoint": true
+    "create_checkpoint": true,
+    "force_calculator": "smoothed_lennard_jones"
 })";
 	using enum boundary_condition;
 

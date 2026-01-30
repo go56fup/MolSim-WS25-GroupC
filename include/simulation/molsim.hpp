@@ -15,6 +15,7 @@
 #include "grid/particle_container/fwd.hpp"
 #include "grid/particle_container/particle_container.hpp"
 #include "grid/particle_container/system.hpp"
+#include "iterators/neighbors.hpp"
 #include "iterators/pairwise.hpp"
 #include "output_writers/io.hpp"
 #include "physics/forces.hpp"
@@ -101,6 +102,83 @@ calculate_forces_batched(particle_container& container, const sim_configuration&
 					}
 				}
 				use_batch_piecewise(batch_p1, batch_p2, count);
+			}
+		}
+	}
+}
+
+constexpr void calculate_forces_no_atomic(
+	particle_container& container, [[maybe_unused]] const sim_configuration& config
+) noexcept {
+	const auto& grid = container.grid_size();
+
+	auto use_batch_piecewise = [&](particle_batch batch_p1, particle_batch batch_p2,
+	                               std::size_t up_to = batch_size) {
+		for (std::size_t i = 0; i < up_to; ++i) {
+			lennard_jones_force_soa_no_atomic(container.system(), batch_p1[i], batch_p2[i], {});
+		}
+	};
+
+	auto use_batch = [&](particle_batch batch_p1, particle_batch batch_p2) {
+		lennard_jones_force_soa_batchwise_no_atomic(container.system(), batch_p1, batch_p2, {});
+	};
+
+#if !SINGLETHREADED || OVERRIDE_CALCULATE_F
+#pragma omp parallel for schedule(dynamic)
+#endif
+	for (auto& cell : container.cells()) {
+		std::size_t count = 0;
+		particle_batch batch_p1;
+		particle_batch batch_p2;
+		for (auto p1_idx : cell) {
+			for (auto p2_idx : cell) {
+				if (p1_idx == p2_idx) continue;
+				batch_p1[count] = p1_idx;
+				batch_p2[count] = p2_idx;
+				++count;
+
+				if (count == batch_size) {
+					use_batch(batch_p1, batch_p2);
+					count = 0;
+				}
+			}
+			use_batch_piecewise(batch_p1, batch_p2, count);
+		}
+	}
+
+#if (!SINGLETHREADED && !DETERMINISTIC) || OVERRIDE_CALCULATE_F
+#pragma omp parallel
+#endif
+	{
+#if (!SINGLETHREADED && !DETERMINISTIC) || OVERRIDE_CALCULATE_F
+#pragma omp single
+#endif
+		for (particle_container::index current_cell_idx{0, 0, 0}; current_cell_idx.z < grid.z;
+		     current_cell_idx = next_3d_index(current_cell_idx, grid)) {
+			for (const auto& target_cell_idx : neighbors_range(container, current_cell_idx)) {
+#if (!SINGLETHREADED && !DETERMINISTIC) || OVERRIDE_CALCULATE_F
+#pragma omp task firstprivate(current_cell_idx, target_cell_idx)
+#endif
+				{
+					const auto& current_cell = container[current_cell_idx];
+					const auto& target_cell = container[target_cell_idx];
+					std::size_t count = 0;
+					particle_batch batch_p1;
+					particle_batch batch_p2;
+					for (auto p1_idx : current_cell) {
+						for (auto p2_idx : target_cell) {
+							batch_p1[count] = p1_idx;
+							batch_p2[count] = p2_idx;
+							++count;
+
+							if (count == batch_size) {
+								use_batch(batch_p1, batch_p2);
+								count = 0;
+							}
+						}
+					}
+					use_batch_piecewise(batch_p1, batch_p2, count);
+				}
 			}
 		}
 	}

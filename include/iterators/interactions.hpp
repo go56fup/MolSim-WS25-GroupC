@@ -1,5 +1,4 @@
 #pragma once
-#include <type_traits>
 
 #include "grid/particle_container/fwd.hpp"
 #include "utility/tracing/macros.hpp"

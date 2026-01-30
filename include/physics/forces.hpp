@@ -49,8 +49,6 @@ struct lennard_jones_constants {
 
  **/
 
-
-
 struct lennard_jones_parameters {
 	vec p1_position;
 	vec p2_position;
@@ -156,6 +154,27 @@ CONSTEXPR_IF_GCC inline void lennard_jones_force_soa(
 	apply_deltas_atomic(system, p1, p2, x_delta, y_delta, z_delta);
 }
 
+CONSTEXPR_IF_GCC inline void lennard_jones_force_soa_no_atomic(
+	particle_system& system, particle_id p1, particle_id p2, vec particle_mirror
+) noexcept {
+	const double pos_diff_x = system.x[p1] - system.x[p2] + particle_mirror.x;
+	const double pos_diff_y = system.y[p1] - system.y[p2] + particle_mirror.y;
+	const double pos_diff_z = system.z[p1] - system.z[p2] + particle_mirror.z;
+	const double r2 = pos_diff_x * pos_diff_x + pos_diff_y * pos_diff_y + pos_diff_z * pos_diff_z;
+	assert(r2 != 0 && "Two particles at the same position cannot interact.");
+
+	const auto [sigma, eps] = get_constants(system, p1, p2);
+
+	const double scaling_factor = get_scaling_factor(sigma, eps, r2);
+	const auto x_delta = -scaling_factor * pos_diff_x;
+	const auto y_delta = -scaling_factor * pos_diff_y;
+	const auto z_delta = -scaling_factor * pos_diff_z;
+
+	system.fx[p1] += x_delta;
+	system.fy[p1] += y_delta;
+	system.fz[p1] += z_delta;
+}
+
 CONSTEXPR_IF_GCC inline void lennard_jones_force_soa_batchwise(
 	particle_system& system, particle_batch p1_batch, particle_batch p2_batch, vec particle_mirror
 ) noexcept {
@@ -215,6 +234,70 @@ CONSTEXPR_IF_GCC inline void lennard_jones_force_soa_batchwise(
 		const auto p1 = p1_batch[i];
 		const auto p2 = p2_batch[i];
 		apply_deltas_atomic(system, p1, p2, x_delta[i], y_delta[i], z_delta[i]);
+	}
+}
+
+CONSTEXPR_IF_GCC inline void lennard_jones_force_soa_batchwise_no_atomic(
+	particle_system& system, particle_batch p1_batch, particle_batch p2_batch, vec particle_mirror
+) noexcept {
+	batch<double> pos_diff_x;
+	batch<double> pos_diff_y;
+	batch<double> pos_diff_z;
+	batch<double> scaling_factor;
+
+	// Position differences
+#if !SINGLETHREADED
+#pragma omp simd
+#endif
+	for (std::size_t i = 0; i < batch_size; ++i) {
+		const auto p1 = p1_batch[i];
+		const auto p2 = p2_batch[i];
+
+		pos_diff_x[i] = system.x[p1] - system.x[p2] + particle_mirror.x;
+		pos_diff_y[i] = system.y[p1] - system.y[p2] + particle_mirror.y;
+		pos_diff_z[i] = system.z[p1] - system.z[p2] + particle_mirror.z;
+	}
+
+#if !SINGLETHREADED
+#pragma omp simd
+#endif
+	for (std::size_t i = 0; i < batch_size; ++i) {
+		const auto p1 = p1_batch[i];
+		const auto p2 = p2_batch[i];
+
+		const double dx = pos_diff_x[i];
+		const double dy = pos_diff_y[i];
+		const double dz = pos_diff_z[i];
+		const double r2 = (dx * dx) + (dy * dy) + (dz * dz);
+
+		assert(r2 != 0.0 && "Two particles at the same position cannot interact.");
+
+		const auto [sigma, eps] = get_constants(system, p1, p2);
+		scaling_factor[i] = get_scaling_factor(sigma, eps, r2);
+	}
+
+	batch<double> x_delta;
+	batch<double> y_delta;
+	batch<double> z_delta;
+
+#if !SINGLETHREADED
+#pragma omp simd
+#endif
+	for (std::size_t i = 0; i < batch_size; ++i) {
+		x_delta[i] = -scaling_factor[i] * pos_diff_x[i];
+		y_delta[i] = -scaling_factor[i] * pos_diff_y[i];
+		z_delta[i] = -scaling_factor[i] * pos_diff_z[i];
+	}
+
+#if !SINGLETHREADED
+#pragma omp simd
+#endif
+	for (std::size_t i = 0; i < batch_size; ++i) {
+		const auto p1 = p1_batch[i];
+
+		system.fx[p1] += x_delta[i];
+		system.fy[p1] += y_delta[i];
+		system.fz[p1] += z_delta[i];
 	}
 }
 

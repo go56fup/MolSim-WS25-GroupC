@@ -1,0 +1,28 @@
+{
+  "delta_t": 0.0005,
+  "cutoff_radius": 3,
+  "boundary_conditions": {
+    "x_min": "periodic",
+    "y_min": "reflecting",
+    "z_min": "reflecting",
+    "x_max": "periodic",
+    "y_max": "reflecting",
+    "z_max": "reflecting"
+  },
+  "end_time": 0.5,
+  "thermostat": {
+    "initial_temperature": 40,
+    "application_frequency": 1000,
+    "enforce_initial_temperature": true
+  },
+  "write_frequency": 10,
+  "base_name": "large_rayleigh_taylor",
+  "domain": [
+    300,
+    54,
+    2.5
+  ],
+  "gravitational_constant": -12.44,
+  "create_checkpoint": false,
+  "force_calculator": "lennard_jones"
+}

@@ -18,7 +18,7 @@
     "max_temperature_difference": 0.00078
   },
   "statistics": {
-    "delta_r": 1,
+    "delta_r": 0.3,
     "calculation_frequency": 1000
   },
   "write_frequency": 10,

@@ -1,0 +1,56 @@
+[
+  {
+    "type": "rectangle",
+    "geometry": {
+      "origin": [
+        0.6,
+        2
+      ],
+      "scale": [
+        250,
+        20
+      ]
+    },
+    "velocity": [
+      0,
+      0,
+      0
+    ],
+    "parameters": {
+      "brownian_mean": 0,
+      "meshwidth": 1.2
+    },
+    "material": {
+      "mass": 1,
+      "sigma": 1.2,
+      "epsilon": 1
+    }
+  },
+  {
+    "type": "rectangle",
+    "geometry": {
+      "origin": [
+        0.6,
+        27
+      ],
+      "scale": [
+        250,
+        20
+      ]
+    },
+    "velocity": [
+      0,
+      0,
+      0
+    ],
+    "parameters": {
+      "brownian_mean": 0,
+      "meshwidth": 1.2
+    },
+    "material": {
+      "mass": 2,
+      "sigma": 1.1,
+      "epsilon": 1
+    }
+  }
+]
