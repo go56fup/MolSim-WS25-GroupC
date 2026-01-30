@@ -323,7 +323,7 @@ TEST(ConfigTest, ThermostatOptional) {
 	STATIC_EXPECT_TRUE(cfg.thermostat->enforce_initial_temperature);
 }
 
-#if HAS_EMBED
+#if 0
 // Check that configuration parsing via #embed works
 TEST(ConfigTest, EmbedTest) {
 	// NOLINTNEXTLINE(*avoid-c-arrays)

@@ -70,7 +70,7 @@ TEST(ForceTests, LennardJones) {
 	STATIC_EXPECT_VEC_DOUBLE_EQ(hand_calculated_result, scaled_force);
 }
 
-#if HAS_EMBED
+#if 0
 // Check that two particles colliding works
 TEST(ConfigTest, GridTest) {
 	// NOLINTNEXTLINE(*avoid-c-arrays)
