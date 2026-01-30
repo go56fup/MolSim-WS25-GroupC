@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.31)
+cmake_minimum_required(VERSION 3.28)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -36,9 +36,17 @@ file(
 add_executable(MolSim ${MY_SRC})
 add_library(project_options INTERFACE)
 
-target_include_directories(
-	project_options INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/input
-)
+target_include_directories(project_options INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+
+list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/modules)
+
+include(embed)
+
+if(HAS_EMBED)
+	target_compile_options(
+		project_options INTERFACE "--embed-dir=${CMAKE_CURRENT_SOURCE_DIR}/input"
+	)
+endif()
 
 target_compile_options(
 	project_options
@@ -59,7 +67,7 @@ target_compile_options(
 				-Wconversion
 				-Wno-c23-extensions
 				>
-				>
+				$<$<CONFIG:Release>:-march=native>
 )
 
 if(ENABLE_SANITIZERS)
@@ -76,9 +84,6 @@ if(BENCHMARK_PRESET)
 endif()
 
 target_compile_definitions(MolSim PRIVATE "SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_${LOG_LEVEL}")
-
-# add additional modules
-list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/modules)
 
 include(vtk)
 include(clang-format)

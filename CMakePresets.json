@@ -28,9 +28,18 @@
 			}
 		},
 		{
+			"name": "test-lite-base",
+			"hidden": true,
+			"description": "Runtime tests only, no VTK output, no static analysis",
+			"inherits": "debug-base",
+			"cacheVariables": {
+				"ENABLE_VTK_OUTPUT": "OFF"
+			}
+		},
+		{
 			"name": "test-base",
 			"hidden": true,
-			"inherits": "debug-base",
+			"inherits": "test-lite-base",
 			"cacheVariables": {
 				"ENABLE_CLANG_TIDY": "ON",
 				"ENABLE_STATIC_TESTING": "ON"
@@ -41,65 +50,71 @@
 			"hidden": true,
 			"inherits": "base",
 			"cacheVariables": {
-				"CMAKE_BUILD_TYPE": "Release"
-			}
-		},
-
-		{
-			"name": "release",
-			"inherits": "release-base",
-			"displayName": "Release (GCC)",
-			"description": "Configure Release build with GCC",
-			"cacheVariables": {
-				"CMAKE_CXX_COMPILER": "g++",
+				"CMAKE_BUILD_TYPE": "Release",
 				"CMAKE_INTERPROCEDURAL_OPTIMIZATION": "ON"
 			}
 		},
 		{
-			"name": "debug",
-			"inherits": "debug-base",
-			"displayName": "Debug (GCC)",
-			"description": "Configure Debug build with GCC",
+			"name": "gcc",
+			"hidden": true,
 			"cacheVariables": {
 				"CMAKE_CXX_COMPILER": "g++"
-				
 			}
+		},
+		{
+			"name": "clang",
+			"hidden": true,
+			"cacheVariables": {
+				"CMAKE_CXX_COMPILER": "clang++"
+			}
+		},
+		{
+			"name": "release",
+			"inherits": ["release-base", "gcc"],
+			"displayName": "Release (GCC)",
+			"description": "Configure Release build with GCC"
+		},
+		{
+			"name": "debug",
+			"inherits": ["debug-base", "gcc"],
+			"displayName": "Debug (GCC)",
+			"description": "Configure Debug build with GCC"
+		},
+		{
+			"name": "test-lite",
+			"inherits": ["test-lite-base", "gcc"],
+			"displayName": "Lite Tests (GCC)",
+			"description": "Configure lightweight Test build with GCC"
 		},
 		{
 			"name": "test",
-			"inherits": "test-base",
+			"inherits": ["test-base", "gcc"],
 			"displayName": "Full Tests (GCC)",
-			"description": "Configure Test build with GCC",
-			"cacheVariables": {
-				"CMAKE_CXX_COMPILER": "g++"
-			}
+			"description": "Configure complete Test build with GCC"
 		},
 		{
 			"name": "release-clang",
-			"inherits": "release-base",
+			"inherits": ["release-base", "clang"],
 			"displayName": "Release (Clang)",
-			"description": "Configure Release build with Clang",
-			"cacheVariables": {
-				"CMAKE_CXX_COMPILER": "clang++"
-			}
+			"description": "Configure Release build with Clang"
 		},
 		{
 			"name": "debug-clang",
-			"inherits": "debug-base",
+			"inherits": ["debug-base", "clang"],
 			"displayName": "Debug (Clang)",
-			"description": "Configure Debug build with Clang",
-			"cacheVariables": {
-				"CMAKE_CXX_COMPILER": "clang++"
-			}
+			"description": "Configure Debug build with Clang"
+		},
+		{
+			"name": "test-lite-clang",
+			"inherits": ["test-lite-base", "clang"],
+			"displayName": "Lite Tests (Clang)",
+			"description": "Configure lightweight Test build with Clang"
 		},
 		{
 			"name": "test-clang",
-			"inherits": "test-base",
+			"inherits": ["test-base", "clang"],
 			"displayName": "Full Tests (Clang)",
-			"description": "Configure Test build with Clang",
-			"cacheVariables": {
-				"CMAKE_CXX_COMPILER": "clang++"
-			}
+			"description": "Configure complete Test build with Clang"
 		}
 	],
 	"buildPresets": [
@@ -119,6 +134,11 @@
 			"configurePreset": "debug"
 		},
 		{
+			"name": "test-lite-build",
+			"inherits": "base",
+			"configurePreset": "test-lite"
+		},
+		{
 			"name": "test-build",
 			"inherits": "base",
 			"configurePreset": "test"
@@ -133,6 +153,12 @@
 			"inherits": "base",
 			"configurePreset": "debug-clang"
 		},
+		{
+			"name": "test-lite-clang-build",
+			"inherits": "base",
+			"configurePreset": "test-lite-clang"
+		},
+
 		{
 			"name": "test-clang-build",
 			"inherits": "base",
@@ -167,12 +193,12 @@
 		{
 			"name": "test-lite",
 			"inherits": "base",
-			"configurePreset": "debug"
+			"configurePreset": "test-lite"
 		},
 		{
 			"name": "test-lite-clang",
 			"inherits": "base",
-			"configurePreset": "debug-clang"
+			"configurePreset": "test-lite-clang"
 		}
 	],
 	"workflowPresets": [
@@ -194,7 +220,7 @@
 		},
 		{
 			"name": "test",
-			"description": "Run all tests with GCC in debug mode",
+			"description": "Run all tests with GCC",
 			"steps": [
 				{ "type": "configure", "name": "test" },
 				{ "type": "build",     "name": "test-build" },
@@ -203,7 +229,7 @@
 		},
 		{
 			"name": "test-clang",
-			"description": "Run all tests with Clang in debug mode",
+			"description": "Run all tests with Clang",
 			"steps": [
 				{ "type": "configure", "name": "test-clang" },
 				{ "type": "build",     "name": "test-clang-build" },
@@ -212,19 +238,19 @@
 		},
 		{
 			"name": "test-lite",
-			"description": "Run runtime tests with GCC in debug mode",
+			"description": "Run runtime tests with GCC",
 			"steps": [
-				{ "type": "configure", "name": "debug" },
-				{ "type": "build",     "name": "debug-build" },
+				{ "type": "configure", "name": "test-lite" },
+				{ "type": "build",     "name": "test-lite-build" },
 				{ "type": "test",      "name": "test-lite" }
 			]
 		},
 		{
 			"name": "test-lite-clang",
-			"description": "Run runtime tests with Clang in debug mode",
+			"description": "Run runtime tests with Clang",
 			"steps": [
-				{ "type": "configure", "name": "debug-clang" },
-				{ "type": "build",     "name": "debug-clang-build" },
+				{ "type": "configure", "name": "test-lite-clang" },
+				{ "type": "build",     "name": "test-lite-clang-build" },
 				{ "type": "test",      "name": "test-lite-clang" }
 			]
 		},

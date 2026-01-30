@@ -23,7 +23,7 @@
   },
   "bodies": [
     {
-      "type": "cuboid_2d",
+      "type": "square",
       "parameters": {
         "origin": [
           1.1225,
