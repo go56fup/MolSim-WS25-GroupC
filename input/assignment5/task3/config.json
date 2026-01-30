@@ -1,0 +1,27 @@
+{
+  "delta_t": 0.0005,
+  "cutoff_radius": 3.0,
+  "boundary_conditions": {
+    "x_min": "periodic",
+    "y_min": "periodic",
+    "z_min": "periodic",
+    "x_max": "periodic",
+    "y_max": "periodic",
+    "z_max": "periodic"
+  },
+  "end_time": 100,
+  "thermostat": {
+    "initial_temperature": 40,
+    "application_frequency": 1000,
+    "enforce_initial_temperature": true
+  },
+  "write_frequency": 10,
+  "base_name": "MD_vtk",
+  "domain": [
+    60,
+    60,
+    60
+  ],
+  "gravitational_constant": -12.44,
+  "create_checkpoint": false
+}

@@ -1,0 +1,60 @@
+[
+  {
+    "type": "cuboid",
+    "geometry": {
+      "origin": [
+        0.6,
+        0.6,
+        0.6
+      ],
+      "scale": [
+        50,
+        20,
+        50
+      ]
+    },
+    "velocity": [
+      0,
+      0,
+      0
+    ],
+    "parameters": {
+      "meshwidth": 1.2,
+      "brownian_mean": 0
+    },
+    "material": {
+      "mass": 1,
+      "sigma": 1.2,
+      "epsilon": 1
+    }
+  },
+  {
+    "type": "cuboid",
+    "geometry": {
+      "origin": [
+        0.6,
+        24.6,
+        0.6
+      ],
+      "scale": [
+        50,
+        20,
+        50
+      ]
+    },
+    "velocity": [
+      0,
+      0,
+      0
+    ],
+    "parameters": {
+      "meshwidth": 1.2,
+      "brownian_mean": 0
+    },
+    "material": {
+      "mass": 2,
+      "sigma": 1.1,
+      "epsilon": 1
+    }
+  }
+]

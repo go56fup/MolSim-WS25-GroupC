@@ -105,14 +105,11 @@ public:
 	 * @param args Arguments to construct particle from.
 	 */
 	constexpr void
-	add_particle(const vec& position, const vec& velocity, const material_description& material);
-
-	template <fwd_reference_to<material_description> Desc>
-	constexpr std::uint8_t register_material(Desc&& desc) noexcept;
+	add_particle(const vec& position, const vec& velocity, const material_description& material, const sim_configuration& config);
 
 	constexpr void reload_particle_state(
 		const particle_state_parameters& parameters, const vec& velocity,
-		const material_description& material
+		const material_description& material, const sim_configuration& config
 	);
 
 	/**
@@ -130,12 +127,12 @@ public:
 	template <std::size_t N>
 	constexpr void add_cuboid(
 		const cuboid_parameters<3>& cuboid, const body_common_parameters& body_parameters,
-		const vec& velocity, const material_description& material, std::size_t& seq_no
+		const vec& velocity, const material_description& material, const sim_configuration& config, std::size_t& seq_no
 	);
 
 	constexpr void add_membrane(
 		const cuboid_parameters<3>& membrane, const body_common_parameters& body_parameters,
-		const vec& velocity, const material_description& material, std::size_t& seq_no
+		const vec& velocity, const material_description& material, const sim_configuration& config, std::size_t& seq_no
 	);
 
 	/**
@@ -153,7 +150,7 @@ public:
 
 	constexpr void add_disc(
 		const disc_parameters<3>& disc, const body_common_parameters& body_parameters,
-		const vec& velocity, const material_description& material, std::size_t& seq_no
+		const vec& velocity, const material_description& material, const sim_configuration& config, std::size_t& seq_no
 	);
 
 	// TODO(tuna): see if the return type specified conflicts when the container is const

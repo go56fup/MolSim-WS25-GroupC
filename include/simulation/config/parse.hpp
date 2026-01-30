@@ -70,13 +70,14 @@ constexpr void populate_simulation(
 		TRACE_INPUT_PARSING("Parsing body with geometry: {}", daw::json::to_json(body.geometry));
 		if (body.type == "particle") {
 			particles.add_particle(
-				body.geometry.as<particle_parameters>().position, body.velocity, body.material
+				body.geometry.as<particle_parameters>().position, body.velocity, body.material,
+				config
 			);
 			continue;
 		}
 		if (body.type == "particle_state") {
 			particles.reload_particle_state(
-				body.geometry.as<particle_state_parameters>(), body.velocity, body.material
+				body.geometry.as<particle_state_parameters>(), body.velocity, body.material, config
 			);
 			continue;
 		}
@@ -86,7 +87,7 @@ constexpr void populate_simulation(
 		if (body.type == "cuboid") {
 			particles.add_cuboid<3>(
 				body.geometry.as<cuboid_parameters<3>>(), body.parameters.value(), body.velocity,
-				body.material, seq_no
+				body.material, config, seq_no
 			);
 			continue;
 		}
@@ -94,7 +95,7 @@ constexpr void populate_simulation(
 			two_d_domain_check();
 			particles.add_cuboid<2>(
 				body.geometry.as<cuboid_parameters<2>>().extend_to_3d(config.domain),
-				body.parameters.value(), body.velocity, body.material, seq_no
+				body.parameters.value(), body.velocity, body.material, config, seq_no
 			);
 			continue;
 		}
@@ -102,14 +103,14 @@ constexpr void populate_simulation(
 			two_d_domain_check();
 			particles.add_disc(
 				body.geometry.as<disc_parameters<2>>().extend_to_3d(config.domain),
-				body.parameters.value(), body.velocity, body.material, seq_no
+				body.parameters.value(), body.velocity, body.material, config, seq_no
 			);
 			continue;
 		}
 		if (body.type == "membrane") {
 			particles.add_membrane(
 				body.geometry.as<cuboid_parameters<2>>().extend_to_3d(config.domain),
-				body.parameters.value(), body.velocity, body.material, seq_no
+				body.parameters.value(), body.velocity, body.material, config, seq_no
 			);
 			continue;
 		}

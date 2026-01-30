@@ -47,10 +47,10 @@ target_compile_definitions(project_options INTERFACE SINGLETHREADED=$<IF:$<BOOL:
 option(DETERMINISTIC "Use deterministic functions: will result in a slower but consistent simulation across runs" OFF)
 target_compile_definitions(project_options INTERFACE DETERMINISTIC=$<IF:$<BOOL:${DETERMINISTIC}>,1,0>)
 
-if(NOT SINGLETHREADED)
+#if(NOT SINGLETHREADED)
 	find_package(OpenMP)
 	target_link_libraries(project_options INTERFACE OpenMP::OpenMP_CXX)
-endif()
+#endif()
 
 if(HAS_EMBED)
 	target_compile_options(

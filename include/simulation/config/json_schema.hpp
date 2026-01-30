@@ -39,6 +39,12 @@ struct json_data_contract<membrane_simulation_parameters> {
 };
 
 template <>
+struct json_data_contract<statistics_parameters> {
+	using type = json_member_list<
+		json_number<"delta_r", double>, json_number<"calculation_frequency", sim_iteration_t>>;
+};
+
+template <>
 struct json_data_contract<sim_configuration> {
 	using constructor_t = sim_configuration_constructor;
 	using type = json_member_list<
@@ -46,6 +52,7 @@ struct json_data_contract<sim_configuration> {
 		json_class<"boundary_conditions", boundary_conditions_descriptor>,
 		json_class_null<"thermostat", std::optional<thermostat_parameters>>,
 		json_class_null<"membrane_parameters", std::optional<membrane_simulation_parameters>>,
+		json_class_null<"statistics", std::optional<statistics_parameters>>,
 		json_number<"end_time", double>, json_number<"write_frequency", sim_iteration_t>,
 		json_string<"base_name">, json_class<"domain", vec>, json_bool<"create_checkpoint">,
 		json_number_null<"gravitational_constant", std::optional<double>>,

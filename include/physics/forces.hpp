@@ -14,7 +14,7 @@
 #include "utility/constants.hpp"
 #include "utility/tracing/macros.hpp"
 
-#define OVERRIDE_CALCULATE_F 0
+#define OVERRIDE_CALCULATE_F 1
 
 [[gnu::const]] constexpr double cubed(double x) noexcept {
 	return x * x * x;
@@ -23,6 +23,11 @@
 [[gnu::const]] constexpr double sixth_power(double x) {
 	return x * x * x * x * x * x;
 }
+
+struct lennard_jones_constants {
+	double sigma{};
+	double epsilon{};
+};
 
 /**
  * @brief Calculates the force resulting from the Lennard-Jones potential.
@@ -44,10 +49,7 @@
 
  **/
 
-struct lennard_jones_constants {
-	double sigma{};
-	double epsilon{};
-};
+
 
 struct lennard_jones_parameters {
 	vec p1_position;
@@ -236,6 +238,7 @@ CONSTEXPR_IF_GCC inline void smoothed_lennard_jones_force(
 	const double pos_diff_y = system.y[p1] - system.y[p2] + particle_mirror.y;
 	const double pos_diff_z = system.z[p1] - system.z[p2] + particle_mirror.z;
 	const double r2 = pos_diff_x * pos_diff_x + pos_diff_y * pos_diff_y + pos_diff_z * pos_diff_z;
+	// TODO(tuna): check against cutoff * cutoff instead of sqrt
 	const double norm = std::sqrt(r2);
 	if (norm >= cutoff_radius) {
 		return;
@@ -265,6 +268,18 @@ CONSTEXPR_IF_GCC inline void smoothed_lennard_jones_force(
 	const auto x_delta = -scaling_factor * pos_diff_x;
 	const auto y_delta = -scaling_factor * pos_diff_y;
 	const auto z_delta = -scaling_factor * pos_diff_z;
+
+#define INTERESTING_PARTICLE_LOG 0
+#if INTERESTING_PARTICLE_LOG
+	if (p1 == 80 || p2 == 80) {
+		TRACE_FORCES(
+			"interesting: {} <-> {}, delta={}, {}, {}, pos_delta={}, {}, {}; scaling_factor={}", p1,
+			p2, x_delta, y_delta, z_delta, pos_diff_x, pos_diff_y, pos_diff_z, scaling_factor
+		);
+		TRACE_FORCES("p1: {}", system.representation(p1));
+		TRACE_FORCES("p2: {}", system.representation(p2));
+	}
+#endif
 	apply_deltas_atomic(system, p1, p2, x_delta, y_delta, z_delta);
 }
 

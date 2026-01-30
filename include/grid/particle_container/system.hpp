@@ -1,11 +1,13 @@
 #pragma once
 
+#include <cstdint>
 #include <utility>
 #include <vector>
 
 #include "physics/vec_3d.hpp"
 #include "simulation/entities.hpp"
 #include "simulation/particle.hpp"
+#include "utility/macros.hpp"
 
 #define system_arithmetic(op, idx, value, x_comp, y_comp, z_comp)                                  \
 	do {                                                                                           \
@@ -24,29 +26,45 @@ private:
 		z.push_back(value.z);
 	}
 
-	constexpr void
-	add_common(const vec& pos, const vec& velocity, const material_description& material) {
+	constexpr void add_common(
+		const vec& pos, const vec& velocity, const material_description& material,
+		const sim_configuration& config
+	) {
 		destructure_push_back(pos, x, y, z);
 		destructure_push_back(velocity, vx, vy, vz);
 		mass.push_back(material.mass);
 		sigma.push_back(material.sigma);
 		epsilon.push_back(material.epsilon);
+
+		STATIC_IF_NOT_TESTING const bool collect_stats = config.statistics.has_value();
+
+		if (collect_stats) {
+			destructure_push_back(pos, old_x, old_y, old_z);
+
+			x_boundary_crosses.push_back(0);
+			y_boundary_crosses.push_back(0);
+			z_boundary_crosses.push_back(0);
+		}
 	}
 
 public:
 	std::vector<double> x, y, z;
+	std::vector<double> old_x, old_y, old_z;
 	std::vector<double> vx, vy, vz;
 	std::vector<double> fx, fy, fz;
 	std::vector<double> old_fx, old_fy, old_fz;
+	std::vector<std::int16_t> x_boundary_crosses, y_boundary_crosses, z_boundary_crosses;
 	std::vector<double> mass;
 	std::vector<double> epsilon;
 	std::vector<double> sigma;
 
 	enum class property : std::uint8_t { position, velocity, force, old_force };
 
-	constexpr void
-	add_particle(const vec& pos, const vec& velocity, const material_description& material) {
-		add_common(pos, velocity, material);
+	constexpr void add_particle(
+		const vec& pos, const vec& velocity, const material_description& material,
+		const sim_configuration& config
+	) {
+		add_common(pos, velocity, material, config);
 		// TODO(tuna): add finalization pass for numa
 		fx.push_back(0);
 		fy.push_back(0);
@@ -59,9 +77,9 @@ public:
 
 	constexpr void add_particle(
 		const vec& pos, const vec& velocity, const vec& force, const vec& old_force,
-		const material_description& material
+		const material_description& material, const sim_configuration& config
 	) {
-		add_common(pos, velocity, material);
+		add_common(pos, velocity, material, config);
 		destructure_push_back(force, fx, fy, fz);
 		destructure_push_back(old_force, old_fx, old_fy, old_fz);
 	}
@@ -118,6 +136,18 @@ public:
 		std::unreachable();
 	}
 
+	constexpr std::span<std::int16_t> crossing_statistics_component(axis a) noexcept {
+		switch (a) {
+		case axis::x:
+			return x_boundary_crosses;
+		case axis::y:
+			return y_boundary_crosses;
+		case axis::z:
+			return z_boundary_crosses;
+		}
+		std::unreachable();
+	}
+
 	constexpr std::size_t size() const noexcept {
 		assert(
 			x.size() == y.size() && y.size() == z.size() && z.size() == fx.size() &&
@@ -127,5 +157,12 @@ public:
 			sigma.size() == epsilon.size()
 		);
 		return x.size();
+	}
+
+	constexpr std::string representation(particle_id p_idx) const noexcept {
+		return fmt::format(
+			"id={}, pos={}, v={}, f={}, old_f={}", p_idx, serialize_position(p_idx),
+			serialize_velocity(p_idx), serialize_force(p_idx), serialize_old_force(p_idx)
+		);
 	}
 };

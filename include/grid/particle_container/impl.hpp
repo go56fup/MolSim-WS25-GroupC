@@ -105,25 +105,27 @@ constexpr particle_container::particle_container(Vec&& domain_arg, double cutoff
 }
 
 constexpr void particle_container::add_particle(
-	const vec& position, const vec& velocity, const material_description& material
+	const vec& position, const vec& velocity, const material_description& material,
+	const sim_configuration& config
 ) {
-	system_.add_particle(position, velocity, material);
+	system_.add_particle(position, velocity, material, config);
 	grid[pos_to_linear_index(position)].push_back(system_.size() - 1);
 }
 
 constexpr void particle_container::reload_particle_state(
 	const particle_state_parameters& parameters, const vec& velocity,
-	const material_description& material
+	const material_description& material, const sim_configuration& config
 ) {
 	system_.add_particle(
-		parameters.position, velocity, parameters.force, parameters.old_force, material
+		parameters.position, velocity, parameters.force, parameters.old_force, material, config
 	);
 	grid[pos_to_linear_index(parameters.position)].push_back(system_.size() - 1);
 }
 
 constexpr void particle_container::add_membrane(
 	const cuboid_parameters<3>& membrane, const body_common_parameters& body_parameters,
-	const vec& velocity, const material_description& material, std::size_t& seq_no
+	const vec& velocity, const material_description& material, const sim_configuration& config,
+	std::size_t& seq_no
 ) {
 	static constexpr std::array<particle_container::index, 4> upwards_moving_particle_coords{
 		{{17, 24, 0}, {17, 25, 0}, {18, 24, 0}, {18, 25, 0}}
@@ -159,7 +161,7 @@ constexpr void particle_container::add_membrane(
 					maxwell_boltzmann_distributed_velocity<2>(
 						body_parameters.brownian_mean, seq_no
 					) + velocity,
-					material
+					material, config
 				);
 			}
 		}
@@ -175,7 +177,8 @@ constexpr void particle_container::add_membrane(
 template <std::size_t N>
 constexpr void particle_container::add_cuboid(
 	const cuboid_parameters<3>& cuboid, const body_common_parameters& body_parameters,
-	const vec& velocity, const material_description& material, std::size_t& seq_no
+	const vec& velocity, const material_description& material, const sim_configuration& config,
+	std::size_t& seq_no
 ) {
 	for (size_type x = 0; x < cuboid.scale.x; ++x) {
 		for (size_type y = 0; y < cuboid.scale.y; ++y) {
@@ -187,7 +190,7 @@ constexpr void particle_container::add_cuboid(
 					maxwell_boltzmann_distributed_velocity<N>(
 						body_parameters.brownian_mean, seq_no
 					) + velocity,
-					material
+					material, config
 				);
 			}
 		}
@@ -196,7 +199,8 @@ constexpr void particle_container::add_cuboid(
 
 constexpr void particle_container::add_disc(
 	const disc_parameters<3>& disc, const body_common_parameters& body_parameters,
-	const vec& velocity, const material_description& material, std::size_t& seq_no
+	const vec& velocity, const material_description& material, const sim_configuration& config,
+	std::size_t& seq_no
 ) {
 	const auto& r = disc.radius;
 	for (int i = static_cast<int>(-r); i <= r; i++) {
@@ -209,7 +213,7 @@ constexpr void particle_container::add_disc(
 			     disc.center.y + (j * body_parameters.meshwidth), disc.center.z},
 				maxwell_boltzmann_distributed_velocity<2>(body_parameters.brownian_mean, seq_no) +
 					velocity,
-				material
+				material, config
 			);
 		}
 	}

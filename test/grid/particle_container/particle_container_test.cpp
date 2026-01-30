@@ -19,7 +19,7 @@ TEST(particle_container, SquarePlacement) {
 		container.add_cuboid<2>(
 			cuboid_parameters<2>{.origin{5, 5}, .scale{2, 2}}.extend_to_3d(domain),
 			{.meshwidth = 1, .brownian_mean = 5.0}, {}, {.mass = 100, .sigma = 1.0, .epsilon = 5.0},
-			seq_no
+			{}, seq_no
 		);
 		const auto first = container.cell_containing({5, 5, 5}).at(0);
 		const auto second = container.cell_containing({6, 6, 5}).at(0);
@@ -39,7 +39,7 @@ TEST(particle_container, Cuboid3DPlacement) {
 		std::size_t seq_no = 0;
 		container.add_cuboid<3>(
 			{.origin{5, 5, 5}, .scale{2, 2, 2}}, {.meshwidth = 1, .brownian_mean = 5.0}, {},
-			{.mass = 100, .sigma = 1.0, .epsilon = 5.0}, seq_no
+			{.mass = 100, .sigma = 1.0, .epsilon = 5.0}, {}, seq_no
 		);
 		const auto first = container.cell_containing({5, 6, 5}).at(0);
 		const auto second = container.cell_containing({6, 6, 6}).at(0);

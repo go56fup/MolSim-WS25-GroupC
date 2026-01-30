@@ -1,0 +1,34 @@
+{
+  "delta_t": 0.001,
+  "cutoff_radius": 2.3,
+  "boundary_conditions": {
+    "x_min": "outflow",
+    "y_min": "outflow",
+    "z_min": "outflow",
+    "x_max": "outflow",
+    "y_max": "outflow",
+    "z_max": "outflow"
+  },
+  "end_time": 150,
+  "thermostat": {
+    "initial_temperature": 0.01,
+	"target_temperature": 1,
+    "application_frequency": 40,
+    "enforce_initial_temperature": true,
+    "max_temperature_difference": 0.001
+  },
+  "statistics": {
+    "delta_r": 1,
+    "calculation_frequency": 1000
+  },
+  "write_frequency": 10,
+  "base_name": "equilibration",
+  "domain": [
+      100,
+      100,
+    100
+  ],
+  "create_checkpoint": true,
+  "force_calculator": "lennard_jones",
+  "lower_radius": 1.9
+}

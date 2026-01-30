@@ -1,0 +1,31 @@
+[
+  {
+    "type": "cuboid",
+    "geometry": {
+      "origin": [
+          50,
+		  50,
+		  50
+      ],
+      "scale": [
+        8,
+        8,
+        8
+      ]
+    },
+    "velocity": [
+      0,
+      0,
+      0
+    ],
+    "parameters": {
+      "brownian_mean": 0,
+      "meshwidth": 1.15
+    },
+    "material": {
+      "mass": 1,
+      "sigma": 1,
+      "epsilon": 1
+    }
+  }
+]

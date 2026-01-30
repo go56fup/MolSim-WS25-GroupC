@@ -1,0 +1,34 @@
+{
+  "delta_t": 0.001,
+  "cutoff_radius": 2.3,
+  "boundary_conditions": {
+    "x_min": "periodic",
+    "y_min": "periodic",
+    "z_min": "periodic",
+    "x_max": "periodic",
+    "y_max": "periodic",
+    "z_max": "periodic"
+  },
+  "end_time": 100,
+  "thermostat": {
+    "initial_temperature": 3.0,
+    "target_temperature": 0.02,
+    "application_frequency": 25,
+    "enforce_initial_temperature": false,
+    "max_temperature_difference": 0.0025
+  },
+  "statistics": {
+    "delta_r": 1,
+    "calculation_frequency": 1000
+  },
+  "write_frequency": 10,
+  "base_name": "super_cooling_argon",
+  "domain": [
+    9.2,
+    9.2,
+    9.2
+  ],
+  "create_checkpoint": false,
+  "force_calculator": "smoothed_lennard_jones",
+  "lower_radius": 1.9
+}

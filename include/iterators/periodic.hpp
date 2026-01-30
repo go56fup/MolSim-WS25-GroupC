@@ -3,6 +3,7 @@
 #include <ranges>
 
 #include "grid/particle_container/fwd.hpp"
+#include "utility/tracing/macros.hpp"
 
 namespace detail {
 class periodic_iterator {
@@ -20,6 +21,15 @@ private:
 	particle_container::signed_index target_cell_idx;
 	std::uint8_t displacement_idx = 0;
 	particle_container::signed_index signed_grid;
+	// TODO(tuna): because displacement_idx is incremented unconditionally, it was never actually
+	// supposed to be used to detect the .end(). However, the only state that is advanced in the
+	// current implementation (which stops yielding after a single cell and never gets the next 3D
+	// index) is the displacement_idx. Therefore, with an unconditional increment, there is no way
+	// to tell the last element from the .end(), as if the .end() has displacement_idx + 1,
+	// operator++ is not prevented from indexing into displacement_count which is 1-past-the-end.
+	// The unconditional increment would need to be refactored to get rid of this extra
+	// statekeeping.
+	bool exhausted = false;
 	static constexpr std::array<particle_container::signed_index, 13> displacements = {
 		{{0, 0, +1},    // i,     j,     k + 1
 	     {0, +1, -1},   // i,     j + 1, k - 1
@@ -62,12 +72,11 @@ public:
 
 	constexpr periodic_iterator(particle_container& c, periodic_iterator::get_end_tag)
 		: container(&c)
-		, displacement_idx(displacement_count) {}
+		, displacement_idx(displacement_count)
+		, exhausted(true) {}
 
 	template <axis Axis>
 	constexpr bool do_displacement(const particle_container::signed_index& displacement) noexcept {
-		TRACE_INTERACTION_ITER("Doing displacement {} on {}", displacement, current_virtual_idx);
-
 		// We do not need to use __builtin_add_overflow() here, because:
 		assert(displacement[Axis] == -1 || displacement[Axis] == 1 || displacement[Axis] == 0);
 		target_cell_idx[Axis] = current_virtual_idx[Axis] + displacement[Axis];
@@ -87,6 +96,7 @@ public:
 		while (displacement_idx < displacement_count) {
 			const auto& displacement = displacements[displacement_idx];
 			target_cell_idx = current_virtual_idx;
+			TRACE_PERIODIC("Doing displacement {} on {}", displacement, current_virtual_idx);
 
 			const bool success = do_displacement<axis::x>(displacement) &&
 			                     do_displacement<axis::y>(displacement) &&
@@ -95,14 +105,13 @@ public:
 			++displacement_idx;
 
 			if (success) {
-				TRACE_INTERACTION_ITER(
+				TRACE_PERIODIC(
 					"Found valid interaction: {} -> {}", current_virtual_idx, target_cell_idx
 				);
 				return *this;
 			}
 		}
-		// TRACE_GRID("end = virtual: {}, target: {}, signed_grid: {}", current_virtual_idx,
-		// target_cell_idx, signed_grid);
+		exhausted = true;
 		return *this;
 	}
 
@@ -114,7 +123,7 @@ public:
 
 	constexpr bool operator==(const periodic_iterator& other) const noexcept {
 		assert(container == other.container);
-		return displacement_idx == other.displacement_idx;
+		return displacement_idx == other.displacement_idx && exhausted == other.exhausted;
 	}
 
 	constexpr particle_container::index operator*() const noexcept {

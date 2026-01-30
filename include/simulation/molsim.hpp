@@ -1,8 +1,10 @@
 #pragma once
 
 #include <cmath>
+#include <mutex>
 #include <ranges>
 #include <span>
+#include <stdexcept>
 #include <string_view>
 
 #include <fmt/compile.h>
@@ -18,6 +20,7 @@
 #include "physics/forces.hpp"
 #include "simulation/entities.hpp"
 #include "simulation/openmp.hpp"
+#include "simulation/statistics.hpp"
 #include "simulation/thermostat.hpp"
 #include "utility/macros.hpp"
 #include "utility/tracing/macros.hpp"
@@ -49,7 +52,7 @@ calculate_forces_batched(particle_container& container, const sim_configuration&
 		particle_batch batch_p2;
 
 		for (auto [p1_idx, p2_idx] : unique_pairs(cell)) {
-			SPDLOG_CRITICAL(
+			TRACE_BATCHING(
 				"Putting {} {} into batch, count={} on thread {}", p1_idx, p2_idx, count,
 				get_thread_num()
 
@@ -118,6 +121,8 @@ calculate_forces_batched(particle_container& container, const sim_configuration&
 constexpr void
 calculate_x(particle_container& container, const sim_configuration& config) noexcept(false) {
 	const double cell_width = container.cutoff_radius();
+	STATIC_IF_NOT_TESTING const bool collect_stats = config.statistics.has_value();
+
 	auto move_to_cell = [&](const particle_container::index& new_cell_idx,
 	                        particle_container::cell& current_cell,
 	                        particle_container::cell::size_type i) {
@@ -170,8 +175,8 @@ calculate_x(particle_container& container, const sim_configuration& config) noex
 						// Zero out the current position first, teleport to 0 if overflowing, to end
 						// of grid if underflowing.
 						TRACE_PERIODIC(
-							"Performing periodic teleport on {}, currently stored in {}", p_idx,
-							cell_idx
+							"Performing periodic teleport on {} at {}, currently stored in {}",
+							p_idx, system.serialize_position(p_idx), cell_idx
 						);
 						displacement[axis_] =
 							-static_cast<particle_container::difference_type>(cell_idx[axis_]);
@@ -179,10 +184,18 @@ calculate_x(particle_container& container, const sim_configuration& config) noex
 						const double update =
 							increment * static_cast<double>(grid[axis_]) * cell_width;
 						system.position_component(axis_)[p_idx] -= update;
+
 						TRACE_PERIODIC(
 							"Periodic displacement: {}, pos update: -{}, new position {}",
 							displacement, update, system.serialize_position(p_idx)
 						);
+						if (collect_stats) {
+							system.crossing_statistics_component(axis_)[p_idx] += increment;
+							TRACE_STATS(
+								"Logged crossing for {}: {} on {}", p_idx, increment, axis_
+							);
+						}
+
 					} else {
 						// TODO(tuna): see if putting a std::unreachable here and only throwing on
 						// debug makes any difference
@@ -197,27 +210,55 @@ calculate_x(particle_container& container, const sim_configuration& config) noex
 			};
 
 			using enum boundary_type;
+			bool was_hit = false;
 
 			if (system.x[p_idx] < cell_origin.x) {
 				update_displacement.template operator()<x_min>();
+				was_hit = true;
 			} else if (system.x[p_idx] >= cell_origin.x + cell_width) {
 				update_displacement.template operator()<x_max>();
-			} else if (system.y[p_idx] < cell_origin.y) {
+				was_hit = true;
+			}
+
+			if (system.y[p_idx] < cell_origin.y) {
 				update_displacement.template operator()<y_min>();
+				was_hit = true;
 			} else if (system.y[p_idx] >= cell_origin.y + cell_width) {
 				update_displacement.template operator()<y_max>();
-			} else if (system.z[p_idx] < cell_origin.z) {
+				was_hit = true;
+			}
+
+			if (system.z[p_idx] < cell_origin.z) {
 				update_displacement.template operator()<z_min>();
+				was_hit = true;
 			} else if (system.z[p_idx] >= cell_origin.z + cell_width) {
 				update_displacement.template operator()<z_max>();
-			} else {
-				// Skip moving if all checks succeed
-				continue;
+				was_hit = true;
 			}
+			if (was_hit) {
 #if !SINGLETHREADED
-			// #pragma omp critical
+				// #pragma omp critical
 #endif
-			move_to_cell(new_cell_idx, cell, particle_idx);
+				move_to_cell(new_cell_idx, cell, particle_idx);
+			}
+#if LOG_GRID
+			const auto pos = system.serialize_position(p_idx);
+			const auto& domain = container.domain();
+			if (out_of_bounds<boundary_type::x_min>(pos, domain) ||
+			    out_of_bounds<boundary_type::x_max>(pos, domain) ||
+			    out_of_bounds<boundary_type::y_min>(pos, domain) ||
+			    out_of_bounds<boundary_type::y_max>(pos, domain) ||
+			    out_of_bounds<boundary_type::z_min>(pos, domain) ||
+			    out_of_bounds<boundary_type::z_max>(pos, domain)) {
+				throw std::out_of_range(fmt::format(
+					"Trying to move {} with v={}, f={}, old_f={} to position {}, which "
+					"is out of "
+					"bounds for domain {}.",
+					p_idx, system.serialize_velocity(p_idx), system.serialize_force(p_idx),
+					system.serialize_old_force(p_idx), pos, domain
+				));
+			}
+#endif
 		}
 	}
 }
@@ -234,7 +275,7 @@ calculate_x(particle_container& container, const sim_configuration& config) noex
  * @param system Particle data to update.
  * @param delta_t The time step for integration.
  */
-constexpr void calculate_v(particle_system& system, double delta_t) noexcept {
+constexpr void calculate_v(particle_system& system, double delta_t) {
 #if !SINGLETHREADED
 #pragma omp parallel for simd schedule(static)
 #endif
@@ -246,6 +287,14 @@ constexpr void calculate_v(particle_system& system, double delta_t) noexcept {
 		system.vy[i] += velocity_scalar * (system.old_fy[i] + system.fy[i]);
 		system.vz[i] += velocity_scalar * (system.old_fz[i] + system.fz[i]);
 	}
+#if LOG_GRID
+	static constexpr double thresh = 100;
+	for (particle_id i = 0; i < system.size(); ++i) {
+		if (system.vx[i] > thresh || system.vy[i] > thresh || system.vz[i] > thresh) {
+			throw std::logic_error(fmt::format("Illegal velocity: {}", system.representation(i)));
+		}
+	}
+#endif
 }
 
 /**
@@ -300,7 +349,7 @@ constexpr void calculate_membrane_forces(
 		const auto other_idx = apply_difference(current_idx, offset);
 		TRACE_MEMBRANE_NEIGHBORS(
 			"Performing interaction towards {}; offset={}. Got current={}, target={} -> [{}, {}] "
-		    "for scale={}",
+			"for scale={}",
 			d, offset, current_idx, other_idx, other_idx / width, other_idx % width, scale
 		);
 
@@ -392,6 +441,7 @@ constexpr void run_sim_iteration(
 	STATIC_IF_NOT_TESTING const bool has_thermostat = config.thermostat.has_value();
 	STATIC_IF_NOT_TESTING const bool has_gravity = config.gravitational_constant != 0;
 	STATIC_IF_NOT_TESTING const bool has_membrane = config.membrane_parameters.has_value();
+
 	calculate_x(container, config);
 	calculate_forces_batched(container, config);
 
@@ -414,9 +464,10 @@ constexpr void run_sim_iteration(
 	}
 
 	calculate_v(container.system(), config.delta_t);
+
 #if LOG_SIM_STATE
 	const auto& system = container.system();
-	for ([maybe_unused]] particle_id i = 0; i < system.size(); ++i) {
+	for ([[maybe_unused]] particle_id i = 0; i < system.size(); ++i) {
 		TRACE_SIM_STATE(
 			"End of iteration, particle {}: pos={}, v={}, f={}, old_f={}", i,
 			system.serialize_position(i), system.serialize_velocity(i), system.serialize_force(i),
@@ -449,12 +500,18 @@ constexpr sim_iteration_t run_simulation(
 	};
 
 	auto run_sim_pass = [&]<sim_traits Traits = {}> {
+		STATIC_IF_NOT_TESTING const bool collect_stats = config.statistics.has_value();
 		TRACE_SIM("beginning iteration {}, current_time={}", iteration, current_time);
 		if (iteration % config.write_frequency == 0) {
 			WRITE_VTK_OUTPUT(container, output_prefix, iteration);
 		}
 
 		run_sim_iteration<Traits.is_first_iteration>(container, config, iteration, current_time);
+
+		if (collect_stats && iteration % config.statistics->calculation_frequency == 0) {
+			WRITE_STATISTICS_OUTPUT(container, config, output_prefix, iteration);
+		}
+
 		current_time += config.delta_t;
 		++iteration;
 	};

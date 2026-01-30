@@ -94,8 +94,14 @@
 #define TRACE_MEMBRANE_NEIGHBORS(...) (void)0
 #endif
 
-#if LOG_HARMONIC
-#define TRACE_HARMONIC(...) SPDLOG_TRACE(__VA_ARGS__)
+#if LOG_STATS
+#define TRACE_STATS(...) SPDLOG_TRACE(__VA_ARGS__)
 #else
-#define TRACE_HARMONIC(...) (void)0
+#define TRACE_STATS(...) (void)0
+#endif
+
+#if LOG_BATCHING
+#define TRACE_BATCHING(...) SPDLOG_TRACE(__VA_ARGS__)
+#else
+#define TRACE_BATCHING(...) (void)0
 #endif

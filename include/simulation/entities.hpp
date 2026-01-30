@@ -123,6 +123,11 @@ struct membrane_simulation_parameters {
 	double upwards_force;
 };
 
+struct statistics_parameters {
+	double delta_r;
+	sim_iteration_t calculation_frequency;
+};
+
 struct sim_configuration {
 	static constexpr auto max_base_name_len = 32;
 	double delta_t{};
@@ -130,6 +135,7 @@ struct sim_configuration {
 	boundary_conditions_descriptor boundary_behavior{};
 	std::optional<thermostat_parameters> thermostat = std::nullopt;
 	std::optional<membrane_simulation_parameters> membrane_parameters = std::nullopt;
+	std::optional<statistics_parameters> statistics = std::nullopt;
 	double end_time{};
 	sim_iteration_t write_frequency = std::numeric_limits<sim_iteration_t>::max();
 	p3094::fixed_string<max_base_name_len> base_name{std::from_range, "unused"};
@@ -146,12 +152,14 @@ struct sim_configuration_constructor {
 		typename String, fwd_reference_to<vec> Vec,
 		fwd_reference_to<boundary_conditions_descriptor> Descriptor,
 		fwd_reference_to<std::optional<thermostat_parameters>> Thermostat,
-		fwd_reference_to<std::optional<membrane_simulation_parameters>> MembraneParams>
+		fwd_reference_to<std::optional<membrane_simulation_parameters>> MembraneParams,
+		fwd_reference_to<std::optional<statistics_parameters>> Stats>
 	static constexpr sim_configuration operator()(
 		double delta_t, double cutoff_radius, Descriptor&& conditions, Thermostat&& thermostat,
-		MembraneParams&& membrane_params, double end_time, sim_iteration_t write_frequency,
-		String&& base_name, Vec&& domain, bool create_checkpoint, std::optional<double> gravity,
-		std::string_view force_calc, std::optional<double> lower_radius
+		MembraneParams&& membrane_params, Stats&& stats, double end_time,
+		sim_iteration_t write_frequency, String&& base_name, Vec&& domain, bool create_checkpoint,
+		std::optional<double> gravity, std::string_view force_calc,
+		std::optional<double> lower_radius
 	) {
 		const decltype(sim_configuration::dimensions) dims = domain.z > cutoff_radius ? 3 : 2;
 		return sim_configuration{
@@ -160,6 +168,7 @@ struct sim_configuration_constructor {
 			std::forward<Descriptor>(conditions),
 			std::forward<Thermostat>(thermostat),
 			std::forward<MembraneParams>(membrane_params),
+			std::forward<Stats>(stats),
 			end_time,
 			write_frequency,
 			{std::from_range, std::forward<String>(base_name)},

@@ -142,6 +142,7 @@ constexpr void periodic_particle_interactions(
 		static_cast<signed_>(grid.x), static_cast<signed_>(grid.y), static_cast<signed_>(grid.z)
 	};
 
+	// TODO(tuna): is this used anywhere but to initialize current_virtual_idx?
 	const particle_container::signed_index signed_idx{
 		static_cast<signed_>(cell_idx.x), static_cast<signed_>(cell_idx.y),
 		static_cast<signed_>(cell_idx.z)
@@ -172,6 +173,7 @@ constexpr void periodic_particle_interactions(
 	handle_boundary.template operator()<z_max>();
 
 	// TODO(tuna): refactor into common batch prep routine
+#if 0
 	auto use_batch_piecewise = [&](particle_batch batch_p1, particle_batch batch_p2,
 	                               std::size_t up_to = batch_size) {
 		for (std::size_t i = 0; i < up_to; ++i) {
@@ -184,16 +186,18 @@ constexpr void periodic_particle_interactions(
 	auto use_batch = [&](particle_batch batch_p1, particle_batch batch_p2) {
 		force_calculator::batch(container.system(), config, batch_p1, batch_p2, particle_mirror);
 	};
-
+#endif
+	TRACE_PERIODIC("current={}, virtual={}, Boundary={}", cell_idx, current_virtual_idx, Boundary);
 	for (const auto& periodic_target : periodic_range(container, current_virtual_idx)) {
 		TRACE_PERIODIC(
-			"Calculating periodic interactions for {} at {} via virtual index: {}", cell_idx,
-			Boundary, current_virtual_idx
+			"Calculating periodic interactions for {} at {} via virtual index: {}, mirror={} => {}", cell_idx,
+			Boundary, current_virtual_idx, particle_mirror, periodic_target
 		);
 
 #if !SINGLETHREADED && !DETERMINISTIC
 #pragma omp parallel for schedule(dynamic)
 #endif
+#if 0
 		for (auto current_p : container[cell_idx]) {
 			std::size_t count = 0;
 			particle_batch batch_p1{};
@@ -210,6 +214,15 @@ constexpr void periodic_particle_interactions(
 				}
 			}
 			use_batch_piecewise(batch_p1, batch_p2, count);
+		}
+	}
+#endif
+		for (auto current_p : container[cell_idx]) {
+			for (auto periodic_p : container[periodic_target]) {
+				force_calculator::soa(
+					container.system(), config, current_p, periodic_p, particle_mirror
+				);
+			}
 		}
 	}
 }
@@ -256,27 +269,28 @@ constexpr void handle_boundary_condition(
 
 constexpr void handle_boundaries(particle_container& container, const sim_configuration& config) {
 	const auto& grid = container.grid_size();
+	const particle_container::index max_valid{grid.x - 1, grid.y - 1, grid.z - 1};
 	using enum boundary_type;
 
 	// TODO(gabriel):parallelis this (Attention corners need to be done atomically)
 	for (particle_container::size_type i = 0; i < grid.y; ++i) {
 		for (particle_container::size_type j = 0; j < grid.z; ++j) {
 			handle_boundary_condition<x_min>(container, config, {0, i, j});
-			handle_boundary_condition<x_max>(container, config, {grid.x - 1, i, j});
+			handle_boundary_condition<x_max>(container, config, {max_valid.x, i, j});
 		}
 	}
 
 	for (particle_container::size_type i = 0; i < grid.x; ++i) {
 		for (particle_container::size_type j = 0; j < grid.z; ++j) {
 			handle_boundary_condition<y_min>(container, config, {i, 0, j});
-			handle_boundary_condition<y_max>(container, config, {i, grid.y - 1, j});
+			handle_boundary_condition<y_max>(container, config, {i, max_valid.y, j});
 		}
 	}
 
 	for (particle_container::size_type i = 0; i < grid.x; ++i) {
 		for (particle_container::size_type j = 0; j < grid.y; ++j) {
 			handle_boundary_condition<z_min>(container, config, {i, j, 0});
-			handle_boundary_condition<z_max>(container, config, {i, j, grid.z - 1});
+			handle_boundary_condition<z_max>(container, config, {i, j, max_valid.z});
 		}
 	}
 
@@ -285,49 +299,61 @@ constexpr void handle_boundaries(particle_container& container, const sim_config
 	if (detail::is_periodic<x_min, y_min>(config)) {
 		for (particle_container::size_type i = 0; i < grid.z; ++i) {
 			periodic_particle_interactions<x_min | y_min>(container, config, {0, 0, i});
-			periodic_particle_interactions<x_min | y_max>(container, config, {0, grid.y, i});
-			periodic_particle_interactions<x_max | y_min>(container, config, {grid.x, 0, i});
-			periodic_particle_interactions<x_max | y_max>(container, config, {grid.x, grid.y, i});
+			periodic_particle_interactions<x_min | y_max>(container, config, {0, max_valid.y, i});
+			periodic_particle_interactions<x_max | y_min>(container, config, {max_valid.x, 0, i});
+			periodic_particle_interactions<x_max | y_max>(
+				container, config, {max_valid.x, max_valid.y, i}
+			);
 		}
 	}
 
 	if (detail::is_periodic<x_min, z_min>(config)) {
 		for (particle_container::size_type i = 0; i < grid.y; ++i) {
 			periodic_particle_interactions<x_min | z_min>(container, config, {0, i, 0});
-			periodic_particle_interactions<x_min | z_max>(container, config, {0, i, grid.z});
-			periodic_particle_interactions<x_max | z_min>(container, config, {grid.x, i, 0});
-			periodic_particle_interactions<x_max | z_max>(container, config, {grid.x, i, grid.z});
+			periodic_particle_interactions<x_min | z_max>(container, config, {0, i, max_valid.z});
+			periodic_particle_interactions<x_max | z_min>(container, config, {max_valid.x, i, 0});
+			periodic_particle_interactions<x_max | z_max>(
+				container, config, {max_valid.x, i, max_valid.z}
+			);
 		}
 	}
 
 	if (detail::is_periodic<y_min, z_min>(config)) {
-		for (particle_container::size_type i = 0; i < grid.y; ++i) {
+		for (particle_container::size_type i = 0; i < grid.x; ++i) {
 			periodic_particle_interactions<y_min | z_min>(container, config, {i, 0, 0});
-			periodic_particle_interactions<y_min | z_max>(container, config, {i, 0, grid.z});
-			periodic_particle_interactions<y_max | z_min>(container, config, {i, grid.y, 0});
-			periodic_particle_interactions<y_max | z_max>(container, config, {i, grid.y, grid.z});
+			periodic_particle_interactions<y_min | z_max>(container, config, {i, 0, max_valid.z});
+			periodic_particle_interactions<y_max | z_min>(container, config, {i, max_valid.y, 0});
+			periodic_particle_interactions<y_max | z_max>(
+				container, config, {i, max_valid.y, max_valid.z}
+			);
 		}
 	}
 
 	if (detail::is_periodic<x_min, y_min, z_min>(config)) {
 		periodic_particle_interactions<x_min | y_min | z_min>(container, config, {0, 0, 0});
 
-		periodic_particle_interactions<x_max | y_min | z_min>(container, config, {grid.x, 0, 0});
-		periodic_particle_interactions<x_min | y_max | z_min>(container, config, {0, grid.y, 0});
-		periodic_particle_interactions<x_min | y_min | z_max>(container, config, {0, 0, grid.z});
+		periodic_particle_interactions<x_max | y_min | z_min>(
+			container, config, {max_valid.x, 0, 0}
+		);
+		periodic_particle_interactions<x_min | y_max | z_min>(
+			container, config, {0, max_valid.y, 0}
+		);
+		periodic_particle_interactions<x_min | y_min | z_max>(
+			container, config, {0, 0, max_valid.z}
+		);
 
 		periodic_particle_interactions<x_max | y_max | z_min>(
-			container, config, {grid.x, grid.y, 0}
+			container, config, {max_valid.x, max_valid.y, 0}
 		);
 		periodic_particle_interactions<x_min | y_max | z_max>(
-			container, config, {0, grid.y, grid.z}
+			container, config, {0, max_valid.y, max_valid.z}
 		);
 		periodic_particle_interactions<x_max | y_min | z_max>(
-			container, config, {grid.x, 0, grid.z}
+			container, config, {max_valid.x, 0, max_valid.z}
 		);
 
 		periodic_particle_interactions<x_max | y_max | z_max>(
-			container, config, {grid.x, grid.y, grid.z}
+			container, config, {max_valid.x, max_valid.y, max_valid.z}
 		);
 	}
 }

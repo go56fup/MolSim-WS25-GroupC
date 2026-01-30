@@ -32,7 +32,7 @@ TEST(ThermostatTests, Cooling) {
 		container.add_cuboid<2>(
 			cuboid_parameters<2>{.origin{0, 0}, .scale{1, 1}}.extend_to_3d(domain),
 			{.meshwidth = 1.1225, .brownian_mean = brownian_mean}, {0, 0, 0},
-			{.mass = mass, .sigma = 1, .epsilon = 5}, seq
+			{.mass = mass, .sigma = 1, .epsilon = 5}, {}, seq
 		);
 
 		run_thermostat(container, therm, dims);
@@ -64,7 +64,7 @@ TEST(ThermostatTests, Heating) {
 		container.add_cuboid<2>(
 			cuboid_parameters<2>{.origin{0, 0}, .scale{1, 1}}.extend_to_3d(domain),
 			{.meshwidth = 1.1225, .brownian_mean = brownian_mean}, {},
-			{.mass = mass, .sigma = 1.0, .epsilon = 5.0}, seq
+			{.mass = mass, .sigma = 1.0, .epsilon = 5.0}, {}, seq
 		);
 
 		run_thermostat(container, therm, dims);
@@ -104,7 +104,7 @@ TEST(ThermostatTests, Holding) {
 		container.add_cuboid<3>(
 			{.origin{3, 3, 3}, .scale{1, 1, 1}},
 			{.meshwidth = 1.1225, .brownian_mean = brownian_mean}, {},
-			{.mass = 2.0, .sigma = 1.0, .epsilon = 5.0}, seq
+			{.mass = 2.0, .sigma = 1.0, .epsilon = 5.0}, {}, seq
 		);
 
 		static constexpr sim_iteration_t hold_temperature_over_n_iterations = 10;
